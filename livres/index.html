@@ -7,7 +7,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Danaïs">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="theme-color" content="#EE6A24">
+<meta name="theme-color" content="#C8501A">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="icon-180.png">
@@ -23,12 +23,12 @@
   --ink: #1A1A1A;
   --ink-soft: #5C5B57;
   --line: #D8D6CF;
-  --orange: #EE6A24;
+  --orange: #C8501A;
   --cerise: #D2335B;
-  --vert: #1F9A5B;
+  --vert: #16804A;
   --bleu: #2D5DA8;
   --violet: #7A4C93;
-  --gris: #8A8A86;
+  --gris: #6F6E69;
   --on-band: #FFFFFF;
   --font: "Gill Sans", "Gill Sans MT", "Cabin", "Trebuchet MS", sans-serif;
   color-scheme: light;
@@ -85,6 +85,10 @@ h2.page { font-size: 28px; margin: 24px 0 12px; font-weight: 700; }
 .cover .fake span { flex: 1; }
 .cover .fake b { flex: 2; background: #fff; color: #1A1A1A; font-size: 9px; line-height: 1.15; padding: 4px; display: flex; align-items: center; justify-content: center; text-align: center; overflow: hidden; font-weight: 700; }
 .sortable-ghost { opacity: .35; }
+/* Retour visuel immédiat quand on touche. */
+.cover, .choice, .btn, .tabs button, .row .info, .handle, .close, .swatch, .stars button { transition: opacity .12s ease-out, transform .12s ease-out; }
+.cover:active, .row .info:active, .tabs button:active, .handle:active, .close:active { opacity: .6; }
+.choice:active, .btn:active, .swatch:active, .stars button:active { transform: scale(.96); }
 .sortable-chosen { transform: scale(1.06); }
 
 /* Listes de lecture. */
@@ -105,7 +109,8 @@ h2.page { font-size: 28px; margin: 24px 0 12px; font-weight: 700; }
 .section-body { padding-top: 10px; }
 
 /* Recherche. */
-.search { display: flex; gap: 8px; margin-top: 8px; }
+.search { display: flex; gap: 8px; }
+.btn:disabled { opacity: .5; }
 .search input { flex: 1; min-width: 0; height: 52px; padding: 0 14px; border: 3px solid var(--ink); background: var(--band-center); border-radius: 0; font-size: 18px; }
 .btn { min-height: 48px; padding: 0 18px; border: 3px solid var(--ink); background: var(--ink); color: var(--ground); font-weight: 700; border-radius: 0; }
 .btn.ghost { background: transparent; color: var(--ink); }
@@ -132,6 +137,7 @@ h2.page { font-size: 28px; margin: 24px 0 12px; font-weight: 700; }
 .field-label { display: block; font-weight: 700; margin: 20px 0 8px; }
 .choices { display: flex; flex-wrap: wrap; gap: 8px; }
 .choice { min-height: 44px; padding: 0 14px; border: 3px solid var(--ink); background: var(--band-center); font-weight: 700; border-radius: 0; }
+.choice:disabled { opacity: .4; }
 .choice[aria-pressed="true"] { background: var(--ink); color: var(--ground); }
 .choice.tier-choice[aria-pressed="true"] { color: #fff; }
 .stars { display: flex; gap: 4px; }
@@ -159,7 +165,7 @@ textarea { min-height: 100px; resize: vertical; }
 .tier-edit { display: flex; align-items: center; gap: 8px; background: var(--band-center); padding: 8px; }
 .tier-edit input { flex: 1; min-width: 0; height: 44px; border: 2px solid var(--line); background: transparent; padding: 0 10px; border-radius: 0; }
 .swatches { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
-.swatch { width: 36px; height: 36px; border: 3px solid transparent; padding: 0; }
+.swatch { width: 44px; height: 44px; border: 3px solid transparent; padding: 0; }
 .swatch[aria-pressed="true"] { border-color: var(--ink); }
 .cover-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 10px; margin-top: 12px; }
 .cover.big { width: 100%; height: auto; aspect-ratio: 2 / 3; }
@@ -196,30 +202,37 @@ textarea { min-height: 100px; resize: vertical; }
 // ---------- Données (gardées dans ce téléphone) ----------
 
 const STORE_KEY = 'bibliotheque-danais-v1';
-const COLORS = ['#EE6A24', '#D2335B', '#1F9A5B', '#2D5DA8', '#7A4C93', '#8A8A86', '#C99A1A', '#1A1A1A'];
+const COLORS = ['#C8501A', '#D2335B', '#16804A', '#2D5DA8', '#7A4C93', '#6F6E69', '#8F6A0C', '#1A1A1A'];
 const LISTS = {
-  reading: { name: 'En cours de lecture', color: '#1F9A5B', empty: 'Aucun livre en cours. Choisis-en un dans ta pile !' },
+  reading: { name: 'En cours de lecture', color: '#16804A', empty: 'Aucun livre en cours. Choisis-en un dans ta pile !' },
   pile: { name: 'Dans ma pile', color: '#2D5DA8', empty: 'Ta pile est vide. Ajoute les livres que tu as et que tu vas lire.' },
   wish: { name: 'Mes envies', color: '#7A4C93', empty: 'Aucune envie pour l’instant. Ajoute les livres que tu aimerais lire.' },
 };
 
 function defaultState() {
   const tiers = [
-    { id: 't1', name: 'Coup de cœur', color: '#EE6A24' },
+    { id: 't1', name: 'Coup de cœur', color: '#C8501A' },
     { id: 't2', name: 'Adoré', color: '#D2335B' },
-    { id: 't3', name: 'Bien', color: '#1F9A5B' },
+    { id: 't3', name: 'Bien', color: '#16804A' },
     { id: 't4', name: 'Moyen', color: '#2D5DA8' },
-    { id: 't5', name: 'Pas aimé', color: '#8A8A86' },
+    { id: 't5', name: 'Pas aimé', color: '#6F6E69' },
   ];
   const order = { reading: [], pile: [], wish: [], unranked: [] };
   tiers.forEach((t) => (order['tier:' + t.id] = []));
   return { version: 1, tiers, books: {}, order };
 }
 
+// Anciennes couleurs (moins lisibles) remplacées par les nouvelles.
+const OLD_COLORS = { '#EE6A24': '#C8501A', '#1F9A5B': '#16804A', '#8A8A86': '#6F6E69', '#C99A1A': '#8F6A0C' };
+
 function load() {
   try {
     const raw = localStorage.getItem(STORE_KEY);
-    if (raw) return JSON.parse(raw);
+    if (raw) {
+      const data = JSON.parse(raw);
+      data.tiers.forEach((t) => (t.color = OLD_COLORS[t.color] || t.color));
+      return data;
+    }
   } catch (e) {}
   return defaultState();
 }
@@ -305,9 +318,9 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '
 function coverHtml(book, color) {
   const label = esc(book.title);
   if (book.cover) {
-    return `<img src="${esc(book.cover)}" alt="" loading="lazy" onerror="coverFailed(this)" onload="if (this.naturalWidth < 20) coverFailed(this)" data-title="${label}" data-color="${esc(color || '#EE6A24')}" data-cover-for="${esc(book.id || '')}">`;
+    return `<img src="${esc(book.cover)}" alt="" loading="lazy" onerror="coverFailed(this)" onload="if (this.naturalWidth < 20) coverFailed(this)" data-title="${label}" data-color="${esc(color || '#C8501A')}" data-cover-for="${esc(book.id || '')}">`;
   }
-  return `<div class="fake" aria-hidden="true"><span style="background:${esc(color || '#EE6A24')}"></span><b>${label}</b><span style="background:${esc(color || '#EE6A24')}"></span></div>`;
+  return `<div class="fake" aria-hidden="true"><span style="background:${esc(color || '#C8501A')}"></span><b>${label}</b><span style="background:${esc(color || '#C8501A')}"></span></div>`;
 }
 
 // L'image ne charge pas : mini couverture à bandes en attendant, et on cherche une vraie photo.
@@ -354,7 +367,7 @@ function toast(text) {
 }
 
 const starSvg = (on) =>
-  `<svg viewBox="0 0 24 24"><path d="M12 2.8l2.8 5.8 6.3.9-4.6 4.4 1.1 6.3L12 17.2 6.4 20.2l1.1-6.3L2.9 9.5l6.3-.9z" fill="${on ? '#EE6A24' : 'none'}" stroke="${on ? '#EE6A24' : 'currentColor'}" stroke-width="1.8" stroke-linejoin="round"/></svg>`;
+  `<svg viewBox="0 0 24 24"><path d="M12 2.8l2.8 5.8 6.3.9-4.6 4.4 1.1 6.3L12 17.2 6.4 20.2l1.1-6.3L2.9 9.5l6.3-.9z" fill="${on ? '#C8501A' : 'none'}" stroke="${on ? '#C8501A' : 'currentColor'}" stroke-width="1.8" stroke-linejoin="round"/></svg>`;
 
 const handleSvg = `<svg width="22" height="22" viewBox="0 0 22 22" fill="currentColor" aria-hidden="true"><rect x="3" y="5" width="16" height="2.4"/><rect x="3" y="10" width="16" height="2.4"/><rect x="3" y="15" width="16" height="2.4"/></svg>`;
 
@@ -389,7 +402,7 @@ function renderRanking() {
   const total = state.tiers.reduce((n, t) => n + (state.order['tier:' + t.id] || []).length, 0) + unranked.length;
   let html = `<h2 class="page">Mon classement</h2>`;
   html += total
-    ? `<p class="hint">Touche un livre pour sa fiche. Appuie longuement et glisse pour le changer de place.</p>`
+    ? `<p class="hint">Touche un livre pour sa fiche. Pour le déplacer, appuie longuement et glisse, ou utilise « Avancer / Reculer » dans sa fiche.</p>`
     : `<p class="hint">Les livres que tu as lus se rangent ici, du coup de cœur au pas aimé. Va dans « Ajouter » pour chercher ton premier livre.</p>`;
   if (unranked.length) html += tierBlock('unranked', 'À classer', '#1A1A1A');
   state.tiers.forEach((t) => (html += tierBlock('tier:' + t.id, t.name, t.color)));
@@ -426,7 +439,7 @@ function renderReading() {
 
 function rowHtml(b, key, i) {
   if (!b) return '';
-  const color = LISTS[key]?.color || '#EE6A24';
+  const color = LISTS[key]?.color || '#C8501A';
   let extra = '';
   if (key === 'reading' && b.pages) {
     const pct = Math.min(100, Math.round(((b.currentPage || 0) / b.pages) * 100));
@@ -442,9 +455,10 @@ function rowHtml(b, key, i) {
 
 function renderAdd() {
   let html = `<h2 class="page">Ajouter un livre</h2>
+    <label class="field-label" for="q" style="margin-top:4px">Titre ou auteur</label>
     <form class="search" id="search-form">
-      <input id="q" type="search" enterkeyhint="search" placeholder="Titre ou auteur…" value="${esc(ui.query)}" aria-label="Titre ou auteur" autocomplete="off">
-      <button class="btn" type="submit">Chercher</button>
+      <input id="q" type="search" enterkeyhint="search" placeholder="ex. Le Petit Prince" value="${esc(ui.query)}" autocomplete="off">
+      <button class="btn" type="submit" ${ui.searching ? 'disabled aria-busy="true"' : ''}>Chercher</button>
     </form>`;
   if (ui.searching) html += `<p class="status">Je cherche…</p>`;
   else if (ui.error) html += `<p class="status">${esc(ui.error)}</p>`;
@@ -453,7 +467,7 @@ function renderAdd() {
     html += `<div class="results">${ui.results
       .map(
         (r, i) => `<div class="row">
-        <button class="cover" data-result="${i}" aria-label="${esc(r.title)}">${coverHtml(r, '#EE6A24')}</button>
+        <button class="cover" data-result="${i}" aria-label="${esc(r.title)}">${coverHtml(r, '#C8501A')}</button>
         <button class="info" data-result="${i}"><span class="title">${esc(r.title)}</span><span class="author">${esc(r.authors)}${r.year ? ' · ' + esc(r.year) : ''}${r.pages ? ' · ' + r.pages + ' pages' : ''}</span></button>
       </div>`,
       )
@@ -755,8 +769,8 @@ function sheetHead(b, color) {
 // Choisir où ranger un livre trouvé.
 function openAddSheet(r) {
   const back = showSheet(
-    '#EE6A24',
-    `${sheetHead(r, '#EE6A24')}
+    '#C8501A',
+    `${sheetHead(r, '#C8501A')}
     <span class="field-label">Où le ranger ?</span>
     <div class="choices">
       <button class="choice" data-to="reading">Je le lis en ce moment</button>
@@ -779,7 +793,7 @@ function openAddSheet(r) {
 
 function openManualSheet() {
   const back = showSheet(
-    '#8A8A86',
+    '#6F6E69',
     `<div class="sheet-head"><div style="flex:1"><h3>Ajouter à la main</h3></div>${closeBtn}</div>
     <label class="field-label" for="m-title">Titre</label><input id="m-title" class="num" style="width:100%">
     <label class="field-label" for="m-author">Auteur (facultatif)</label><input id="m-author" class="num" style="width:100%">
@@ -813,6 +827,16 @@ function openSheet(id) {
     ${['reading', 'pile', 'wish'].map((k) => `<button class="choice" data-to="${k}" aria-pressed="${place === k}">${LISTS[k].name}</button>`).join('')}
     <button class="choice" data-to="read" aria-pressed="${!!isRead}">Lu</button>
   </div>`;
+
+  const siblings = state.order[place] || [];
+  if (siblings.length > 1 && place !== 'reading') {
+    const pos = siblings.indexOf(id);
+    inner += `<span class="field-label">Sa place ${place === 'pile' ? 'dans ma pile' : 'dans ce niveau'} : ${pos + 1} sur ${siblings.length}</span>
+      <div class="choices">
+        <button class="choice" data-shift="-1" ${pos === 0 ? 'disabled' : ''}>Avancer</button>
+        <button class="choice" data-shift="1" ${pos === siblings.length - 1 ? 'disabled' : ''}>Reculer</button>
+      </div>`;
+  }
 
   if (place === 'reading') {
     inner += `<label class="field-label" for="cur">Où j’en suis</label>
@@ -879,6 +903,17 @@ function openSheet(id) {
   let confirmRemove = false;
   back.addEventListener('click', (e) => {
     if (e.target.closest('[data-covers]')) return openCoverPicker(id);
+    const shift = e.target.closest('[data-shift]');
+    if (shift) {
+      const list = state.order[place];
+      const i = list.indexOf(id);
+      const j = i + Number(shift.dataset.shift);
+      if (j < 0 || j >= list.length) return;
+      [list[i], list[j]] = [list[j], list[i]];
+      save();
+      render();
+      return openSheet(id);
+    }
     const star = e.target.closest('[data-star]');
     if (star) {
       const n = Number(star.dataset.star);
@@ -918,7 +953,7 @@ function openSheet(id) {
 async function openCoverPicker(id) {
   const b = state.books[id];
   const back = showSheet(
-    '#EE6A24',
+    '#C8501A',
     `<div class="sheet-head"><div style="flex:1"><h3>Choisis la couverture</h3><p>${esc(b.title)}</p></div>${closeBtn}</div>
     <p class="status" id="cover-status">Je cherche les couvertures…</p>
     <div class="cover-grid" id="cover-grid"></div>
@@ -949,7 +984,7 @@ async function openCoverPicker(id) {
 
 function openTierEditor() {
   const back = showSheet(
-    '#EE6A24',
+    '#C8501A',
     `<div class="sheet-head"><div style="flex:1"><h3>Mes niveaux</h3><p>Renomme, change la couleur, ajoute ou retire un niveau.</p></div>${closeBtn}</div>
     <div class="list" style="margin-top:16px">${state.tiers
       .map(
