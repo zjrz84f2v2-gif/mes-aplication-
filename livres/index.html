@@ -294,6 +294,7 @@ function addBook(data, to) {
   };
   moveBook(id, to);
   if (!state.books[id].cover) repairCover(id);
+  if (!state.books[id].pages) fillPages(id);
   toast(`« ${data.title} » ajouté à ${placeName(to)}.`);
 }
 
@@ -591,24 +592,34 @@ async function search(q) {
   if (!q) return;
   ui.searching = true;
   ui.error = '';
+  ui.results = null;
   render();
-  try {
-    ui.results = await searchGoogle(q);
-    if (!ui.results.length) ui.results = await searchOpenLibrary(q);
-  } catch (e) {
-    try {
-      ui.results = await searchOpenLibrary(q);
-    } catch (e2) {
-      ui.results = null;
-      ui.error = 'La recherche ne marche pas : vérifie ta connexion internet, puis réessaie.';
-    }
+  const token = (ui.token = {});
+  // Deux catalogues en même temps : Apple Books (très complet en français) et Open Library.
+  const apple = searchApple(q).catch(() => null);
+  const ol = searchOpenLibrary(q).catch(() => null);
+  const first = await apple;
+  if (token !== ui.token) return;
+  if (first && first.length) {
+    ui.results = first;
+    ui.searching = false;
+    render();
   }
-  if (ui.results) ui.results.sort((a, b) => (b.cover ? 1 : 0) - (a.cover ? 1 : 0));
+  const more = await ol;
+  if (token !== ui.token) return;
+  if (!first && !more) {
+    ui.results = null;
+    ui.error = 'La recherche ne marche pas : vérifie ta connexion internet, puis réessaie.';
+  } else {
+    ui.results = mergeResults(first || [], more || []);
+    ui.results.sort((a, b) => (b.cover ? 1 : 0) - (a.cover ? 1 : 0));
+  }
   ui.searching = false;
   render();
   fillMissingCovers(ui.results);
 }
 
+// Résultats sans couverture : on en cherche une (les 8 premiers).
 async function fillMissingCovers(results) {
   for (const r of (results || []).filter((x) => !x.cover).slice(0, 8)) {
     const [first] = await coverCandidates(r.title, r.authors, r.isbn);
@@ -619,24 +630,57 @@ async function fillMissingCovers(results) {
   }
 }
 
-async function searchGoogle(q) {
-  const url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&maxResults=20&printType=books&langRestrict=fr`;
-  let data = await (await fetch(url)).json();
-  // Rien en français ? On cherche dans toutes les langues.
-  if (!data.items) data = await (await fetch(url.replace('&langRestrict=fr', ''))).json();
-  return (data.items || []).map((it) => {
-    const v = it.volumeInfo || {};
-    const img = v.imageLinks?.thumbnail || v.imageLinks?.smallThumbnail || '';
-    const ids = v.industryIdentifiers || [];
-    const isbn = (ids.find((x) => x.type === 'ISBN_13') || ids.find((x) => x.type === 'ISBN_10'))?.identifier || '';
+// « La Femme de ménage » et « la femme de menage » sont le même livre.
+const norm = (t) =>
+  String(t || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+
+function mergeResults(a, b) {
+  const seen = new Set(a.map((r) => norm(r.title) + '|' + norm(r.authors.split(',')[0])));
+  return [...a, ...b.filter((r) => !seen.has(norm(r.title) + '|' + norm(r.authors.split(',')[0])))];
+}
+
+// Apple Books répond en « JSONP » : on charge la réponse comme un petit script.
+let jsonpCount = 0;
+function jsonp(url, timeout = 9000) {
+  return new Promise((resolve, reject) => {
+    const name = 'cbLivres' + ++jsonpCount;
+    const script = document.createElement('script');
+    const done = (fn, arg) => {
+      clearTimeout(timer);
+      delete window[name];
+      script.remove();
+      fn(arg);
+    };
+    const timer = setTimeout(() => done(reject, new Error('délai dépassé')), timeout);
+    window[name] = (data) => done(resolve, data);
+    script.onerror = () => done(reject, new Error('réseau'));
+    script.src = url + (url.includes('?') ? '&' : '?') + 'callback=' + name;
+    document.head.appendChild(script);
+  });
+}
+
+async function searchApple(q, limit = 25) {
+  const data = await jsonp(
+    `https://itunes.apple.com/search?term=${encodeURIComponent(q)}&media=ebook&entity=ebook&country=fr&lang=fr_fr&limit=${limit}`,
+  );
+  return (data.results || []).map((r) => {
+    const art = r.artworkUrl100 || '';
     return {
-      googleId: it.id,
-      title: v.title + (v.subtitle ? ' : ' + v.subtitle : ''),
-      authors: (v.authors || []).join(', '),
-      pages: v.pageCount || 0,
-      year: (v.publishedDate || '').slice(0, 4),
-      isbn,
-      cover: img ? img.replace('http://', 'https://').replace('&edge=curl', '') : isbnCover(isbn),
+      googleId: 'ap:' + r.trackId,
+      // « (Enhanced Edition) » et autres mentions de version numérique retirées.
+      title: (r.trackName || '').replace(/\s*\((enhanced|french|édition|edition)[^)]*\)\s*$/i, ''),
+      authors: r.artistName || '',
+      pages: 0,
+      year: (r.releaseDate || '').slice(0, 4),
+      // Le numéro ISBN est souvent dans le nom de l'image : il sert à trouver le nombre de pages.
+      isbn: (art.match(/97[89]\d{10}/) || [''])[0],
+      // Couverture en bonne taille (l'adresse accepte la taille voulue).
+      cover: art.replace('100x100bb', '400x600bb'),
     };
   });
 }
@@ -676,6 +720,14 @@ async function coverCandidates(title, authors, isbn) {
   const found = [];
   const add = (url) => url && !found.includes(url) && found.push(url);
   const author = (authors || '').split(',')[0].trim();
+  // Apple Books : les couvertures des éditions dont le titre correspond.
+  try {
+    const t = norm(title);
+    const apple = await searchApple(`${title} ${author}`.trim(), 15);
+    apple
+      .filter((r) => norm(r.title).includes(t) || t.includes(norm(r.title)))
+      .forEach((r) => add(r.cover));
+  } catch (e) {}
   if (isbn) {
     add(isbnCover(isbn));
     const isbn10 = toIsbn10(isbn);
@@ -686,14 +738,6 @@ async function coverCandidates(title, authors, isbn) {
       await fetch(`https://openlibrary.org/search.json?title=${encodeURIComponent(title)}${author ? '&author=' + encodeURIComponent(author) : ''}&limit=30&fields=cover_i`)
     ).json();
     (ol.docs || []).forEach((d) => d.cover_i && add(olCover(d.cover_i)));
-  } catch (e) {}
-  try {
-    const q = `intitle:${title}${author ? ' inauthor:' + author : ''}`;
-    const g = await (await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&maxResults=20&printType=books`)).json();
-    (g.items || []).forEach((it) => {
-      const img = it.volumeInfo?.imageLinks?.thumbnail;
-      if (img) add(img.replace('http://', 'https://').replace('&edge=curl', ''));
-    });
   } catch (e) {}
   return found;
 }
@@ -716,6 +760,24 @@ async function repairCover(id) {
     save();
     render();
   }
+}
+
+async function fillPages(id) {
+  const b = state.books[id];
+  if (!b) return;
+  const author = (b.authors || '').split(',')[0].trim();
+  const url = b.isbn
+    ? `https://openlibrary.org/search.json?isbn=${encodeURIComponent(b.isbn)}&fields=number_of_pages_median`
+    : `https://openlibrary.org/search.json?title=${encodeURIComponent(b.title)}${author ? '&author=' + encodeURIComponent(author) : ''}&limit=1&fields=number_of_pages_median`;
+  try {
+    const data = await (await fetch(url)).json();
+    const pages = data.docs?.[0]?.number_of_pages_median;
+    if (pages && state.books[id] && !state.books[id].pages) {
+      state.books[id].pages = pages;
+      save();
+      render();
+    }
+  } catch (e) {}
 }
 
 // Une photo prise avec le téléphone, réduite pour ne pas remplir la mémoire.
