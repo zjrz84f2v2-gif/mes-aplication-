@@ -27,6 +27,8 @@ function jsonp(url) {
       lignes.push('RESULTAT ' + t + ' => avec referer 400x600: ' + a + ' | sans referer 400x600: ' + b + ' | sans referer 600x600: ' + c + ' | avec referer 100x100: ' + d2);
     } catch (e) { lignes.push('RESULTAT ' + t + ' => ERREUR ' + e.message); }
   }
+  const ctrl = (url) => new Promise((ok) => { const i = new Image(); i.onload = () => ok(i.naturalWidth + 'x' + i.naturalHeight); i.onerror = () => ok('ÉCHEC'); i.src = url; });
+  lignes.push('TEMOIN icone du site: ' + (await ctrl('icon-512.png')) + ' | Open Library: ' + (await ctrl('https://covers.openlibrary.org/b/id/10708272-M.jpg')));
   document.getElementById('out').innerHTML = lignes.map((l) => '<p>' + l + '</p>').join('');
 })();
 </script>
