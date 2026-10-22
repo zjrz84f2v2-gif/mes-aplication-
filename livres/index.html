@@ -6,191 +6,226 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Danaïs">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="theme-color" content="#C8501A">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#060A16">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="icon-180.png">
 <title>La bibliothèque de Danaïs</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cabin:wght@400;600;700&display=swap">
 <style>
-/* Couvertures à bandes : chaque niveau est une bande de couleur franche. */
+/* Style « console de jeu » : fond nuit profond, couvertures en grand, rangées qui défilent,
+   bleu vif pour les actions, coins arrondis, barre du bas translucide. */
 :root {
-  --ground: #F0EFEA;
-  --band-center: #FFFFFF;
-  --ink: #1A1A1A;
-  --ink-soft: #5C5B57;
-  --line: #D8D6CF;
-  --orange: #C8501A;
-  --cerise: #D2335B;
-  --vert: #16804A;
-  --bleu: #2D5DA8;
-  --violet: #7A4C93;
-  --gris: #6F6E69;
-  --on-band: #FFFFFF;
-  --font: "Gill Sans", "Gill Sans MT", "Cabin", "Trebuchet MS", sans-serif;
-  color-scheme: light;
-}
-@media (prefers-color-scheme: dark) {
-  :root {
-    --ground: #151515;
-    --band-center: #222222;
-    --ink: #F1F0EC;
-    --ink-soft: #A9A7A0;
-    --line: #34332F;
-    color-scheme: dark;
-  }
+  --bg: #060A16;
+  --surface: #0E1427;
+  --surface-2: #172039;
+  --surface-3: #212C4A;
+  --text: #FFFFFF;
+  --text-2: #A9B3C9;
+  --text-3: #7C87A1;
+  --line: rgba(255, 255, 255, .09);
+  --blue: #1F6FEB;
+  --blue-text: #6EA8FF;
+  --gold: #E8B84A;
+  --danger: #FF6B81;
+  --radius: 16px;
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+  color-scheme: dark;
 }
 * { box-sizing: border-box; }
-html, body { margin: 0; height: 100%; }
+html, body { margin: 0; min-height: 100%; }
 body {
-  background: var(--ground);
-  color: var(--ink);
+  background: var(--bg);
+  color: var(--text);
   font: 17px/1.4 var(--font);
   -webkit-tap-highlight-color: transparent;
   -webkit-text-size-adjust: 100%;
+  -webkit-font-smoothing: antialiased;
 }
-::selection { background: var(--orange); color: #fff; }
+::selection { background: var(--blue); color: #fff; }
 button, input, textarea, select { font: inherit; color: inherit; }
 button { cursor: pointer; }
-:focus-visible { outline: 3px solid var(--bleu); outline-offset: 2px; }
+:focus-visible { outline: 3px solid var(--blue-text); outline-offset: 2px; border-radius: 8px; }
 
-#app { min-height: 100%; padding-bottom: calc(76px + env(safe-area-inset-bottom)); }
-.wrap { padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right)); }
+#app { min-height: 100vh; padding-top: env(safe-area-inset-top); padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
+.wrap { padding-left: max(18px, env(safe-area-inset-left)); padding-right: max(18px, env(safe-area-inset-right)); }
 
-/* En-tête : une couverture à trois bandes. */
-.cover-head { padding-top: env(safe-area-inset-top); background: var(--orange); }
-.cover-head .top, .cover-head .bottom { height: 44px; display: flex; align-items: center; justify-content: center; color: var(--on-band); letter-spacing: .18em; text-transform: uppercase; font-size: 13px; font-weight: 600; }
-.cover-head .middle { background: var(--band-center); text-align: center; padding: 14px 16px 16px; border-top: 3px solid var(--band-center); }
-.cover-head .middle .over { font-size: 15px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); }
-.cover-head .middle h1 { margin: 2px 0 0; font-size: 44px; line-height: 1; font-weight: 700; letter-spacing: -.01em; }
-.cover-head .bottom { height: 14px; }
-.cover-head.small .top { height: 40px; }
+/* En-tête de profil (avatar, niveau, trophées). */
+.profile { display: flex; align-items: center; gap: 14px; padding-top: 18px; }
+.avatar { width: 58px; height: 58px; border-radius: 50%; background: var(--blue); display: flex; align-items: center; justify-content: center; font-size: 26px; font-weight: 800; flex: 0 0 auto; box-shadow: 0 0 0 3px var(--bg), 0 0 0 5px var(--blue); }
+.profile h1 { margin: 0; font-size: 26px; line-height: 1.1; font-weight: 800; letter-spacing: -.01em; }
+.profile .level { color: var(--text-2); font-size: 15px; margin-top: 2px; }
+.profile .level b { color: var(--blue-text); }
+.level-bar { height: 6px; border-radius: 3px; background: var(--surface-3); margin-top: 8px; overflow: hidden; }
+.level-bar i { display: block; height: 100%; background: var(--blue-text); border-radius: 3px; }
+.trophies { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; margin: 16px -18px 0; padding: 0 18px 2px; }
+.trophies::-webkit-scrollbar, .rail::-webkit-scrollbar { display: none; }
+.trophy-chip { flex: 0 0 auto; display: flex; align-items: center; gap: 6px; background: var(--surface); border: 1px solid var(--line); padding: 7px 12px 7px 9px; border-radius: 999px; font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.trophy-chip svg { width: 18px; height: 18px; }
+.trophy-chip span { color: var(--text-2); font-weight: 600; }
 
-h2.page { font-size: 28px; margin: 24px 0 12px; font-weight: 700; }
-.hint { color: var(--ink-soft); font-size: 15px; margin: 8px 0 0; }
+h2.page { font-size: 30px; margin: 22px 0 6px; font-weight: 800; letter-spacing: -.015em; }
+.section-head { display: flex; align-items: baseline; justify-content: space-between; margin: 30px 0 12px; }
+.section-head h3 { margin: 0; font-size: 21px; font-weight: 800; letter-spacing: -.01em; }
+.section-head h3 small { color: var(--text-3); font-size: 15px; font-weight: 600; margin-left: 6px; }
+.see-all { background: none; border: 0; color: var(--blue-text); font-weight: 700; font-size: 15px; min-height: 44px; padding: 0 2px; }
+.hint { color: var(--text-2); font-size: 15px; margin: 6px 0 0; }
+.empty { color: var(--text-2); font-size: 15px; background: var(--surface); border: 1px dashed var(--surface-3); border-radius: var(--radius); padding: 18px; }
 
-/* Bandes de niveaux. */
-.tier { margin-top: 14px; }
-.tier-name { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; color: var(--on-band); text-transform: uppercase; letter-spacing: .14em; font-size: 14px; font-weight: 700; }
-.tier-name .count { letter-spacing: 0; font-weight: 600; opacity: .9; }
-.tier-books { min-height: 108px; display: flex; flex-wrap: wrap; gap: 8px; padding: 10px; background: var(--band-center); border: 3px solid; border-top: 0; }
-.tier-books:empty::after { content: "Glisse un livre ici"; color: var(--ink-soft); font-size: 15px; align-self: center; margin: 0 auto; }
-
-.cover { width: 62px; height: 92px; flex: 0 0 auto; position: relative; background: var(--line); border: 0; padding: 0; overflow: hidden; touch-action: manipulation; }
+/* Couvertures. */
+.cover { width: 62px; height: 93px; flex: 0 0 auto; position: relative; background: var(--surface-2); border: 0; padding: 0; overflow: hidden; border-radius: 8px; touch-action: manipulation; box-shadow: 0 6px 18px rgba(0, 0, 0, .45); }
 .cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.cover .fake { position: absolute; inset: 0; display: flex; flex-direction: column; }
-.cover .fake span { flex: 1; }
-.cover .fake b { flex: 2; background: #fff; color: #1A1A1A; font-size: 9px; line-height: 1.15; padding: 4px; display: flex; align-items: center; justify-content: center; text-align: center; overflow: hidden; font-weight: 700; }
+.cover .fake { position: absolute; inset: 0; display: flex; flex-direction: column; background: var(--surface-2); }
+.cover .fake span { height: 18%; flex: 0 0 auto; }
+.cover .fake b { flex: 1; color: var(--text); font-size: 10px; line-height: 1.2; padding: 6px; display: flex; align-items: center; justify-content: center; text-align: center; overflow: hidden; font-weight: 700; }
+
+/* Carte « en cours » : la couverture floutée en fond, comme une affiche de jeu. */
+.rail { display: flex; gap: 12px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; margin: 0 -18px; padding: 0 18px 6px; }
+.hero { position: relative; flex: 0 0 100%; scroll-snap-align: center; border-radius: 22px; overflow: hidden; background: var(--surface); min-height: 214px; border: 0; padding: 0; text-align: left; }
+.rail .hero { flex-basis: calc(100% - 26px); }
+.rail .hero:only-child { flex-basis: 100%; }
+.hero-bg { position: absolute; inset: -40px; background-size: cover; background-position: center; filter: blur(34px) saturate(1.5); opacity: .85; transform: scale(1.1); }
+.hero::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(6, 10, 22, .15) 0%, rgba(6, 10, 22, .82) 70%); }
+.hero-body { position: relative; z-index: 1; display: flex; gap: 16px; padding: 18px; align-items: flex-end; min-height: 214px; }
+.hero .cover { width: 106px; height: 159px; border-radius: 10px; box-shadow: 0 14px 30px rgba(0, 0, 0, .55); }
+.hero-info { flex: 1; min-width: 0; }
+.hero-kind { font-size: 13px; font-weight: 700; color: var(--text-2); }
+.hero-title { font-size: 21px; font-weight: 800; line-height: 1.15; margin-top: 4px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.hero-author { color: var(--text-2); font-size: 15px; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.progress { height: 6px; border-radius: 3px; background: rgba(255, 255, 255, .18); margin-top: 12px; overflow: hidden; }
+.progress i { display: block; height: 100%; background: var(--blue-text); border-radius: 3px; }
+.progress-label { display: block; font-size: 13px; color: var(--text-2); margin-top: 6px; font-variant-numeric: tabular-nums; font-weight: 600; }
+
+/* Rangées de vignettes. */
+.tiles { display: flex; align-items: flex-start; gap: 12px; overflow-x: auto; scrollbar-width: none; margin: 0 -18px; padding: 0 18px 8px; }
+.tiles::-webkit-scrollbar { display: none; }
+.tile { flex: 0 0 auto; width: 112px; background: none; border: 0; padding: 0; text-align: left; display: flex; flex-direction: column; }
+.tile .cover { display: block; width: 112px; height: 168px; border-radius: 12px; }
+.tile .t { display: block; font-size: 14px; font-weight: 700; margin-top: 8px; line-height: 1.25; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.tile .a { display: block; font-size: 13px; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+.rank-badge { position: absolute; top: 6px; left: 6px; z-index: 1; min-width: 26px; height: 26px; border-radius: 13px; background: rgba(6, 10, 22, .8); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); color: #fff; font-size: 14px; font-weight: 800; display: flex; align-items: center; justify-content: center; padding: 0 7px; font-variant-numeric: tabular-nums; }
+
+/* Classement par niveaux. */
+.tier { margin-top: 14px; background: var(--surface); border-radius: 20px; padding: 14px; border: 1px solid var(--line); }
+.tier-name { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 17px; }
+.tier-name .badge { width: 34px; height: 34px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex: 0 0 auto; }
+.tier-name .badge svg { width: 20px; height: 20px; }
+.tier-name .count { margin-left: auto; color: var(--text-3); font-weight: 700; font-variant-numeric: tabular-nums; font-size: 15px; }
+.tier-books { min-height: 96px; display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+.tier-books:empty::after { content: "Glisse un livre ici"; color: var(--text-3); font-size: 15px; align-self: center; margin: 0 auto; }
+.tier-books .cover { width: 72px; height: 108px; }
 .sortable-ghost { opacity: .35; }
-/* Retour visuel immédiat quand on touche. */
-.cover, .choice, .btn, .tabs button, .row .info, .handle, .close, .swatch, .stars button { transition: opacity .12s ease-out, transform .12s ease-out; }
-.cover:active, .row .info:active, .tabs button:active, .handle:active, .close:active { opacity: .6; }
-.choice:active, .btn:active, .swatch:active, .stars button:active { transform: scale(.96); }
 .sortable-chosen { transform: scale(1.06); }
 
-/* Listes de lecture. */
-.list { display: flex; flex-direction: column; gap: 8px; min-height: 56px; }
-.list:empty::after { content: attr(data-empty); color: var(--ink-soft); font-size: 15px; padding: 14px; border: 2px dashed var(--line); }
-.row { display: flex; align-items: center; gap: 12px; background: var(--band-center); padding: 8px; }
-.row .cover { width: 48px; height: 72px; }
+/* Listes (vue « Tout voir »). */
+.back { display: inline-flex; align-items: center; gap: 4px; background: none; border: 0; color: var(--blue-text); font-weight: 700; min-height: 44px; padding: 0; margin-top: 10px; }
+.list { display: flex; flex-direction: column; gap: 10px; min-height: 56px; margin-top: 12px; }
+.list:empty::after { content: attr(data-empty); color: var(--text-2); font-size: 15px; padding: 18px; border: 1px dashed var(--surface-3); border-radius: var(--radius); }
+.row { display: flex; align-items: center; gap: 12px; background: var(--surface); padding: 10px; border-radius: var(--radius); border: 1px solid var(--line); }
+.row .cover { width: 50px; height: 75px; box-shadow: none; }
 .row .info { flex: 1; min-width: 0; text-align: left; background: none; border: 0; padding: 4px 0; }
-.row .title { font-weight: 700; display: block; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-.row .author { color: var(--ink-soft); font-size: 15px; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.row .rank { width: 30px; text-align: center; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--ink-soft); }
-.handle { width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; background: none; border: 0; color: var(--ink-soft); touch-action: none; }
-.progress { height: 8px; background: var(--line); margin-top: 6px; }
-.progress i { display: block; height: 100%; background: var(--vert); }
-.progress-label { font-size: 14px; color: var(--ink-soft); margin-top: 4px; font-variant-numeric: tabular-nums; }
-
-.section-band { margin-top: 26px; color: var(--on-band); padding: 10px 14px; text-transform: uppercase; letter-spacing: .14em; font-weight: 700; font-size: 14px; display: flex; justify-content: space-between; }
-.section-body { padding-top: 10px; }
+.row .title { font-weight: 700; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.row .author { color: var(--text-2); font-size: 15px; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row .rank { width: 28px; text-align: center; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--text-3); }
+.handle { width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; background: none; border: 0; color: var(--text-3); touch-action: none; border-radius: 12px; }
 
 /* Recherche. */
-.search { display: flex; gap: 8px; }
-.btn:disabled { opacity: .5; }
-.search input { flex: 1; min-width: 0; height: 52px; padding: 0 14px; border: 3px solid var(--ink); background: var(--band-center); border-radius: 0; font-size: 18px; }
-.btn { min-height: 48px; padding: 0 18px; border: 3px solid var(--ink); background: var(--ink); color: var(--ground); font-weight: 700; border-radius: 0; }
-.btn.ghost { background: transparent; color: var(--ink); }
-.btn.danger { background: transparent; color: var(--cerise); border-color: var(--cerise); }
-.btn.full { width: 100%; }
-.results { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
-.status { color: var(--ink-soft); padding: 12px 0; }
+.search { display: flex; gap: 10px; margin-top: 14px; }
+.search-field { flex: 1; min-width: 0; position: relative; }
+.search-field svg { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); width: 20px; height: 20px; color: var(--text-3); pointer-events: none; }
+.search input { width: 100%; height: 52px; padding: 0 14px 0 44px; border: 1px solid var(--line); background: var(--surface-2); border-radius: 14px; font-size: 17px; }
+.search input::placeholder { color: var(--text-3); }
+.results { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
+.status { color: var(--text-2); padding: 14px 0; }
+.field-label { display: block; font-weight: 700; margin: 22px 0 10px; font-size: 16px; }
 
-/* Barre d'onglets. */
-.tabs { position: fixed; left: 0; right: 0; bottom: 0; display: flex; background: var(--band-center); border-top: 3px solid var(--ink); padding-bottom: env(safe-area-inset-bottom); padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); z-index: 10; }
-.tabs button { flex: 1; min-height: 60px; background: none; border: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; font-size: 12px; font-weight: 600; color: var(--ink-soft); }
-.tabs button[aria-selected="true"] { color: var(--orange); }
-.tabs svg { width: 26px; height: 26px; }
+/* Boutons. */
+.btn { min-height: 50px; padding: 0 22px; border: 0; background: var(--blue); color: #fff; font-weight: 700; border-radius: 999px; }
+.btn.ghost { background: var(--surface-2); color: var(--text); }
+.btn.danger { background: transparent; color: var(--danger); border: 1.5px solid rgba(255, 107, 129, .5); }
+.btn.full { width: 100%; }
+.btn:disabled { opacity: .5; }
+
+/* Barre d'onglets translucide. */
+.tabs { position: fixed; left: 12px; right: 12px; bottom: calc(10px + env(safe-area-inset-bottom)); display: flex; background: rgba(23, 32, 57, .72); backdrop-filter: blur(22px) saturate(170%); -webkit-backdrop-filter: blur(22px) saturate(170%); border: 1px solid rgba(255, 255, 255, .1); border-radius: 26px; padding: 6px; z-index: 10; box-shadow: 0 12px 30px rgba(0, 0, 0, .45); }
+.tabs button { flex: 1; min-height: 58px; background: none; border: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; font-size: 11px; font-weight: 700; color: var(--text-3); border-radius: 20px; }
+.tabs button[aria-selected="true"] { color: #fff; background: rgba(255, 255, 255, .1); }
+.tabs button[aria-selected="true"] svg { color: var(--blue-text); }
+.tabs svg { width: 24px; height: 24px; }
 
 /* Fiche d'un livre (feuille qui monte du bas). */
-.sheet-back { position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 20; display: flex; align-items: flex-end; }
-.sheet { background: var(--ground); width: 100%; max-height: 92%; overflow-y: auto; padding-bottom: calc(24px + env(safe-area-inset-bottom)); }
-.sheet .band { height: 14px; }
-.sheet-head { display: flex; gap: 14px; padding-top: 16px; align-items: flex-start; }
-.sheet-head .cover { width: 84px; height: 126px; }
-.sheet-head h3 { margin: 0; font-size: 22px; line-height: 1.2; }
-.sheet-head p { margin: 4px 0 0; color: var(--ink-soft); }
-.close { margin-left: auto; width: 44px; height: 44px; border: 0; background: none; color: var(--ink); flex: 0 0 auto; }
-.field-label { display: block; font-weight: 700; margin: 20px 0 8px; }
+.sheet-back { position: fixed; inset: 0; background: rgba(0, 0, 0, .6); z-index: 20; display: flex; align-items: flex-end; }
+.sheet { background: var(--surface); width: 100%; max-height: 92%; overflow-y: auto; border-radius: 26px 26px 0 0; padding-bottom: calc(26px + env(safe-area-inset-bottom)); position: relative; }
+.sheet .band { width: 40px; height: 5px; border-radius: 3px; background: var(--surface-3); margin: 10px auto 0; }
+.sheet-head { display: flex; gap: 16px; padding-top: 16px; align-items: flex-start; }
+.sheet-head .cover { width: 92px; height: 138px; border-radius: 10px; }
+.sheet-head h3 { margin: 0; font-size: 22px; line-height: 1.2; font-weight: 800; }
+.sheet-head p { margin: 4px 0 0; color: var(--text-2); font-size: 15px; }
+.close { margin-left: auto; width: 40px; height: 40px; border: 0; background: var(--surface-2); color: var(--text); flex: 0 0 auto; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+.close svg { width: 16px; height: 16px; }
 .choices { display: flex; flex-wrap: wrap; gap: 8px; }
-.choice { min-height: 44px; padding: 0 14px; border: 3px solid var(--ink); background: var(--band-center); font-weight: 700; border-radius: 0; }
+.choice { min-height: 44px; padding: 0 16px; border: 1.5px solid var(--surface-3); background: var(--surface-2); font-weight: 700; border-radius: 999px; }
 .choice:disabled { opacity: .4; }
-.choice[aria-pressed="true"] { background: var(--ink); color: var(--ground); }
-.choice.tier-choice[aria-pressed="true"] { color: #fff; }
+.choice[aria-pressed="true"] { background: var(--blue); border-color: var(--blue); color: #fff; }
+.choice.tier-choice[aria-pressed="true"] { color: var(--bg); }
 .stars { display: flex; gap: 4px; }
 .stars button { width: 48px; height: 48px; background: none; border: 0; padding: 0; }
-.stars svg { width: 36px; height: 36px; }
-textarea, .num { width: 100%; border: 3px solid var(--ink); background: var(--band-center); padding: 12px; border-radius: 0; font-size: 17px; }
+.stars svg { width: 34px; height: 34px; }
+textarea, .num { width: 100%; border: 1px solid var(--line); background: var(--surface-2); padding: 12px 14px; border-radius: 14px; font-size: 17px; }
 textarea { min-height: 100px; resize: vertical; }
 .num { width: 110px; height: 48px; font-variant-numeric: tabular-nums; }
 .pages-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .actions { display: flex; flex-direction: column; gap: 10px; margin-top: 26px; }
 
 /* Statistiques. */
-.stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
-.stat { background: var(--band-center); padding: 14px; }
-.stat strong { display: block; font-size: 34px; line-height: 1.1; font-variant-numeric: tabular-nums; }
-.stat span { color: var(--ink-soft); font-size: 15px; }
-.bars { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
-.bar { display: grid; grid-template-columns: 118px 1fr 30px; align-items: center; gap: 8px; font-size: 15px; }
-.bar .track { height: 22px; background: var(--band-center); }
-.bar .fill { height: 100%; }
-.bar .n { text-align: right; font-variant-numeric: tabular-nums; font-weight: 700; }
-.bar .lbl { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+.stat { background: var(--surface); padding: 16px; border-radius: 18px; border: 1px solid var(--line); }
+.stat strong { display: block; font-size: 34px; line-height: 1.05; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+.stat span { color: var(--text-2); font-size: 14px; font-weight: 600; }
+.stat.big { grid-column: 1 / -1; display: flex; align-items: center; gap: 16px; }
+.stat.big svg { width: 44px; height: 44px; flex: 0 0 auto; }
+.bars { display: flex; flex-direction: column; gap: 10px; margin-top: 4px; background: var(--surface); border-radius: 18px; padding: 16px; border: 1px solid var(--line); }
+.bar { display: grid; grid-template-columns: 112px 1fr 30px; align-items: center; gap: 10px; font-size: 15px; }
+.bar .track { height: 10px; background: var(--surface-3); border-radius: 5px; overflow: hidden; }
+.bar .fill { height: 100%; border-radius: 5px; }
+.bar .n { text-align: right; font-variant-numeric: tabular-nums; font-weight: 800; }
+.bar .lbl { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
 
 /* Réglages des niveaux. */
-.tier-edit { display: flex; align-items: center; gap: 8px; background: var(--band-center); padding: 8px; }
-.tier-edit input { flex: 1; min-width: 0; height: 44px; border: 2px solid var(--line); background: transparent; padding: 0 10px; border-radius: 0; }
-.swatches { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
-.swatch { width: 44px; height: 44px; border: 3px solid transparent; padding: 0; }
-.swatch[aria-pressed="true"] { border-color: var(--ink); }
-.cover-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 10px; margin-top: 12px; }
+.tier-edit { display: flex; align-items: center; gap: 8px; background: var(--surface-2); padding: 8px 8px 8px 12px; border-radius: 14px; }
+.tier-edit input { flex: 1; min-width: 0; height: 44px; border: 1px solid var(--line); background: var(--surface); padding: 0 12px; border-radius: 10px; }
+.swatches { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.swatch { width: 44px; height: 44px; border: 3px solid transparent; padding: 0; border-radius: 50%; }
+.swatch[aria-pressed="true"] { border-color: #fff; }
+.cover-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 12px; margin-top: 12px; }
 .cover.big { width: 100%; height: auto; aspect-ratio: 2 / 3; }
 .photo-choice { display: inline-flex; align-items: center; cursor: pointer; }
-.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(86px + env(safe-area-inset-bottom)); background: var(--ink); color: var(--ground); padding: 12px 18px; font-weight: 600; z-index: 30; max-width: calc(100% - 32px); text-align: center; }
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(100px + env(safe-area-inset-bottom)); background: #fff; color: var(--bg); padding: 12px 18px; font-weight: 700; z-index: 30; max-width: calc(100% - 32px); text-align: center; border-radius: 999px; box-shadow: 0 10px 30px rgba(0, 0, 0, .5); }
+
+/* Retour visuel immédiat quand on touche. */
+.cover, .choice, .btn, .tabs button, .row .info, .handle, .close, .swatch, .stars button, .tile, .hero, .see-all, .back { transition: opacity .12s ease-out, transform .14s ease-out, background-color .14s ease-out; }
+.cover:active, .row .info:active, .handle:active, .close:active, .see-all:active, .back:active { opacity: .6; }
+.choice:active, .btn:active, .swatch:active, .stars button:active, .tile:active, .hero:active, .tabs button:active { transform: scale(.96); }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
 </style>
 </head>
 <body>
 <div id="app"></div>
 <nav class="tabs" role="tablist" aria-label="Sections">
-  <button role="tab" data-tab="classement" aria-selected="true">
-    <svg viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="2.4"><rect x="3" y="4" width="20" height="5"/><rect x="3" y="11" width="20" height="5"/><rect x="3" y="18" width="20" height="5"/></svg>
+  <button role="tab" data-tab="accueil" aria-selected="true">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="M3 10.5L12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>
+    Accueil
+  </button>
+  <button role="tab" data-tab="classement" aria-selected="false">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="M7 3h10v5a5 5 0 0 1-10 0z"/><path d="M7 5H4v2a3 3 0 0 0 3 3M17 5h3v2a3 3 0 0 1-3 3M12 13v4M8 21h8M9 17h6v4H9z"/></svg>
     Classement
   </button>
-  <button role="tab" data-tab="lectures" aria-selected="false">
-    <svg viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"><path d="M3 5h7a3 3 0 0 1 3 3v14a2.5 2.5 0 0 0-2.5-2.5H3z"/><path d="M23 5h-7a3 3 0 0 0-3 3v14a2.5 2.5 0 0 1 2.5-2.5H23z"/></svg>
-    Lectures
-  </button>
   <button role="tab" data-tab="ajouter" aria-selected="false">
-    <svg viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="11.5" cy="11.5" r="7"/><path d="M17 17l5 5"/></svg>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5l5 5"/></svg>
     Ajouter
   </button>
   <button role="tab" data-tab="stats" aria-selected="false">
-    <svg viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 22V13M13 22V5M21 22v-6"/></svg>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 20V12M12 20V5M19 20v-6"/></svg>
     Stats
   </button>
 </nav>
@@ -202,28 +237,37 @@ textarea { min-height: 100px; resize: vertical; }
 // ---------- Données (gardées dans ce téléphone) ----------
 
 const STORE_KEY = 'bibliotheque-danais-v1';
-const COLORS = ['#C8501A', '#D2335B', '#16804A', '#2D5DA8', '#7A4C93', '#6F6E69', '#8F6A0C', '#1A1A1A'];
+const COLORS = ['#E8B84A', '#F06A8A', '#3CC48A', '#4C8DFF', '#A585FF', '#8E98AE', '#D08A57', '#DCE3F0'];
 const LISTS = {
-  reading: { name: 'En cours de lecture', color: '#16804A', empty: 'Aucun livre en cours. Choisis-en un dans ta pile !' },
-  pile: { name: 'Dans ma pile', color: '#2D5DA8', empty: 'Ta pile est vide. Ajoute les livres que tu as et que tu vas lire.' },
-  wish: { name: 'Mes envies', color: '#7A4C93', empty: 'Aucune envie pour l’instant. Ajoute les livres que tu aimerais lire.' },
+  reading: { name: 'En cours de lecture', color: '#3CC48A', empty: 'Aucun livre en cours. Choisis-en un dans ta pile !' },
+  pile: { name: 'Ma pile', color: '#4C8DFF', empty: 'Ta pile est vide. Ajoute les livres que tu as et que tu vas lire.' },
+  wish: { name: 'Mes envies', color: '#A585FF', empty: 'Aucune envie pour l’instant. Ajoute les livres que tu aimerais lire.' },
 };
 
 function defaultState() {
   const tiers = [
-    { id: 't1', name: 'Coup de cœur', color: '#C8501A' },
-    { id: 't2', name: 'Adoré', color: '#D2335B' },
-    { id: 't3', name: 'Bien', color: '#16804A' },
-    { id: 't4', name: 'Moyen', color: '#2D5DA8' },
-    { id: 't5', name: 'Pas aimé', color: '#6F6E69' },
+    { id: 't1', name: 'Coup de cœur', color: '#E8B84A' },
+    { id: 't2', name: 'Adoré', color: '#F06A8A' },
+    { id: 't3', name: 'Bien', color: '#3CC48A' },
+    { id: 't4', name: 'Moyen', color: '#4C8DFF' },
+    { id: 't5', name: 'Pas aimé', color: '#8E98AE' },
   ];
   const order = { reading: [], pile: [], wish: [], unranked: [] };
   tiers.forEach((t) => (order['tier:' + t.id] = []));
   return { version: 1, tiers, books: {}, order };
 }
 
-// Anciennes couleurs (moins lisibles) remplacées par les nouvelles.
-const OLD_COLORS = { '#EE6A24': '#C8501A', '#1F9A5B': '#16804A', '#8A8A86': '#6F6E69', '#C99A1A': '#8F6A0C' };
+// Couleurs des anciennes versions de l'app, remplacées par celles du nouveau style.
+const OLD_COLORS = {
+  '#EE6A24': '#E8B84A', '#E8B84A': '#E8B84A',
+  '#D2335B': '#F06A8A',
+  '#1F9A5B': '#3CC48A', '#16804A': '#3CC48A',
+  '#2D5DA8': '#4C8DFF',
+  '#7A4C93': '#A585FF',
+  '#8A8A86': '#8E98AE', '#6F6E69': '#8E98AE',
+  '#C99A1A': '#D08A57', '#8F6A0C': '#D08A57',
+  '#1A1A1A': '#DCE3F0',
+};
 
 function load() {
   try {
@@ -238,7 +282,7 @@ function load() {
 }
 
 let state = load();
-let ui = { tab: 'classement', query: '', results: null, searching: false, error: '' };
+let ui = { tab: 'accueil', sub: null, query: '', results: null, searching: false, error: '' };
 
 function save() {
   try {
@@ -319,9 +363,9 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '
 function coverHtml(book, color) {
   const label = esc(book.title);
   if (book.cover) {
-    return `<img src="${esc(book.cover)}" alt="" loading="lazy" onerror="coverFailed(this)" onload="if (this.naturalWidth < 20) coverFailed(this)" data-title="${label}" data-color="${esc(color || '#C8501A')}" data-cover-for="${esc(book.id || '')}">`;
+    return `<img src="${esc(book.cover)}" alt="" loading="lazy" onerror="coverFailed(this)" onload="if (this.naturalWidth < 20) coverFailed(this)" data-title="${label}" data-color="${esc(color || '#E8B84A')}" data-cover-for="${esc(book.id || '')}">`;
   }
-  return `<div class="fake" aria-hidden="true"><span style="background:${esc(color || '#C8501A')}"></span><b>${label}</b><span style="background:${esc(color || '#C8501A')}"></span></div>`;
+  return `<div class="fake" aria-hidden="true"><span style="background:${esc(color || '#E8B84A')}"></span><b>${label}</b><span style="background:${esc(color || '#E8B84A')}"></span></div>`;
 }
 
 // L'image ne charge pas : mini couverture à bandes en attendant, et on cherche une vraie photo.
@@ -368,7 +412,7 @@ function toast(text) {
 }
 
 const starSvg = (on) =>
-  `<svg viewBox="0 0 24 24"><path d="M12 2.8l2.8 5.8 6.3.9-4.6 4.4 1.1 6.3L12 17.2 6.4 20.2l1.1-6.3L2.9 9.5l6.3-.9z" fill="${on ? '#C8501A' : 'none'}" stroke="${on ? '#C8501A' : 'currentColor'}" stroke-width="1.8" stroke-linejoin="round"/></svg>`;
+  `<svg viewBox="0 0 24 24"><path d="M12 2.8l2.8 5.8 6.3.9-4.6 4.4 1.1 6.3L12 17.2 6.4 20.2l1.1-6.3L2.9 9.5l6.3-.9z" fill="${on ? '#E8B84A' : 'none'}" stroke="${on ? '#E8B84A' : 'currentColor'}" stroke-width="1.8" stroke-linejoin="round"/></svg>`;
 
 const handleSvg = `<svg width="22" height="22" viewBox="0 0 22 22" fill="currentColor" aria-hidden="true"><rect x="3" y="5" width="16" height="2.4"/><rect x="3" y="10" width="16" height="2.4"/><rect x="3" y="15" width="16" height="2.4"/></svg>`;
 
@@ -377,35 +421,134 @@ const handleSvg = `<svg width="22" height="22" viewBox="0 0 22 22" fill="current
 const app = document.getElementById('app');
 let sortables = [];
 
+// Texte foncé ou blanc selon la couleur de fond (pour rester lisible).
+function onColor(hex) {
+  const n = parseInt(hex.slice(1), 16);
+  const lum = [(n >> 16) & 255, (n >> 8) & 255, n & 255]
+    .map((v) => v / 255)
+    .map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
+  return 0.2126 * lum[0] + 0.7152 * lum[1] + 0.0722 * lum[2] > 0.25 ? '#060A16' : '#FFFFFF';
+}
+
+const trophySvg = (color) =>
+  `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h10v2h3v3a4 4 0 0 1-4 4h-.3A5 5 0 0 1 13 14.9V18h3v3H8v-3h3v-3.1A5 5 0 0 1 8.3 12H8a4 4 0 0 1-4-4V5h3zm0 4H6v1a2 2 0 0 0 1.2 1.8A5 5 0 0 1 7 8.8zm10 0v1.8c0 .3 0 .7-.2 1A2 2 0 0 0 18 8V7z" fill="${color}"/></svg>`;
+
+const chevron = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3L5 8l5 5"/></svg>`;
+
+function readIds() {
+  return [...state.tiers.flatMap((t) => state.order['tier:' + t.id] || []), ...(state.order.unranked || [])];
+}
+
 function render() {
   sortables.forEach((s) => s.destroy());
   sortables = [];
   document.querySelectorAll('.tabs button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === ui.tab)));
-  const screens = { classement: renderRanking, lectures: renderReading, ajouter: renderAdd, stats: renderStats };
-  app.innerHTML = header() + `<div class="wrap">${screens[ui.tab]()}</div>`;
+  const screens = { accueil: renderHome, classement: renderRanking, ajouter: renderAdd, stats: renderStats };
+  app.innerHTML = `<div class="wrap">${screens[ui.tab]()}</div>`;
   bindScreen();
 }
 
-function header() {
-  // Sur les autres onglets, l'en-tête se réduit à une bande pour laisser la place au contenu.
-  if (ui.tab !== 'classement') return `<header class="cover-head small"><div class="top">La bibliothèque de Danaïs</div></header>`;
-  const read = state.tiers.reduce((n, t) => n + (state.order['tier:' + t.id] || []).length, 0) + (state.order.unranked || []).length;
-  const pile = (state.order.pile || []).length;
-  return `<header class="cover-head">
-    <div class="top">${read} livre${read > 1 ? 's' : ''} lu${read > 1 ? 's' : ''} · ${pile} dans la pile</div>
-    <div class="middle"><div class="over">La bibliothèque de</div><h1>Danaïs</h1></div>
-    <div class="bottom"></div>
-  </header>`;
+// Profil : niveau (un niveau tous les 5 livres lus) et trophées par niveau de classement.
+function profileHtml() {
+  const read = readIds().length;
+  const level = Math.floor(read / 5) + 1;
+  const left = 5 - (read % 5);
+  return `<header class="profile">
+      <div class="avatar" aria-hidden="true">D</div>
+      <div style="flex:1;min-width:0">
+        <h1>Danaïs</h1>
+        <div class="level"><b>Niveau ${level}</b> · plus que ${left} livre${left > 1 ? 's' : ''}</div>
+        <div class="level-bar" aria-hidden="true"><i style="width:${((read % 5) / 5) * 100}%"></i></div>
+      </div>
+    </header>
+    <div class="trophies" aria-label="Mes livres par niveau">${state.tiers
+      .map((t) => `<span class="trophy-chip">${trophySvg(t.color)}${(state.order['tier:' + t.id] || []).length}<span>${esc(t.name)}</span></span>`)
+      .join('')}</div>`;
+}
+
+function renderHome() {
+  if (ui.sub) return renderList(ui.sub);
+  const reading = (state.order.reading || []).map((id) => state.books[id]).filter(Boolean);
+  let html = profileHtml();
+
+  html += `<div class="section-head"><h3>En cours de lecture</h3></div>`;
+  html += reading.length
+    ? `<div class="rail">${reading.map(heroHtml).join('')}</div>`
+    : `<p class="empty">Aucun livre en cours. Touche un livre de ta pile, puis « En cours de lecture ».</p>`;
+
+  html += railSection('pile', 'Ma pile', true);
+  html += railSection('wish', 'Mes envies', false);
+  const top = state.tiers[0];
+  if (top && (state.order['tier:' + top.id] || []).length) {
+    html += `<div class="section-head"><h3>${esc(top.name)}</h3><button class="see-all" data-tab-go="classement">Classement</button></div>
+      <div class="tiles">${(state.order['tier:' + top.id] || []).map((id) => tileHtml(state.books[id])).join('')}</div>`;
+  }
+  return html;
+}
+
+function heroHtml(b) {
+  const pct = b.pages ? Math.min(100, Math.round(((b.currentPage || 0) / b.pages) * 100)) : 0;
+  return `<button class="hero" data-book="${b.id}" aria-label="${esc(b.title)}, ${pct} %">
+    ${b.cover ? `<div class="hero-bg" style="background-image:url('${esc(b.cover).replace(/'/g, '%27')}')"></div>` : ''}
+    <div class="hero-body">
+      <div class="cover">${coverHtml(b, state.tiers[0]?.color)}</div>
+      <div class="hero-info">
+        <div class="hero-kind">Je lis</div>
+        <div class="hero-title">${esc(b.title)}</div>
+        <div class="hero-author">${esc(b.authors)}</div>
+        ${b.pages ? `<div class="progress" aria-hidden="true"><i style="width:${pct}%"></i></div><span class="progress-label">Page ${b.currentPage || 0} sur ${b.pages} · ${pct} %</span>` : `<span class="progress-label">Touche pour noter ta page</span>`}
+      </div>
+    </div>
+  </button>`;
+}
+
+function railSection(key, title, ranked) {
+  const ids = state.order[key] || [];
+  const head = `<div class="section-head"><h3>${title}<small>${ids.length}</small></h3>${ids.length ? `<button class="see-all" data-see="${key}">${ranked ? 'Ranger' : 'Tout voir'}</button>` : ''}</div>`;
+  if (!ids.length) return head + `<p class="empty">${esc(LISTS[key].empty)}</p>`;
+  return head + `<div class="tiles">${ids.map((id, i) => tileHtml(state.books[id], ranked ? i + 1 : 0)).join('')}</div>`;
+}
+
+function tileHtml(b, rank) {
+  if (!b) return '';
+  return `<button class="tile" data-book="${b.id}" aria-label="${rank ? rank + ', ' : ''}${esc(b.title)}">
+    <span class="cover">${rank ? `<span class="rank-badge">${rank}</span>` : ''}${coverHtml(b, state.tiers[0]?.color)}</span>
+    <span class="t">${esc(b.title)}</span><span class="a">${esc(b.authors)}</span>
+  </button>`;
+}
+
+// Vue « Tout voir » : la liste complète, rangeable.
+function renderList(key) {
+  const list = LISTS[key];
+  const ids = state.order[key] || [];
+  return `<button class="back" data-back>${chevron} Accueil</button>
+    <h2 class="page" style="margin-top:4px">${list.name}</h2>
+    ${ids.length > 1 ? `<p class="hint">Glisse avec la poignée pour choisir l’ordre, ou utilise « Avancer / Reculer » dans la fiche du livre.</p>` : ''}
+    <div class="list sortable" data-list="${key}" data-empty="${esc(list.empty)}">${ids.map((id, i) => rowHtml(state.books[id], key, i)).join('')}</div>`;
+}
+
+function rowHtml(b, key, i) {
+  if (!b) return '';
+  let extra = '';
+  if (key === 'reading' && b.pages) {
+    const pct = Math.min(100, Math.round(((b.currentPage || 0) / b.pages) * 100));
+    extra = `<div class="progress" aria-hidden="true"><i style="width:${pct}%"></i></div><span class="progress-label">Page ${b.currentPage || 0} sur ${b.pages} · ${pct} %</span>`;
+  }
+  return `<div class="row" data-id="${b.id}">
+    ${key === 'pile' ? `<span class="rank">${i + 1}</span>` : ''}
+    <button class="cover" data-book="${b.id}" aria-label="${esc(b.title)}">${coverHtml(b, state.tiers[0]?.color)}</button>
+    <button class="info" data-book="${b.id}"><span class="title">${esc(b.title)}</span><span class="author">${esc(b.authors)}</span>${extra}</button>
+    <button class="handle" aria-label="Déplacer ${esc(b.title)}">${handleSvg}</button>
+  </div>`;
 }
 
 function renderRanking() {
   const unranked = state.order.unranked || [];
-  const total = state.tiers.reduce((n, t) => n + (state.order['tier:' + t.id] || []).length, 0) + unranked.length;
   let html = `<h2 class="page">Mon classement</h2>`;
-  html += total
+  html += readIds().length
     ? `<p class="hint">Touche un livre pour sa fiche. Pour le déplacer, appuie longuement et glisse, ou utilise « Avancer / Reculer » dans sa fiche.</p>`
     : `<p class="hint">Les livres que tu as lus se rangent ici, du coup de cœur au pas aimé. Va dans « Ajouter » pour chercher ton premier livre.</p>`;
-  if (unranked.length) html += tierBlock('unranked', 'À classer', '#1A1A1A');
+  if (unranked.length) html += tierBlock('unranked', 'À classer', '#FFFFFF');
   state.tiers.forEach((t) => (html += tierBlock('tier:' + t.id, t.name, t.color)));
   html += `<div class="actions"><button class="btn ghost full" data-action="edit-tiers">Modifier mes niveaux</button></div>`;
   return html;
@@ -414,8 +557,8 @@ function renderRanking() {
 function tierBlock(key, name, color) {
   const ids = state.order[key] || [];
   return `<section class="tier">
-    <div class="tier-name" style="background:${esc(color)}"><span>${esc(name)}</span><span class="count">${ids.length}</span></div>
-    <div class="tier-books sortable" data-list="${esc(key)}" style="border-color:${esc(color)}">${ids
+    <div class="tier-name"><span class="badge" style="background:${esc(color)}">${trophySvg(onColor(color))}</span><span>${esc(name)}</span><span class="count">${ids.length}</span></div>
+    <div class="tier-books sortable" data-list="${esc(key)}">${ids
       .map((id) => {
         const b = state.books[id];
         return b ? `<button class="cover" data-book="${b.id}" aria-label="${esc(b.title)}">${coverHtml(b, color)}</button>` : '';
@@ -424,41 +567,14 @@ function tierBlock(key, name, color) {
   </section>`;
 }
 
-function renderReading() {
-  let html = `<h2 class="page">Mes lectures</h2>`;
-  for (const key of ['reading', 'pile', 'wish']) {
-    const list = LISTS[key];
-    const ids = state.order[key] || [];
-    html += `<div class="section-band" style="background:${list.color}"><span>${list.name}</span><span>${ids.length}</span></div>
-      <div class="section-body">
-      ${key === 'pile' && ids.length > 1 ? `<p class="hint" style="margin:0 0 8px">Glisse avec la poignée à droite pour choisir l’ordre de lecture.</p>` : ''}
-      <div class="list sortable" data-list="${key}" data-empty="${esc(list.empty)}">${ids.map((id, i) => rowHtml(state.books[id], key, i)).join('')}</div>
-      </div>`;
-  }
-  return html;
-}
-
-function rowHtml(b, key, i) {
-  if (!b) return '';
-  const color = LISTS[key]?.color || '#C8501A';
-  let extra = '';
-  if (key === 'reading' && b.pages) {
-    const pct = Math.min(100, Math.round(((b.currentPage || 0) / b.pages) * 100));
-    extra = `<div class="progress" aria-hidden="true"><i style="width:${pct}%"></i></div><span class="progress-label">Page ${b.currentPage || 0} sur ${b.pages} · ${pct} %</span>`;
-  }
-  return `<div class="row" data-id="${b.id}">
-    ${key === 'pile' ? `<span class="rank">${i + 1}</span>` : ''}
-    <button class="cover" data-book="${b.id}" aria-label="${esc(b.title)}">${coverHtml(b, color)}</button>
-    <button class="info" data-book="${b.id}"><span class="title">${esc(b.title)}</span><span class="author">${esc(b.authors)}</span>${extra}</button>
-    <button class="handle" aria-label="Déplacer ${esc(b.title)}">${handleSvg}</button>
-  </div>`;
-}
-
 function renderAdd() {
   let html = `<h2 class="page">Ajouter un livre</h2>
-    <label class="field-label" for="q" style="margin-top:4px">Titre ou auteur</label>
+    <label class="field-label" for="q" style="margin:14px 0 0">Titre ou auteur</label>
     <form class="search" id="search-form">
-      <input id="q" type="search" enterkeyhint="search" placeholder="ex. Le Petit Prince" value="${esc(ui.query)}" autocomplete="off">
+      <div class="search-field">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5l5 5"/></svg>
+        <input id="q" type="search" enterkeyhint="search" placeholder="ex. La femme de ménage" value="${esc(ui.query)}" autocomplete="off">
+      </div>
       <button class="btn" type="submit" ${ui.searching ? 'disabled aria-busy="true"' : ''}>Chercher</button>
     </form>`;
   if (ui.searching) html += `<p class="status">Je cherche…</p>`;
@@ -468,25 +584,22 @@ function renderAdd() {
     html += `<div class="results">${ui.results
       .map(
         (r, i) => `<div class="row">
-        <button class="cover" data-result="${i}" aria-label="${esc(r.title)}">${coverHtml(r, '#C8501A')}</button>
+        <button class="cover" data-result="${i}" aria-label="${esc(r.title)}">${coverHtml(r, state.tiers[0]?.color)}</button>
         <button class="info" data-result="${i}"><span class="title">${esc(r.title)}</span><span class="author">${esc(r.authors)}${r.year ? ' · ' + esc(r.year) : ''}${r.pages ? ' · ' + r.pages + ' pages' : ''}</span></button>
       </div>`,
       )
       .join('')}</div>`;
   }
-  if (!ui.results || !ui.searching) {
-    html += `<div class="section-band" style="background:var(--gris)"><span>Pas trouvé ?</span></div>
-      <div class="section-body">
-        <button class="btn ghost full" data-action="manual">Ajouter un livre à la main</button>
-      </div>`;
+  if (!ui.searching) {
+    html += `<div class="section-head"><h3>Pas trouvé ?</h3></div>
+      <button class="btn ghost full" data-action="manual">Ajouter un livre à la main</button>`;
   }
   return html;
 }
 
 function renderStats() {
   const year = new Date().getFullYear();
-  const readIds = [...state.tiers.flatMap((t) => state.order['tier:' + t.id] || []), ...(state.order.unranked || [])];
-  const read = readIds.map((id) => state.books[id]).filter(Boolean);
+  const read = readIds().map((id) => state.books[id]).filter(Boolean);
   const thisYear = read.filter((b) => b.finishedAt && new Date(b.finishedAt).getFullYear() === year);
   const pagesYear = thisYear.reduce((n, b) => n + (b.pages || 0), 0);
   const rated = read.filter((b) => b.rating);
@@ -494,28 +607,25 @@ function renderStats() {
   const max = Math.max(1, ...state.tiers.map((t) => (state.order['tier:' + t.id] || []).length));
   return `<h2 class="page">Mes stats</h2>
     <div class="stat-grid">
-      <div class="stat"><strong>${thisYear.length}</strong><span>livre${thisYear.length > 1 ? 's' : ''} lu${thisYear.length > 1 ? 's' : ''} en ${year}</span></div>
+      <div class="stat big">${trophySvg('#E8B84A')}<div><strong>${thisYear.length}</strong><span>livre${thisYear.length > 1 ? 's' : ''} lu${thisYear.length > 1 ? 's' : ''} en ${year}</span></div></div>
       <div class="stat"><strong>${pagesYear.toLocaleString('fr-FR')}</strong><span>pages lues en ${year}</span></div>
-      <div class="stat"><strong>${read.length}</strong><span>livres lus en tout</span></div>
       <div class="stat"><strong>${avg}</strong><span>note moyenne sur 5</span></div>
+      <div class="stat"><strong>${read.length}</strong><span>livres lus en tout</span></div>
       <div class="stat"><strong>${(state.order.pile || []).length}</strong><span>dans ta pile</span></div>
-      <div class="stat"><strong>${(state.order.wish || []).length}</strong><span>envies</span></div>
     </div>
-    <div class="section-band" style="background:var(--orange)"><span>Par niveau</span></div>
+    <div class="section-head"><h3>Par niveau</h3></div>
     <div class="bars">${state.tiers
       .map((t) => {
         const n = (state.order['tier:' + t.id] || []).length;
         return `<div class="bar"><span class="lbl">${esc(t.name)}</span><span class="track"><span class="fill" style="display:block;width:${(n / max) * 100}%;background:${esc(t.color)}"></span></span><span class="n">${n}</span></div>`;
       })
       .join('')}</div>
-    <div class="section-band" style="background:var(--gris)"><span>Sauvegarde</span></div>
-    <div class="section-body">
-      <p class="hint" style="margin:0 0 10px">Tes livres sont gardés dans ce téléphone. Fais une sauvegarde de temps en temps : si tu vides Safari, tu pourras tout récupérer.</p>
-      <div class="actions" style="margin-top:0">
-        <button class="btn full" data-action="export">Sauvegarder dans un fichier</button>
-        <button class="btn ghost full" data-action="import">Récupérer une sauvegarde</button>
-        <input type="file" id="import-file" accept="application/json,.json" hidden>
-      </div>
+    <div class="section-head"><h3>Sauvegarde</h3></div>
+    <p class="hint" style="margin:0 0 12px">Tes livres sont gardés dans ce téléphone. Fais une sauvegarde de temps en temps : si tu vides Safari, tu pourras tout récupérer.</p>
+    <div class="actions" style="margin-top:0">
+      <button class="btn full" data-action="export">Sauvegarder dans un fichier</button>
+      <button class="btn ghost full" data-action="import">Récupérer une sauvegarde</button>
+      <input type="file" id="import-file" accept="application/json,.json" hidden>
     </div>`;
 }
 
@@ -563,8 +673,26 @@ function bindScreen() {
 }
 
 document.addEventListener('click', (e) => {
+  const go = e.target.closest('[data-tab-go]');
+  if (go) {
+    ui.tab = go.dataset.tabGo;
+    render();
+    return window.scrollTo(0, 0);
+  }
+  const see = e.target.closest('[data-see]');
+  if (see) {
+    ui.sub = see.dataset.see;
+    render();
+    return window.scrollTo(0, 0);
+  }
+  if (e.target.closest('[data-back]')) {
+    ui.sub = null;
+    render();
+    return window.scrollTo(0, 0);
+  }
   const tab = e.target.closest('.tabs button');
   if (tab) {
+    ui.sub = null;
     ui.tab = tab.dataset.tab;
     render();
     window.scrollTo(0, 0);
@@ -831,8 +959,8 @@ function sheetHead(b, color) {
 // Choisir où ranger un livre trouvé.
 function openAddSheet(r) {
   const back = showSheet(
-    '#C8501A',
-    `${sheetHead(r, '#C8501A')}
+    '#E8B84A',
+    `${sheetHead(r, '#E8B84A')}
     <span class="field-label">Où le ranger ?</span>
     <div class="choices">
       <button class="choice" data-to="reading">Je le lis en ce moment</button>
@@ -910,7 +1038,7 @@ function openSheet(id) {
     inner += `<span class="field-label">Mon niveau</span><div class="choices">${state.tiers
       .map(
         (t) =>
-          `<button class="choice tier-choice" data-to="tier:${t.id}" aria-pressed="${place === 'tier:' + t.id}" style="border-color:${esc(t.color)};${place === 'tier:' + t.id ? 'background:' + esc(t.color) : ''}">${esc(t.name)}</button>`,
+          `<button class="choice tier-choice" data-to="tier:${t.id}" aria-pressed="${place === 'tier:' + t.id}" style="border-color:${esc(t.color)};${place === 'tier:' + t.id ? 'background:' + esc(t.color) + ';color:' + onColor(t.color) : ''}">${esc(t.name)}</button>`,
       )
       .join('')}</div>
       <span class="field-label">Ma note</span>
@@ -1015,7 +1143,7 @@ function openSheet(id) {
 async function openCoverPicker(id) {
   const b = state.books[id];
   const back = showSheet(
-    '#C8501A',
+    '#E8B84A',
     `<div class="sheet-head"><div style="flex:1"><h3>Choisis la couverture</h3><p>${esc(b.title)}</p></div>${closeBtn}</div>
     <p class="status" id="cover-status">Je cherche les couvertures…</p>
     <div class="cover-grid" id="cover-grid"></div>
@@ -1046,7 +1174,7 @@ async function openCoverPicker(id) {
 
 function openTierEditor() {
   const back = showSheet(
-    '#C8501A',
+    '#E8B84A',
     `<div class="sheet-head"><div style="flex:1"><h3>Mes niveaux</h3><p>Renomme, change la couleur, ajoute ou retire un niveau.</p></div>${closeBtn}</div>
     <div class="list" style="margin-top:16px">${state.tiers
       .map(
