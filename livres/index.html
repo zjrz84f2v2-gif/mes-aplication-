@@ -161,6 +161,9 @@ textarea { min-height: 100px; resize: vertical; }
 .swatches { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
 .swatch { width: 36px; height: 36px; border: 3px solid transparent; padding: 0; }
 .swatch[aria-pressed="true"] { border-color: var(--ink); }
+.cover-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 10px; margin-top: 12px; }
+.cover.big { width: 100%; height: auto; aspect-ratio: 2 / 3; }
+.photo-choice { display: inline-flex; align-items: center; cursor: pointer; }
 .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(86px + env(safe-area-inset-bottom)); background: var(--ink); color: var(--ground); padding: 12px 18px; font-weight: 600; z-index: 30; max-width: calc(100% - 32px); text-align: center; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
 </style>
@@ -276,6 +279,7 @@ function addBook(data, to) {
     finishedAt: null,
   };
   moveBook(id, to);
+  if (!state.books[id].cover) repairCover(id);
   toast(`« ${data.title} » ajouté à ${placeName(to)}.`);
 }
 
@@ -300,12 +304,30 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '
 function coverHtml(book, color) {
   const label = esc(book.title);
   if (book.cover) {
-    return `<img src="${esc(book.cover)}" alt="" loading="lazy" onerror="this.replaceWith(fakeCover(this))" data-title="${label}" data-color="${esc(color || '#EE6A24')}">`;
+    return `<img src="${esc(book.cover)}" alt="" loading="lazy" onerror="coverFailed(this)" data-title="${label}" data-color="${esc(color || '#EE6A24')}" data-cover-for="${esc(book.id || '')}">`;
   }
   return `<div class="fake" aria-hidden="true"><span style="background:${esc(color || '#EE6A24')}"></span><b>${label}</b><span style="background:${esc(color || '#EE6A24')}"></span></div>`;
 }
 
-// Couverture de remplacement (si l'image ne charge pas) : une mini couverture à bandes.
+// L'image ne charge pas : mini couverture à bandes en attendant, et on cherche une vraie photo.
+function coverFailed(img) {
+  const id = img.dataset.coverFor;
+  img.replaceWith(fakeCover(img));
+  if (id && state.books[id]) {
+    state.books[id].cover = '';
+    repairCover(id);
+    return;
+  }
+  // Résultat de recherche : on lui cherche une autre couverture.
+  const r = (ui.results || []).find((x) => esc(x.title) === esc(img.dataset.title) && x.cover);
+  if (r && !r.retried) {
+    r.retried = true;
+    r.cover = '';
+    fillMissingCovers(ui.results);
+  }
+}
+
+// Couverture de remplacement : une mini couverture à bandes.
 function fakeCover(img) {
   const div = document.createElement('div');
   div.className = 'fake';
@@ -565,6 +587,17 @@ async function search(q) {
   }
   ui.searching = false;
   render();
+  fillMissingCovers(ui.results);
+}
+
+async function fillMissingCovers(results) {
+  for (const r of (results || []).filter((x) => !x.cover).slice(0, 8)) {
+    const [first] = await coverCandidates(r.title, r.authors);
+    if (first && ui.results === results) {
+      r.cover = first;
+      render();
+    }
+  }
 }
 
 async function searchGoogle(q) {
@@ -575,27 +608,90 @@ async function searchGoogle(q) {
   return (data.items || []).map((it) => {
     const v = it.volumeInfo || {};
     const img = v.imageLinks?.thumbnail || v.imageLinks?.smallThumbnail || '';
+    const isbn = (v.industryIdentifiers || []).find((x) => x.type.startsWith('ISBN'))?.identifier || '';
     return {
       googleId: it.id,
       title: v.title + (v.subtitle ? ' : ' + v.subtitle : ''),
       authors: (v.authors || []).join(', '),
       pages: v.pageCount || 0,
       year: (v.publishedDate || '').slice(0, 4),
-      cover: img.replace('http://', 'https://').replace('&edge=curl', ''),
+      cover: img ? img.replace('http://', 'https://').replace('&edge=curl', '') : isbnCover(isbn),
     };
   });
 }
 
 async function searchOpenLibrary(q) {
-  const data = await (await fetch(`https://openlibrary.org/search.json?q=${encodeURIComponent(q)}&limit=20`)).json();
+  const data = await (await fetch(`https://openlibrary.org/search.json?q=${encodeURIComponent(q)}&limit=20&fields=${OL_FIELDS}`)).json();
   return (data.docs || []).map((d) => ({
     googleId: 'ol:' + d.key,
     title: d.title,
     authors: (d.author_name || []).join(', '),
     pages: d.number_of_pages_median || 0,
     year: d.first_publish_year ? String(d.first_publish_year) : '',
-    cover: d.cover_i ? `https://covers.openlibrary.org/b/id/${d.cover_i}-M.jpg` : '',
+    cover: d.cover_i ? olCover(d.cover_i) : isbnCover(d.isbn?.[0]),
   }));
+}
+
+const OL_FIELDS = 'key,title,author_name,number_of_pages_median,first_publish_year,cover_i,isbn';
+const olCover = (coverId) => `https://covers.openlibrary.org/b/id/${coverId}-M.jpg`;
+// « default=false » : pas d'image grise si la couverture n'existe pas (l'app cherche alors ailleurs).
+const isbnCover = (isbn) => (isbn ? `https://covers.openlibrary.org/b/isbn/${encodeURIComponent(isbn)}-M.jpg?default=false` : '');
+
+// ---------- Trouver la vraie couverture ----------
+
+// Toutes les couvertures connues pour ce livre (plusieurs éditions), la plus probable en premier.
+async function coverCandidates(title, authors) {
+  const found = [];
+  const add = (url) => url && !found.includes(url) && found.push(url);
+  const author = (authors || '').split(',')[0].trim();
+  try {
+    const ol = await (
+      await fetch(`https://openlibrary.org/search.json?title=${encodeURIComponent(title)}${author ? '&author=' + encodeURIComponent(author) : ''}&limit=30&fields=cover_i`)
+    ).json();
+    (ol.docs || []).forEach((d) => d.cover_i && add(olCover(d.cover_i)));
+  } catch (e) {}
+  try {
+    const q = `intitle:${title}${author ? ' inauthor:' + author : ''}`;
+    const g = await (await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&maxResults=20&printType=books`)).json();
+    (g.items || []).forEach((it) => {
+      const img = it.volumeInfo?.imageLinks?.thumbnail;
+      if (img) add(img.replace('http://', 'https://').replace('&edge=curl', ''));
+    });
+  } catch (e) {}
+  return found;
+}
+
+// Cherche une couverture pour un livre qui n'en a pas (une seule fois par livre et par ouverture de l'app).
+const repairing = new Set();
+async function repairCover(id) {
+  if (repairing.has(id)) return;
+  repairing.add(id);
+  const b = state.books[id];
+  if (!b || b.cover) return;
+  const [first] = await coverCandidates(b.title, b.authors);
+  if (first && state.books[id] && !state.books[id].cover) {
+    state.books[id].cover = first;
+    save();
+    render();
+  }
+}
+
+// Une photo prise avec le téléphone, réduite pour ne pas remplir la mémoire.
+function photoToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, 420 / img.height);
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(img.src);
+      resolve(canvas.toDataURL('image/jpeg', 0.82));
+    };
+    img.onerror = reject;
+    img.src = URL.createObjectURL(file);
+  });
 }
 
 // ---------- Feuilles (fiches) ----------
@@ -711,6 +807,12 @@ function openSheet(id) {
       <textarea id="review" placeholder="Ce que j’en ai pensé…">${esc(b.review)}</textarea>`;
   }
 
+  inner += `<span class="field-label">La couverture</span>
+    <div class="choices">
+      <button class="choice" data-covers>Choisir une autre couverture</button>
+      <label class="choice photo-choice">Prendre une photo du livre<input type="file" accept="image/*" capture="environment" data-photo hidden></label>
+    </div>`;
+
   inner += `<div class="actions">
     ${place === 'reading' ? `<button class="btn full" data-to="read">J’ai fini ce livre !</button>` : ''}
     <button class="btn danger full" data-remove>Retirer de ma bibliothèque</button>
@@ -728,6 +830,19 @@ function openSheet(id) {
   };
   cur?.addEventListener('change', saveProgress);
   tot?.addEventListener('change', saveProgress);
+  back.querySelector('[data-photo]').addEventListener('change', async (e) => {
+    const f = e.target.files[0];
+    if (!f) return;
+    try {
+      b.cover = await photoToDataUrl(f);
+      save();
+      render();
+      openSheet(id);
+      toast('Photo enregistrée !');
+    } catch (err) {
+      toast('Impossible de lire cette photo.');
+    }
+  });
   back.querySelector('#review')?.addEventListener('input', (e) => {
     b.review = e.target.value;
     save();
@@ -735,6 +850,7 @@ function openSheet(id) {
 
   let confirmRemove = false;
   back.addEventListener('click', (e) => {
+    if (e.target.closest('[data-covers]')) return openCoverPicker(id);
     const star = e.target.closest('[data-star]');
     if (star) {
       const n = Number(star.dataset.star);
@@ -768,6 +884,37 @@ function openSheet(id) {
       toast('Livre retiré.');
     }
   });
+}
+
+// Choisir parmi les couvertures des différentes éditions.
+async function openCoverPicker(id) {
+  const b = state.books[id];
+  const back = showSheet(
+    '#EE6A24',
+    `<div class="sheet-head"><div style="flex:1"><h3>Choisis la couverture</h3><p>${esc(b.title)}</p></div>${closeBtn}</div>
+    <p class="status" id="cover-status">Je cherche les couvertures…</p>
+    <div class="cover-grid" id="cover-grid"></div>
+    <div class="actions"><button class="btn ghost full" data-back>Retour à la fiche</button></div>`,
+  );
+  back.addEventListener('click', (e) => {
+    if (e.target.closest('[data-back]')) return openSheet(id);
+    const pick = e.target.closest('[data-pick]');
+    if (pick) {
+      b.cover = pick.dataset.pick;
+      save();
+      render();
+      openSheet(id);
+      toast('Couverture changée !');
+    }
+  });
+  const urls = await coverCandidates(b.title, b.authors);
+  if (!document.body.contains(back)) return;
+  back.querySelector('#cover-status').textContent = urls.length
+    ? 'Touche la bonne couverture.'
+    : 'Aucune couverture trouvée. Tu peux prendre ton livre en photo depuis sa fiche.';
+  back.querySelector('#cover-grid').innerHTML = urls
+    .map((u) => `<button class="cover big" data-pick="${esc(u)}" aria-label="Choisir cette couverture"><img src="${esc(u)}" alt="" loading="lazy" onerror="this.parentNode.remove()"></button>`)
+    .join('');
 }
 
 // ---------- Modifier les niveaux ----------
@@ -858,6 +1005,9 @@ function importBackup(e) {
 }
 
 render();
+Object.values(state.books)
+  .filter((b) => !b.cover)
+  .forEach((b) => repairCover(b.id));
 </script>
 </body>
 </html>
