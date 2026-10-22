@@ -271,6 +271,7 @@ function addBook(data, to) {
     pages: data.pages || 0,
     year: data.year || '',
     googleId: data.googleId || '',
+    isbn: data.isbn || '',
     rating: 0,
     review: '',
     currentPage: 0,
@@ -304,7 +305,7 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '
 function coverHtml(book, color) {
   const label = esc(book.title);
   if (book.cover) {
-    return `<img src="${esc(book.cover)}" alt="" loading="lazy" onerror="coverFailed(this)" data-title="${label}" data-color="${esc(color || '#EE6A24')}" data-cover-for="${esc(book.id || '')}">`;
+    return `<img src="${esc(book.cover)}" alt="" loading="lazy" onerror="coverFailed(this)" onload="if (this.naturalWidth < 20) coverFailed(this)" data-title="${label}" data-color="${esc(color || '#EE6A24')}" data-cover-for="${esc(book.id || '')}">`;
   }
   return `<div class="fake" aria-hidden="true"><span style="background:${esc(color || '#EE6A24')}"></span><b>${label}</b><span style="background:${esc(color || '#EE6A24')}"></span></div>`;
 }
@@ -314,6 +315,9 @@ function coverFailed(img) {
   const id = img.dataset.coverFor;
   img.replaceWith(fakeCover(img));
   if (id && state.books[id]) {
+    // On retient cette couverture comme ratée pour passer à la suivante.
+    if (!repairing.has(id)) repairing.set(id, { tried: new Set(), list: null });
+    repairing.get(id).tried.add(state.books[id].cover);
     state.books[id].cover = '';
     repairCover(id);
     return;
@@ -585,6 +589,7 @@ async function search(q) {
       ui.error = 'La recherche ne marche pas : vérifie ta connexion internet, puis réessaie.';
     }
   }
+  if (ui.results) ui.results.sort((a, b) => (b.cover ? 1 : 0) - (a.cover ? 1 : 0));
   ui.searching = false;
   render();
   fillMissingCovers(ui.results);
@@ -592,7 +597,7 @@ async function search(q) {
 
 async function fillMissingCovers(results) {
   for (const r of (results || []).filter((x) => !x.cover).slice(0, 8)) {
-    const [first] = await coverCandidates(r.title, r.authors);
+    const [first] = await coverCandidates(r.title, r.authors, r.isbn);
     if (first && ui.results === results) {
       r.cover = first;
       render();
@@ -608,13 +613,15 @@ async function searchGoogle(q) {
   return (data.items || []).map((it) => {
     const v = it.volumeInfo || {};
     const img = v.imageLinks?.thumbnail || v.imageLinks?.smallThumbnail || '';
-    const isbn = (v.industryIdentifiers || []).find((x) => x.type.startsWith('ISBN'))?.identifier || '';
+    const ids = v.industryIdentifiers || [];
+    const isbn = (ids.find((x) => x.type === 'ISBN_13') || ids.find((x) => x.type === 'ISBN_10'))?.identifier || '';
     return {
       googleId: it.id,
       title: v.title + (v.subtitle ? ' : ' + v.subtitle : ''),
       authors: (v.authors || []).join(', '),
       pages: v.pageCount || 0,
       year: (v.publishedDate || '').slice(0, 4),
+      isbn,
       cover: img ? img.replace('http://', 'https://').replace('&edge=curl', '') : isbnCover(isbn),
     };
   });
@@ -628,6 +635,7 @@ async function searchOpenLibrary(q) {
     authors: (d.author_name || []).join(', '),
     pages: d.number_of_pages_median || 0,
     year: d.first_publish_year ? String(d.first_publish_year) : '',
+    isbn: d.isbn?.[0] || '',
     cover: d.cover_i ? olCover(d.cover_i) : isbnCover(d.isbn?.[0]),
   }));
 }
@@ -635,15 +643,30 @@ async function searchOpenLibrary(q) {
 const OL_FIELDS = 'key,title,author_name,number_of_pages_median,first_publish_year,cover_i,isbn';
 const olCover = (coverId) => `https://covers.openlibrary.org/b/id/${coverId}-M.jpg`;
 // « default=false » : pas d'image grise si la couverture n'existe pas (l'app cherche alors ailleurs).
+// 9782070612758 -> 2070612759 (format utilisé par Amazon).
+function toIsbn10(isbn) {
+  const d = String(isbn).replace(/[^0-9X]/gi, '');
+  if (d.length === 10) return d;
+  if (d.length !== 13 || !d.startsWith('978')) return '';
+  const core = d.slice(3, 12);
+  const sum = [...core].reduce((n, c, i) => n + Number(c) * (10 - i), 0);
+  const check = (11 - (sum % 11)) % 11;
+  return core + (check === 10 ? 'X' : String(check));
+}
 const isbnCover = (isbn) => (isbn ? `https://covers.openlibrary.org/b/isbn/${encodeURIComponent(isbn)}-M.jpg?default=false` : '');
 
 // ---------- Trouver la vraie couverture ----------
 
 // Toutes les couvertures connues pour ce livre (plusieurs éditions), la plus probable en premier.
-async function coverCandidates(title, authors) {
+async function coverCandidates(title, authors, isbn) {
   const found = [];
   const add = (url) => url && !found.includes(url) && found.push(url);
   const author = (authors || '').split(',')[0].trim();
+  if (isbn) {
+    add(isbnCover(isbn));
+    const isbn10 = toIsbn10(isbn);
+    if (isbn10) add(`https://images-na.ssl-images-amazon.com/images/P/${isbn10}.01.LZZZZZZZ.jpg`);
+  }
   try {
     const ol = await (
       await fetch(`https://openlibrary.org/search.json?title=${encodeURIComponent(title)}${author ? '&author=' + encodeURIComponent(author) : ''}&limit=30&fields=cover_i`)
@@ -662,15 +685,20 @@ async function coverCandidates(title, authors) {
 }
 
 // Cherche une couverture pour un livre qui n'en a pas (une seule fois par livre et par ouverture de l'app).
-const repairing = new Set();
+const repairing = new Map(); // livre -> couvertures déjà essayées
 async function repairCover(id) {
-  if (repairing.has(id)) return;
-  repairing.add(id);
   const b = state.books[id];
   if (!b || b.cover) return;
-  const [first] = await coverCandidates(b.title, b.authors);
-  if (first && state.books[id] && !state.books[id].cover) {
-    state.books[id].cover = first;
+  if (!repairing.has(id)) repairing.set(id, { tried: new Set(), list: null });
+  const job = repairing.get(id);
+  if (job.busy) return;
+  job.busy = true;
+  if (!job.list) job.list = await coverCandidates(b.title, b.authors, b.isbn);
+  job.busy = false;
+  const next = job.list.find((u) => !job.tried.has(u));
+  if (next && state.books[id] && !state.books[id].cover) {
+    job.tried.add(next);
+    state.books[id].cover = next;
     save();
     render();
   }
@@ -907,7 +935,7 @@ async function openCoverPicker(id) {
       toast('Couverture changée !');
     }
   });
-  const urls = await coverCandidates(b.title, b.authors);
+  const urls = await coverCandidates(b.title, b.authors, b.isbn);
   if (!document.body.contains(back)) return;
   back.querySelector('#cover-status').textContent = urls.length
     ? 'Touche la bonne couverture.'
