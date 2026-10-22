@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><title>Vérification des couvertures</title></head>
+<body style="font:16px sans-serif">
+<h1>Vérification des couvertures</h1>
+<div id="out">En cours…</div>
+<script>
+// Page temporaire : cherche 4 livres sur Apple Books comme l'app, et vérifie que les couvertures s'affichent.
+const titres = ['La femme de ménage', 'Harry Potter à l\'école des sorciers', 'Les sept maris d\'Evelyn Hugo', 'Le Petit Prince'];
+let n = 0;
+function jsonp(url) {
+  return new Promise((ok, ko) => {
+    const name = 'cb' + ++n, s = document.createElement('script');
+    window[name] = (d) => { ok(d); s.remove(); };
+    s.onerror = ko; s.src = url + '&callback=' + name; document.head.appendChild(s);
+    setTimeout(() => ko(new Error('délai')), 10000);
+  });
+}
+(async () => {
+  const lignes = [];
+  for (const t of titres) {
+    try {
+      const d = await jsonp('https://itunes.apple.com/search?term=' + encodeURIComponent(t) + '&media=ebook&entity=ebook&country=fr&lang=fr_fr&limit=3');
+      const r = d.results[0];
+      const src = r.artworkUrl100.replace('100x100bb', '400x600bb');
+      const taille = await new Promise((ok) => { const i = new Image(); i.onload = () => ok(i.naturalWidth + 'x' + i.naturalHeight); i.onerror = () => ok('ÉCHEC'); i.src = src; document.body.appendChild(i); i.style.height = '150px'; });
+      lignes.push('RESULTAT ' + t + ' => trouvé « ' + r.trackName + ' » de ' + r.artistName + ' ; couverture ' + taille);
+    } catch (e) { lignes.push('RESULTAT ' + t + ' => ERREUR ' + e.message); }
+  }
+  document.getElementById('out').innerHTML = lignes.map((l) => '<p>' + l + '</p>').join('');
+})();
+</script>
+</body></html>
