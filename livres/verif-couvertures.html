@@ -22,8 +22,9 @@ function jsonp(url) {
       const d = await jsonp('https://itunes.apple.com/search?term=' + encodeURIComponent(t) + '&media=ebook&entity=ebook&country=fr&lang=fr_fr&limit=3');
       const r = d.results[0];
       const src = r.artworkUrl100.replace('100x100bb', '400x600bb');
-      const taille = await new Promise((ok) => { const i = new Image(); i.onload = () => ok(i.naturalWidth + 'x' + i.naturalHeight); i.onerror = () => ok('ÉCHEC'); i.src = src; document.body.appendChild(i); i.style.height = '150px'; });
-      lignes.push('RESULTAT ' + t + ' => trouvé « ' + r.trackName + ' » de ' + r.artistName + ' ; couverture ' + taille);
+      const essai = (url, noref) => new Promise((ok) => { const i = new Image(); if (noref) i.referrerPolicy = 'no-referrer'; i.onload = () => ok(i.naturalWidth + 'x' + i.naturalHeight); i.onerror = () => ok('ÉCHEC'); i.src = url + (noref ? '' : '?r=1'); document.body.appendChild(i); i.style.height = '80px'; });
+      const a = await essai(src, false), b = await essai(src, true), c = await essai(r.artworkUrl100.replace('100x100bb', '600x600bb'), true), d2 = await essai(r.artworkUrl100, false);
+      lignes.push('RESULTAT ' + t + ' => avec referer 400x600: ' + a + ' | sans referer 400x600: ' + b + ' | sans referer 600x600: ' + c + ' | avec referer 100x100: ' + d2);
     } catch (e) { lignes.push('RESULTAT ' + t + ' => ERREUR ' + e.message); }
   }
   document.getElementById('out').innerHTML = lignes.map((l) => '<p>' + l + '</p>').join('');
