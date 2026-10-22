@@ -1,0 +1,14 @@
+{
+ "name": "La bibliothèque de Danaïs",
+ "short_name": "Danaïs",
+ "start_url": "./",
+ "scope": "./",
+ "display": "standalone",
+ "background_color": "#F0EFEA",
+ "theme_color": "#EE6A24",
+ "lang": "fr",
+ "icons": [
+  { "src": "icon-180.png", "sizes": "180x180", "type": "image/png" },
+  { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" }
+ ]
+}

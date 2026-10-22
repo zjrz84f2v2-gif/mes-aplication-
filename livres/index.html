@@ -1,0 +1,863 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Danaïs">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#EE6A24">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-180.png">
+<title>La bibliothèque de Danaïs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cabin:wght@400;600;700&display=swap">
+<style>
+/* Couvertures à bandes : chaque niveau est une bande de couleur franche. */
+:root {
+  --ground: #F0EFEA;
+  --band-center: #FFFFFF;
+  --ink: #1A1A1A;
+  --ink-soft: #5C5B57;
+  --line: #D8D6CF;
+  --orange: #EE6A24;
+  --cerise: #D2335B;
+  --vert: #1F9A5B;
+  --bleu: #2D5DA8;
+  --violet: #7A4C93;
+  --gris: #8A8A86;
+  --on-band: #FFFFFF;
+  --font: "Gill Sans", "Gill Sans MT", "Cabin", "Trebuchet MS", sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ground: #151515;
+    --band-center: #222222;
+    --ink: #F1F0EC;
+    --ink-soft: #A9A7A0;
+    --line: #34332F;
+    color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  background: var(--ground);
+  color: var(--ink);
+  font: 17px/1.4 var(--font);
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+}
+::selection { background: var(--orange); color: #fff; }
+button, input, textarea, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 3px solid var(--bleu); outline-offset: 2px; }
+
+#app { min-height: 100%; padding-bottom: calc(76px + env(safe-area-inset-bottom)); }
+.wrap { padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right)); }
+
+/* En-tête : une couverture à trois bandes. */
+.cover-head { padding-top: env(safe-area-inset-top); background: var(--orange); }
+.cover-head .top, .cover-head .bottom { height: 44px; display: flex; align-items: center; justify-content: center; color: var(--on-band); letter-spacing: .18em; text-transform: uppercase; font-size: 13px; font-weight: 600; }
+.cover-head .middle { background: var(--band-center); text-align: center; padding: 14px 16px 16px; border-top: 3px solid var(--band-center); }
+.cover-head .middle .over { font-size: 15px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); }
+.cover-head .middle h1 { margin: 2px 0 0; font-size: 44px; line-height: 1; font-weight: 700; letter-spacing: -.01em; }
+.cover-head .bottom { height: 14px; }
+.cover-head.small .top { height: 40px; }
+
+h2.page { font-size: 28px; margin: 24px 0 12px; font-weight: 700; }
+.hint { color: var(--ink-soft); font-size: 15px; margin: 8px 0 0; }
+
+/* Bandes de niveaux. */
+.tier { margin-top: 14px; }
+.tier-name { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; color: var(--on-band); text-transform: uppercase; letter-spacing: .14em; font-size: 14px; font-weight: 700; }
+.tier-name .count { letter-spacing: 0; font-weight: 600; opacity: .9; }
+.tier-books { min-height: 108px; display: flex; flex-wrap: wrap; gap: 8px; padding: 10px; background: var(--band-center); border: 3px solid; border-top: 0; }
+.tier-books:empty::after { content: "Glisse un livre ici"; color: var(--ink-soft); font-size: 15px; align-self: center; margin: 0 auto; }
+
+.cover { width: 62px; height: 92px; flex: 0 0 auto; position: relative; background: var(--line); border: 0; padding: 0; overflow: hidden; touch-action: manipulation; }
+.cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.cover .fake { position: absolute; inset: 0; display: flex; flex-direction: column; }
+.cover .fake span { flex: 1; }
+.cover .fake b { flex: 2; background: #fff; color: #1A1A1A; font-size: 9px; line-height: 1.15; padding: 4px; display: flex; align-items: center; justify-content: center; text-align: center; overflow: hidden; font-weight: 700; }
+.sortable-ghost { opacity: .35; }
+.sortable-chosen { transform: scale(1.06); }
+
+/* Listes de lecture. */
+.list { display: flex; flex-direction: column; gap: 8px; min-height: 56px; }
+.list:empty::after { content: attr(data-empty); color: var(--ink-soft); font-size: 15px; padding: 14px; border: 2px dashed var(--line); }
+.row { display: flex; align-items: center; gap: 12px; background: var(--band-center); padding: 8px; }
+.row .cover { width: 48px; height: 72px; }
+.row .info { flex: 1; min-width: 0; text-align: left; background: none; border: 0; padding: 4px 0; }
+.row .title { font-weight: 700; display: block; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.row .author { color: var(--ink-soft); font-size: 15px; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row .rank { width: 30px; text-align: center; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--ink-soft); }
+.handle { width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; background: none; border: 0; color: var(--ink-soft); touch-action: none; }
+.progress { height: 8px; background: var(--line); margin-top: 6px; }
+.progress i { display: block; height: 100%; background: var(--vert); }
+.progress-label { font-size: 14px; color: var(--ink-soft); margin-top: 4px; font-variant-numeric: tabular-nums; }
+
+.section-band { margin-top: 26px; color: var(--on-band); padding: 10px 14px; text-transform: uppercase; letter-spacing: .14em; font-weight: 700; font-size: 14px; display: flex; justify-content: space-between; }
+.section-body { padding-top: 10px; }
+
+/* Recherche. */
+.search { display: flex; gap: 8px; margin-top: 8px; }
+.search input { flex: 1; min-width: 0; height: 52px; padding: 0 14px; border: 3px solid var(--ink); background: var(--band-center); border-radius: 0; font-size: 18px; }
+.btn { min-height: 48px; padding: 0 18px; border: 3px solid var(--ink); background: var(--ink); color: var(--ground); font-weight: 700; border-radius: 0; }
+.btn.ghost { background: transparent; color: var(--ink); }
+.btn.danger { background: transparent; color: var(--cerise); border-color: var(--cerise); }
+.btn.full { width: 100%; }
+.results { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+.status { color: var(--ink-soft); padding: 12px 0; }
+
+/* Barre d'onglets. */
+.tabs { position: fixed; left: 0; right: 0; bottom: 0; display: flex; background: var(--band-center); border-top: 3px solid var(--ink); padding-bottom: env(safe-area-inset-bottom); padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); z-index: 10; }
+.tabs button { flex: 1; min-height: 60px; background: none; border: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; font-size: 12px; font-weight: 600; color: var(--ink-soft); }
+.tabs button[aria-selected="true"] { color: var(--orange); }
+.tabs svg { width: 26px; height: 26px; }
+
+/* Fiche d'un livre (feuille qui monte du bas). */
+.sheet-back { position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 20; display: flex; align-items: flex-end; }
+.sheet { background: var(--ground); width: 100%; max-height: 92%; overflow-y: auto; padding-bottom: calc(24px + env(safe-area-inset-bottom)); }
+.sheet .band { height: 14px; }
+.sheet-head { display: flex; gap: 14px; padding-top: 16px; align-items: flex-start; }
+.sheet-head .cover { width: 84px; height: 126px; }
+.sheet-head h3 { margin: 0; font-size: 22px; line-height: 1.2; }
+.sheet-head p { margin: 4px 0 0; color: var(--ink-soft); }
+.close { margin-left: auto; width: 44px; height: 44px; border: 0; background: none; color: var(--ink); flex: 0 0 auto; }
+.field-label { display: block; font-weight: 700; margin: 20px 0 8px; }
+.choices { display: flex; flex-wrap: wrap; gap: 8px; }
+.choice { min-height: 44px; padding: 0 14px; border: 3px solid var(--ink); background: var(--band-center); font-weight: 700; border-radius: 0; }
+.choice[aria-pressed="true"] { background: var(--ink); color: var(--ground); }
+.choice.tier-choice[aria-pressed="true"] { color: #fff; }
+.stars { display: flex; gap: 4px; }
+.stars button { width: 48px; height: 48px; background: none; border: 0; padding: 0; }
+.stars svg { width: 36px; height: 36px; }
+textarea, .num { width: 100%; border: 3px solid var(--ink); background: var(--band-center); padding: 12px; border-radius: 0; font-size: 17px; }
+textarea { min-height: 100px; resize: vertical; }
+.num { width: 110px; height: 48px; font-variant-numeric: tabular-nums; }
+.pages-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.actions { display: flex; flex-direction: column; gap: 10px; margin-top: 26px; }
+
+/* Statistiques. */
+.stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+.stat { background: var(--band-center); padding: 14px; }
+.stat strong { display: block; font-size: 34px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.stat span { color: var(--ink-soft); font-size: 15px; }
+.bars { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.bar { display: grid; grid-template-columns: 118px 1fr 30px; align-items: center; gap: 8px; font-size: 15px; }
+.bar .track { height: 22px; background: var(--band-center); }
+.bar .fill { height: 100%; }
+.bar .n { text-align: right; font-variant-numeric: tabular-nums; font-weight: 700; }
+.bar .lbl { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Réglages des niveaux. */
+.tier-edit { display: flex; align-items: center; gap: 8px; background: var(--band-center); padding: 8px; }
+.tier-edit input { flex: 1; min-width: 0; height: 44px; border: 2px solid var(--line); background: transparent; padding: 0 10px; border-radius: 0; }
+.swatches { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.swatch { width: 36px; height: 36px; border: 3px solid transparent; padding: 0; }
+.swatch[aria-pressed="true"] { border-color: var(--ink); }
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(86px + env(safe-area-inset-bottom)); background: var(--ink); color: var(--ground); padding: 12px 18px; font-weight: 600; z-index: 30; max-width: calc(100% - 32px); text-align: center; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<nav class="tabs" role="tablist" aria-label="Sections">
+  <button role="tab" data-tab="classement" aria-selected="true">
+    <svg viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="2.4"><rect x="3" y="4" width="20" height="5"/><rect x="3" y="11" width="20" height="5"/><rect x="3" y="18" width="20" height="5"/></svg>
+    Classement
+  </button>
+  <button role="tab" data-tab="lectures" aria-selected="false">
+    <svg viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"><path d="M3 5h7a3 3 0 0 1 3 3v14a2.5 2.5 0 0 0-2.5-2.5H3z"/><path d="M23 5h-7a3 3 0 0 0-3 3v14a2.5 2.5 0 0 1 2.5-2.5H23z"/></svg>
+    Lectures
+  </button>
+  <button role="tab" data-tab="ajouter" aria-selected="false">
+    <svg viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="11.5" cy="11.5" r="7"/><path d="M17 17l5 5"/></svg>
+    Ajouter
+  </button>
+  <button role="tab" data-tab="stats" aria-selected="false">
+    <svg viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 22V13M13 22V5M21 22v-6"/></svg>
+    Stats
+  </button>
+</nav>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.2/Sortable.min.js"></script>
+<script>
+'use strict';
+
+// ---------- Données (gardées dans ce téléphone) ----------
+
+const STORE_KEY = 'bibliotheque-danais-v1';
+const COLORS = ['#EE6A24', '#D2335B', '#1F9A5B', '#2D5DA8', '#7A4C93', '#8A8A86', '#C99A1A', '#1A1A1A'];
+const LISTS = {
+  reading: { name: 'En cours de lecture', color: '#1F9A5B', empty: 'Aucun livre en cours. Choisis-en un dans ta pile !' },
+  pile: { name: 'Dans ma pile', color: '#2D5DA8', empty: 'Ta pile est vide. Ajoute les livres que tu as et que tu vas lire.' },
+  wish: { name: 'Mes envies', color: '#7A4C93', empty: 'Aucune envie pour l’instant. Ajoute les livres que tu aimerais lire.' },
+};
+
+function defaultState() {
+  const tiers = [
+    { id: 't1', name: 'Coup de cœur', color: '#EE6A24' },
+    { id: 't2', name: 'Adoré', color: '#D2335B' },
+    { id: 't3', name: 'Bien', color: '#1F9A5B' },
+    { id: 't4', name: 'Moyen', color: '#2D5DA8' },
+    { id: 't5', name: 'Pas aimé', color: '#8A8A86' },
+  ];
+  const order = { reading: [], pile: [], wish: [], unranked: [] };
+  tiers.forEach((t) => (order['tier:' + t.id] = []));
+  return { version: 1, tiers, books: {}, order };
+}
+
+function load() {
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch (e) {}
+  return defaultState();
+}
+
+let state = load();
+let ui = { tab: 'classement', query: '', results: null, searching: false, error: '' };
+
+function save() {
+  try {
+    localStorage.setItem(STORE_KEY, JSON.stringify(state));
+  } catch (e) {
+    toast('Impossible d’enregistrer sur ce téléphone.');
+  }
+}
+
+// Où se trouve un livre : 'reading', 'pile', 'wish', 'unranked' ou 'tier:<id>'.
+function placeOf(id) {
+  return Object.keys(state.order).find((k) => state.order[k].includes(id)) || null;
+}
+
+function moveBook(id, to, index) {
+  const from = placeOf(id);
+  if (from) state.order[from] = state.order[from].filter((x) => x !== id);
+  if (!state.order[to]) state.order[to] = [];
+  const list = state.order[to];
+  list.splice(index == null ? list.length : index, 0, id);
+  const book = state.books[id];
+  const wasRead = from && (from.startsWith('tier:') || from === 'unranked');
+  const isRead = to.startsWith('tier:') || to === 'unranked';
+  if (isRead && !wasRead) book.finishedAt = Date.now();
+  if (!isRead) book.finishedAt = null;
+  if (to === 'reading' && !book.startedAt) book.startedAt = Date.now();
+  save();
+}
+
+function addBook(data, to) {
+  const existing = Object.values(state.books).find((b) => data.googleId && b.googleId === data.googleId);
+  if (existing) {
+    toast('Ce livre est déjà dans ta bibliothèque.');
+    openSheet(existing.id);
+    return;
+  }
+  const id = 'b' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  state.books[id] = {
+    id,
+    title: data.title,
+    authors: data.authors || '',
+    cover: data.cover || '',
+    pages: data.pages || 0,
+    year: data.year || '',
+    googleId: data.googleId || '',
+    rating: 0,
+    review: '',
+    currentPage: 0,
+    addedAt: Date.now(),
+    startedAt: null,
+    finishedAt: null,
+  };
+  moveBook(id, to);
+  toast(`« ${data.title} » ajouté à ${placeName(to)}.`);
+}
+
+function removeBook(id) {
+  const from = placeOf(id);
+  if (from) state.order[from] = state.order[from].filter((x) => x !== id);
+  delete state.books[id];
+  save();
+}
+
+function placeName(key) {
+  if (LISTS[key]) return LISTS[key].name.toLowerCase();
+  if (key === 'unranked') return 'tes livres lus';
+  const tier = state.tiers.find((t) => 'tier:' + t.id === key);
+  return tier ? `« ${tier.name} »` : '';
+}
+
+// ---------- Petits outils ----------
+
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+function coverHtml(book, color) {
+  const label = esc(book.title);
+  if (book.cover) {
+    return `<img src="${esc(book.cover)}" alt="" loading="lazy" onerror="this.replaceWith(fakeCover(this))" data-title="${label}" data-color="${esc(color || '#EE6A24')}">`;
+  }
+  return `<div class="fake" aria-hidden="true"><span style="background:${esc(color || '#EE6A24')}"></span><b>${label}</b><span style="background:${esc(color || '#EE6A24')}"></span></div>`;
+}
+
+// Couverture de remplacement (si l'image ne charge pas) : une mini couverture à bandes.
+function fakeCover(img) {
+  const div = document.createElement('div');
+  div.className = 'fake';
+  div.setAttribute('aria-hidden', 'true');
+  const c = img.dataset.color;
+  div.innerHTML = `<span style="background:${c}"></span><b>${img.dataset.title}</b><span style="background:${c}"></span>`;
+  return div;
+}
+
+let toastTimer;
+function toast(text) {
+  document.querySelector('.toast')?.remove();
+  const el = document.createElement('div');
+  el.className = 'toast';
+  el.setAttribute('role', 'status');
+  el.textContent = text;
+  document.body.appendChild(el);
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.remove(), 2000);
+}
+
+const starSvg = (on) =>
+  `<svg viewBox="0 0 24 24"><path d="M12 2.8l2.8 5.8 6.3.9-4.6 4.4 1.1 6.3L12 17.2 6.4 20.2l1.1-6.3L2.9 9.5l6.3-.9z" fill="${on ? '#EE6A24' : 'none'}" stroke="${on ? '#EE6A24' : 'currentColor'}" stroke-width="1.8" stroke-linejoin="round"/></svg>`;
+
+const handleSvg = `<svg width="22" height="22" viewBox="0 0 22 22" fill="currentColor" aria-hidden="true"><rect x="3" y="5" width="16" height="2.4"/><rect x="3" y="10" width="16" height="2.4"/><rect x="3" y="15" width="16" height="2.4"/></svg>`;
+
+// ---------- Écrans ----------
+
+const app = document.getElementById('app');
+let sortables = [];
+
+function render() {
+  sortables.forEach((s) => s.destroy());
+  sortables = [];
+  document.querySelectorAll('.tabs button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === ui.tab)));
+  const screens = { classement: renderRanking, lectures: renderReading, ajouter: renderAdd, stats: renderStats };
+  app.innerHTML = header() + `<div class="wrap">${screens[ui.tab]()}</div>`;
+  bindScreen();
+}
+
+function header() {
+  // Sur les autres onglets, l'en-tête se réduit à une bande pour laisser la place au contenu.
+  if (ui.tab !== 'classement') return `<header class="cover-head small"><div class="top">La bibliothèque de Danaïs</div></header>`;
+  const read = state.tiers.reduce((n, t) => n + (state.order['tier:' + t.id] || []).length, 0) + (state.order.unranked || []).length;
+  const pile = (state.order.pile || []).length;
+  return `<header class="cover-head">
+    <div class="top">${read} livre${read > 1 ? 's' : ''} lu${read > 1 ? 's' : ''} · ${pile} dans la pile</div>
+    <div class="middle"><div class="over">La bibliothèque de</div><h1>Danaïs</h1></div>
+    <div class="bottom"></div>
+  </header>`;
+}
+
+function renderRanking() {
+  const unranked = state.order.unranked || [];
+  const total = state.tiers.reduce((n, t) => n + (state.order['tier:' + t.id] || []).length, 0) + unranked.length;
+  let html = `<h2 class="page">Mon classement</h2>`;
+  html += total
+    ? `<p class="hint">Touche un livre pour sa fiche. Appuie longuement et glisse pour le changer de place.</p>`
+    : `<p class="hint">Les livres que tu as lus se rangent ici, du coup de cœur au pas aimé. Va dans « Ajouter » pour chercher ton premier livre.</p>`;
+  if (unranked.length) html += tierBlock('unranked', 'À classer', '#1A1A1A');
+  state.tiers.forEach((t) => (html += tierBlock('tier:' + t.id, t.name, t.color)));
+  html += `<div class="actions"><button class="btn ghost full" data-action="edit-tiers">Modifier mes niveaux</button></div>`;
+  return html;
+}
+
+function tierBlock(key, name, color) {
+  const ids = state.order[key] || [];
+  return `<section class="tier">
+    <div class="tier-name" style="background:${esc(color)}"><span>${esc(name)}</span><span class="count">${ids.length}</span></div>
+    <div class="tier-books sortable" data-list="${esc(key)}" style="border-color:${esc(color)}">${ids
+      .map((id) => {
+        const b = state.books[id];
+        return b ? `<button class="cover" data-book="${b.id}" aria-label="${esc(b.title)}">${coverHtml(b, color)}</button>` : '';
+      })
+      .join('')}</div>
+  </section>`;
+}
+
+function renderReading() {
+  let html = `<h2 class="page">Mes lectures</h2>`;
+  for (const key of ['reading', 'pile', 'wish']) {
+    const list = LISTS[key];
+    const ids = state.order[key] || [];
+    html += `<div class="section-band" style="background:${list.color}"><span>${list.name}</span><span>${ids.length}</span></div>
+      <div class="section-body">
+      ${key === 'pile' && ids.length > 1 ? `<p class="hint" style="margin:0 0 8px">Glisse avec la poignée à droite pour choisir l’ordre de lecture.</p>` : ''}
+      <div class="list sortable" data-list="${key}" data-empty="${esc(list.empty)}">${ids.map((id, i) => rowHtml(state.books[id], key, i)).join('')}</div>
+      </div>`;
+  }
+  return html;
+}
+
+function rowHtml(b, key, i) {
+  if (!b) return '';
+  const color = LISTS[key]?.color || '#EE6A24';
+  let extra = '';
+  if (key === 'reading' && b.pages) {
+    const pct = Math.min(100, Math.round(((b.currentPage || 0) / b.pages) * 100));
+    extra = `<div class="progress" aria-hidden="true"><i style="width:${pct}%"></i></div><span class="progress-label">Page ${b.currentPage || 0} sur ${b.pages} · ${pct} %</span>`;
+  }
+  return `<div class="row" data-id="${b.id}">
+    ${key === 'pile' ? `<span class="rank">${i + 1}</span>` : ''}
+    <button class="cover" data-book="${b.id}" aria-label="${esc(b.title)}">${coverHtml(b, color)}</button>
+    <button class="info" data-book="${b.id}"><span class="title">${esc(b.title)}</span><span class="author">${esc(b.authors)}</span>${extra}</button>
+    <button class="handle" aria-label="Déplacer ${esc(b.title)}">${handleSvg}</button>
+  </div>`;
+}
+
+function renderAdd() {
+  let html = `<h2 class="page">Ajouter un livre</h2>
+    <form class="search" id="search-form">
+      <input id="q" type="search" enterkeyhint="search" placeholder="Titre ou auteur…" value="${esc(ui.query)}" aria-label="Titre ou auteur" autocomplete="off">
+      <button class="btn" type="submit">Chercher</button>
+    </form>`;
+  if (ui.searching) html += `<p class="status">Je cherche…</p>`;
+  else if (ui.error) html += `<p class="status">${esc(ui.error)}</p>`;
+  else if (ui.results && !ui.results.length) html += `<p class="status">Aucun livre trouvé. Essaie un autre mot, ou ajoute-le à la main ci-dessous.</p>`;
+  if (ui.results && ui.results.length) {
+    html += `<div class="results">${ui.results
+      .map(
+        (r, i) => `<div class="row">
+        <button class="cover" data-result="${i}" aria-label="${esc(r.title)}">${coverHtml(r, '#EE6A24')}</button>
+        <button class="info" data-result="${i}"><span class="title">${esc(r.title)}</span><span class="author">${esc(r.authors)}${r.year ? ' · ' + esc(r.year) : ''}${r.pages ? ' · ' + r.pages + ' pages' : ''}</span></button>
+      </div>`,
+      )
+      .join('')}</div>`;
+  }
+  if (!ui.results || !ui.searching) {
+    html += `<div class="section-band" style="background:var(--gris)"><span>Pas trouvé ?</span></div>
+      <div class="section-body">
+        <button class="btn ghost full" data-action="manual">Ajouter un livre à la main</button>
+      </div>`;
+  }
+  return html;
+}
+
+function renderStats() {
+  const year = new Date().getFullYear();
+  const readIds = [...state.tiers.flatMap((t) => state.order['tier:' + t.id] || []), ...(state.order.unranked || [])];
+  const read = readIds.map((id) => state.books[id]).filter(Boolean);
+  const thisYear = read.filter((b) => b.finishedAt && new Date(b.finishedAt).getFullYear() === year);
+  const pagesYear = thisYear.reduce((n, b) => n + (b.pages || 0), 0);
+  const rated = read.filter((b) => b.rating);
+  const avg = rated.length ? (rated.reduce((n, b) => n + b.rating, 0) / rated.length).toFixed(1).replace('.', ',') : '–';
+  const max = Math.max(1, ...state.tiers.map((t) => (state.order['tier:' + t.id] || []).length));
+  return `<h2 class="page">Mes stats</h2>
+    <div class="stat-grid">
+      <div class="stat"><strong>${thisYear.length}</strong><span>livre${thisYear.length > 1 ? 's' : ''} lu${thisYear.length > 1 ? 's' : ''} en ${year}</span></div>
+      <div class="stat"><strong>${pagesYear.toLocaleString('fr-FR')}</strong><span>pages lues en ${year}</span></div>
+      <div class="stat"><strong>${read.length}</strong><span>livres lus en tout</span></div>
+      <div class="stat"><strong>${avg}</strong><span>note moyenne sur 5</span></div>
+      <div class="stat"><strong>${(state.order.pile || []).length}</strong><span>dans ta pile</span></div>
+      <div class="stat"><strong>${(state.order.wish || []).length}</strong><span>envies</span></div>
+    </div>
+    <div class="section-band" style="background:var(--orange)"><span>Par niveau</span></div>
+    <div class="bars">${state.tiers
+      .map((t) => {
+        const n = (state.order['tier:' + t.id] || []).length;
+        return `<div class="bar"><span class="lbl">${esc(t.name)}</span><span class="track"><span class="fill" style="display:block;width:${(n / max) * 100}%;background:${esc(t.color)}"></span></span><span class="n">${n}</span></div>`;
+      })
+      .join('')}</div>
+    <div class="section-band" style="background:var(--gris)"><span>Sauvegarde</span></div>
+    <div class="section-body">
+      <p class="hint" style="margin:0 0 10px">Tes livres sont gardés dans ce téléphone. Fais une sauvegarde de temps en temps : si tu vides Safari, tu pourras tout récupérer.</p>
+      <div class="actions" style="margin-top:0">
+        <button class="btn full" data-action="export">Sauvegarder dans un fichier</button>
+        <button class="btn ghost full" data-action="import">Récupérer une sauvegarde</button>
+        <input type="file" id="import-file" accept="application/json,.json" hidden>
+      </div>
+    </div>`;
+}
+
+// ---------- Interactions ----------
+
+function bindScreen() {
+  // Glisser-déposer : appui long pour attraper un livre (le défilement reste normal).
+  document.querySelectorAll('.tier-books.sortable').forEach((el) => {
+    sortables.push(
+      Sortable.create(el, {
+        group: 'tiers',
+        animation: 160,
+        delay: 220,
+        delayOnTouchOnly: true,
+        onEnd: (e) => {
+          moveBook(e.item.dataset.book, e.to.dataset.list, e.newIndex);
+          render();
+        },
+      }),
+    );
+  });
+  document.querySelectorAll('.list.sortable').forEach((el) => {
+    sortables.push(
+      Sortable.create(el, {
+        group: 'lists',
+        animation: 160,
+        handle: '.handle',
+        onEnd: (e) => {
+          moveBook(e.item.dataset.id, e.to.dataset.list, e.newIndex);
+          render();
+        },
+      }),
+    );
+  });
+
+  const form = document.getElementById('search-form');
+  if (form) {
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      search(document.getElementById('q').value);
+    });
+  }
+  const file = document.getElementById('import-file');
+  if (file) file.addEventListener('change', importBackup);
+}
+
+document.addEventListener('click', (e) => {
+  const tab = e.target.closest('.tabs button');
+  if (tab) {
+    ui.tab = tab.dataset.tab;
+    render();
+    window.scrollTo(0, 0);
+    if (ui.tab === 'ajouter' && !ui.results) setTimeout(() => document.getElementById('q')?.focus(), 50);
+    return;
+  }
+  const book = e.target.closest('[data-book]');
+  if (book && !e.target.closest('.sheet')) return openSheet(book.dataset.book);
+  const result = e.target.closest('[data-result]');
+  if (result) return openAddSheet(ui.results[Number(result.dataset.result)]);
+  const action = e.target.closest('[data-action]');
+  if (!action) return;
+  const a = action.dataset.action;
+  if (a === 'edit-tiers') openTierEditor();
+  else if (a === 'manual') openManualSheet();
+  else if (a === 'export') exportBackup();
+  else if (a === 'import') document.getElementById('import-file').click();
+});
+
+// ---------- Recherche de livres ----------
+
+async function search(q) {
+  q = q.trim();
+  ui.query = q;
+  if (!q) return;
+  ui.searching = true;
+  ui.error = '';
+  render();
+  try {
+    ui.results = await searchGoogle(q);
+    if (!ui.results.length) ui.results = await searchOpenLibrary(q);
+  } catch (e) {
+    try {
+      ui.results = await searchOpenLibrary(q);
+    } catch (e2) {
+      ui.results = null;
+      ui.error = 'La recherche ne marche pas : vérifie ta connexion internet, puis réessaie.';
+    }
+  }
+  ui.searching = false;
+  render();
+}
+
+async function searchGoogle(q) {
+  const url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&maxResults=20&printType=books&langRestrict=fr`;
+  let data = await (await fetch(url)).json();
+  // Rien en français ? On cherche dans toutes les langues.
+  if (!data.items) data = await (await fetch(url.replace('&langRestrict=fr', ''))).json();
+  return (data.items || []).map((it) => {
+    const v = it.volumeInfo || {};
+    const img = v.imageLinks?.thumbnail || v.imageLinks?.smallThumbnail || '';
+    return {
+      googleId: it.id,
+      title: v.title + (v.subtitle ? ' : ' + v.subtitle : ''),
+      authors: (v.authors || []).join(', '),
+      pages: v.pageCount || 0,
+      year: (v.publishedDate || '').slice(0, 4),
+      cover: img.replace('http://', 'https://').replace('&edge=curl', ''),
+    };
+  });
+}
+
+async function searchOpenLibrary(q) {
+  const data = await (await fetch(`https://openlibrary.org/search.json?q=${encodeURIComponent(q)}&limit=20`)).json();
+  return (data.docs || []).map((d) => ({
+    googleId: 'ol:' + d.key,
+    title: d.title,
+    authors: (d.author_name || []).join(', '),
+    pages: d.number_of_pages_median || 0,
+    year: d.first_publish_year ? String(d.first_publish_year) : '',
+    cover: d.cover_i ? `https://covers.openlibrary.org/b/id/${d.cover_i}-M.jpg` : '',
+  }));
+}
+
+// ---------- Feuilles (fiches) ----------
+
+function showSheet(color, inner) {
+  closeSheet();
+  const back = document.createElement('div');
+  back.className = 'sheet-back';
+  back.innerHTML = `<div class="sheet" role="dialog" aria-modal="true"><div class="band" style="background:${esc(color)}"></div><div class="wrap">${inner}</div></div>`;
+  back.addEventListener('click', (e) => {
+    if (e.target === back || e.target.closest('.close')) closeSheet();
+  });
+  document.body.appendChild(back);
+  document.body.style.overflow = 'hidden';
+  return back;
+}
+
+function closeSheet() {
+  document.querySelector('.sheet-back')?.remove();
+  document.body.style.overflow = '';
+}
+
+const closeBtn = `<button class="close" aria-label="Fermer"><svg width="22" height="22" viewBox="0 0 22 22" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M4 4l14 14M18 4L4 18"/></svg></button>`;
+
+function sheetHead(b, color) {
+  return `<div class="sheet-head">
+    <div class="cover">${coverHtml(b, color)}</div>
+    <div style="min-width:0"><h3>${esc(b.title)}</h3><p>${esc(b.authors)}${b.year ? ' · ' + esc(b.year) : ''}</p>${b.pages ? `<p>${b.pages} pages</p>` : ''}</div>
+    ${closeBtn}
+  </div>`;
+}
+
+// Choisir où ranger un livre trouvé.
+function openAddSheet(r) {
+  const back = showSheet(
+    '#EE6A24',
+    `${sheetHead(r, '#EE6A24')}
+    <span class="field-label">Où le ranger ?</span>
+    <div class="choices">
+      <button class="choice" data-to="reading">Je le lis en ce moment</button>
+      <button class="choice" data-to="pile">Je l’ai, je vais le lire</button>
+      <button class="choice" data-to="wish">J’aimerais le lire</button>
+    </div>
+    <span class="field-label">Déjà lu ? Classe-le :</span>
+    <div class="choices">${state.tiers
+      .map((t) => `<button class="choice tier-choice" data-to="tier:${t.id}" style="border-color:${esc(t.color)}">${esc(t.name)}</button>`)
+      .join('')}</div>`,
+  );
+  back.addEventListener('click', (e) => {
+    const c = e.target.closest('[data-to]');
+    if (!c) return;
+    addBook(r, c.dataset.to);
+    closeSheet();
+    render();
+  });
+}
+
+function openManualSheet() {
+  const back = showSheet(
+    '#8A8A86',
+    `<div class="sheet-head"><div style="flex:1"><h3>Ajouter à la main</h3></div>${closeBtn}</div>
+    <label class="field-label" for="m-title">Titre</label><input id="m-title" class="num" style="width:100%">
+    <label class="field-label" for="m-author">Auteur (facultatif)</label><input id="m-author" class="num" style="width:100%">
+    <label class="field-label" for="m-pages">Nombre de pages (facultatif)</label><input id="m-pages" class="num" type="number" inputmode="numeric" min="0">
+    <div class="actions"><button class="btn full" data-action-sheet="next">Continuer</button></div>`,
+  );
+  back.querySelector('#m-title').focus();
+  back.addEventListener('click', (e) => {
+    if (!e.target.closest('[data-action-sheet="next"]')) return;
+    const title = back.querySelector('#m-title').value.trim();
+    if (!title) return toast('Écris au moins le titre.');
+    openAddSheet({
+      title,
+      authors: back.querySelector('#m-author').value.trim(),
+      pages: parseInt(back.querySelector('#m-pages').value, 10) || 0,
+    });
+  });
+}
+
+// Fiche d'un livre de la bibliothèque.
+function openSheet(id) {
+  const b = state.books[id];
+  if (!b) return;
+  const place = placeOf(id);
+  const isRead = place && (place.startsWith('tier:') || place === 'unranked');
+  const tier = state.tiers.find((t) => 'tier:' + t.id === place);
+  const color = tier?.color || LISTS[place]?.color || '#1A1A1A';
+  let inner = sheetHead(b, color);
+
+  inner += `<span class="field-label">Où il est</span><div class="choices">
+    ${['reading', 'pile', 'wish'].map((k) => `<button class="choice" data-to="${k}" aria-pressed="${place === k}">${LISTS[k].name}</button>`).join('')}
+    <button class="choice" data-to="read" aria-pressed="${!!isRead}">Lu</button>
+  </div>`;
+
+  if (place === 'reading') {
+    inner += `<label class="field-label" for="cur">Où j’en suis</label>
+      <div class="pages-row"><span>Page</span><input id="cur" class="num" type="number" inputmode="numeric" min="0" value="${b.currentPage || 0}">
+      <span>sur</span><input id="tot" class="num" type="number" inputmode="numeric" min="0" value="${b.pages || ''}" placeholder="?"></div>`;
+  }
+
+  if (isRead) {
+    inner += `<span class="field-label">Mon niveau</span><div class="choices">${state.tiers
+      .map(
+        (t) =>
+          `<button class="choice tier-choice" data-to="tier:${t.id}" aria-pressed="${place === 'tier:' + t.id}" style="border-color:${esc(t.color)};${place === 'tier:' + t.id ? 'background:' + esc(t.color) : ''}">${esc(t.name)}</button>`,
+      )
+      .join('')}</div>
+      <span class="field-label">Ma note</span>
+      <div class="stars" role="group" aria-label="Note sur 5">${[1, 2, 3, 4, 5]
+        .map((n) => `<button data-star="${n}" aria-label="${n} sur 5" aria-pressed="${b.rating >= n}">${starSvg(b.rating >= n)}</button>`)
+        .join('')}</div>
+      <label class="field-label" for="review">Mon avis</label>
+      <textarea id="review" placeholder="Ce que j’en ai pensé…">${esc(b.review)}</textarea>`;
+  }
+
+  inner += `<div class="actions">
+    ${place === 'reading' ? `<button class="btn full" data-to="read">J’ai fini ce livre !</button>` : ''}
+    <button class="btn danger full" data-remove>Retirer de ma bibliothèque</button>
+  </div>`;
+
+  const back = showSheet(color, inner);
+
+  const cur = back.querySelector('#cur');
+  const tot = back.querySelector('#tot');
+  const saveProgress = () => {
+    b.pages = Math.max(0, parseInt(tot.value, 10) || 0);
+    b.currentPage = Math.max(0, Math.min(b.pages || Infinity, parseInt(cur.value, 10) || 0));
+    save();
+    render();
+  };
+  cur?.addEventListener('change', saveProgress);
+  tot?.addEventListener('change', saveProgress);
+  back.querySelector('#review')?.addEventListener('input', (e) => {
+    b.review = e.target.value;
+    save();
+  });
+
+  let confirmRemove = false;
+  back.addEventListener('click', (e) => {
+    const star = e.target.closest('[data-star]');
+    if (star) {
+      const n = Number(star.dataset.star);
+      b.rating = b.rating === n ? 0 : n;
+      save();
+      return openSheet(id);
+    }
+    const to = e.target.closest('[data-to]');
+    if (to) {
+      let dest = to.dataset.to;
+      // « Lu » : il faut choisir un niveau, on le met d'abord dans « À classer ».
+      if (dest === 'read') {
+        if (isRead) return;
+        dest = 'unranked';
+        toast('Bravo ! Choisis maintenant son niveau.');
+      }
+      if (dest !== place) moveBook(id, dest);
+      render();
+      return openSheet(id);
+    }
+    const rm = e.target.closest('[data-remove]');
+    if (rm) {
+      if (!confirmRemove) {
+        confirmRemove = true;
+        rm.textContent = 'Appuie encore pour confirmer';
+        return;
+      }
+      removeBook(id);
+      closeSheet();
+      render();
+      toast('Livre retiré.');
+    }
+  });
+}
+
+// ---------- Modifier les niveaux ----------
+
+function openTierEditor() {
+  const back = showSheet(
+    '#EE6A24',
+    `<div class="sheet-head"><div style="flex:1"><h3>Mes niveaux</h3><p>Renomme, change la couleur, ajoute ou retire un niveau.</p></div>${closeBtn}</div>
+    <div class="list" style="margin-top:16px">${state.tiers
+      .map(
+        (t, i) => `<div>
+        <div class="tier-edit" style="border-left:8px solid ${esc(t.color)}">
+          <input value="${esc(t.name)}" data-rename="${t.id}" aria-label="Nom du niveau ${i + 1}">
+          <button class="handle" data-up="${t.id}" aria-label="Monter" ${i === 0 ? 'disabled' : ''}><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M4 13l6-6 6 6"/></svg></button>
+          <button class="handle" data-del="${t.id}" aria-label="Supprimer ${esc(t.name)}"><svg width="20" height="20" viewBox="0 0 20 20" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M4 4l12 12M16 4L4 16"/></svg></button>
+        </div>
+        <div class="swatches">${COLORS.map((c) => `<button class="swatch" data-color="${c}" data-tier="${t.id}" style="background:${c}" aria-label="Couleur" aria-pressed="${c === t.color}"></button>`).join('')}</div>
+      </div>`,
+      )
+      .join('')}</div>
+    <div class="actions"><button class="btn full" data-add-tier>Ajouter un niveau</button></div>`,
+  );
+  back.addEventListener('input', (e) => {
+    const t = state.tiers.find((x) => x.id === e.target.dataset.rename);
+    if (t) {
+      t.name = e.target.value || 'Sans nom';
+      save();
+      render();
+    }
+  });
+  back.addEventListener('click', (e) => {
+    const sw = e.target.closest('[data-color]');
+    const up = e.target.closest('[data-up]');
+    const del = e.target.closest('[data-del]');
+    if (sw) {
+      state.tiers.find((x) => x.id === sw.dataset.tier).color = sw.dataset.color;
+    } else if (up) {
+      const i = state.tiers.findIndex((x) => x.id === up.dataset.up);
+      [state.tiers[i - 1], state.tiers[i]] = [state.tiers[i], state.tiers[i - 1]];
+    } else if (del) {
+      if (state.tiers.length <= 1) return toast('Il faut garder au moins un niveau.');
+      const key = 'tier:' + del.dataset.del;
+      // Les livres de ce niveau passent dans « À classer ».
+      state.order.unranked = [...(state.order.unranked || []), ...(state.order[key] || [])];
+      delete state.order[key];
+      state.tiers = state.tiers.filter((x) => x.id !== del.dataset.del);
+    } else if (e.target.closest('[data-add-tier]')) {
+      const id = 't' + Date.now().toString(36);
+      state.tiers.push({ id, name: 'Nouveau niveau', color: COLORS[state.tiers.length % COLORS.length] });
+      state.order['tier:' + id] = [];
+    } else return;
+    save();
+    render();
+    openTierEditor();
+  });
+}
+
+// ---------- Sauvegarde ----------
+
+function exportBackup() {
+  const blob = new Blob([JSON.stringify(state, null, 1)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `bibliotheque-danais-${new Date().toISOString().slice(0, 10)}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  toast('Sauvegarde créée. Range le fichier dans « Fichiers ».');
+}
+
+function importBackup(e) {
+  const f = e.target.files[0];
+  if (!f) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const data = JSON.parse(reader.result);
+      if (!data.tiers || !data.books || !data.order) throw new Error('format');
+      state = data;
+      save();
+      render();
+      toast('Sauvegarde récupérée !');
+    } catch (err) {
+      toast('Ce fichier n’est pas une sauvegarde de la bibliothèque.');
+    }
+  };
+  reader.readAsText(f);
+}
+
+render();
+</script>
+</body>
+</html>
