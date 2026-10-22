@@ -1001,11 +1001,15 @@ __r(0);
 // L'app peut être posée à n'importe quelle adresse : on lui indique la sienne avant de la lancer.
 (function () {
   var base = location.pathname.replace(/\/index\.html$/, '').replace(/\/$/, '');
-  // Retour à l'accueil : on garde l'adresse exacte du fichier (sans « / » final), qui reste rechargeable.
+  var home = location.pathname;
+  // Retour à l'accueil : on remet l'adresse d'ouverture exacte, qui reste rechargeable.
   ['pushState', 'replaceState'].forEach(function (name) {
     var original = history[name];
     history[name] = function (state, title, url) {
-      if (base && typeof url === 'string' && url.split('?')[0] === base + '/') url = base + url.slice(base.length + 1);
+      if (typeof url === 'string') {
+        var path = url.split('?')[0];
+        if (path === base || path === base + '/') url = home + url.slice(path.length);
+      }
       try {
         return original.call(history, state, title, url);
       } catch (e) {
