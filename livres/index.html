@@ -363,7 +363,7 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '
 function coverHtml(book, color) {
   const label = esc(book.title);
   if (book.cover) {
-    return `<img src="${esc(book.cover)}" alt="" loading="lazy" onerror="coverFailed(this)" onload="if (this.naturalWidth < 20) coverFailed(this)" data-title="${label}" data-color="${esc(color || '#E8B84A')}" data-cover-for="${esc(book.id || '')}">`;
+    return `<img src="${esc(book.cover)}" alt="" loading="lazy" onerror="coverFailed(this)" onload="if (this.naturalWidth < 20 && this.src.includes('amazon')) coverFailed(this)" data-title="${label}" data-color="${esc(color || '#E8B84A')}" data-cover-for="${esc(book.id || '')}">`;
   }
   return `<div class="fake" aria-hidden="true"><span style="background:${esc(color || '#E8B84A')}"></span><b>${label}</b><span style="background:${esc(color || '#E8B84A')}"></span></div>`;
 }
@@ -373,11 +373,10 @@ function coverFailed(img) {
   const id = img.dataset.coverFor;
   img.replaceWith(fakeCover(img));
   if (id && state.books[id]) {
-    // On retient cette couverture comme ratée pour passer à la suivante.
+    // On garde la couverture enregistrée (le réseau peut juste être lent) et on en cherche une qui marche.
     if (!repairing.has(id)) repairing.set(id, { tried: new Set(), list: null });
     repairing.get(id).tried.add(state.books[id].cover);
-    state.books[id].cover = '';
-    repairCover(id);
+    repairCover(id, true);
     return;
   }
   // Résultat de recherche : on lui cherche une autre couverture.
@@ -872,22 +871,44 @@ async function coverCandidates(title, authors, isbn) {
 
 // Cherche une couverture pour un livre qui n'en a pas (une seule fois par livre et par ouverture de l'app).
 const repairing = new Map(); // livre -> couvertures déjà essayées
-async function repairCover(id) {
+async function repairCover(id, replace = false) {
   const b = state.books[id];
-  if (!b || b.cover) return;
+  if (!b || (b.cover && !replace)) return;
   if (!repairing.has(id)) repairing.set(id, { tried: new Set(), list: null });
   const job = repairing.get(id);
   if (job.busy) return;
   job.busy = true;
   if (!job.list) job.list = await coverCandidates(b.title, b.authors, b.isbn);
-  job.busy = false;
-  const next = job.list.find((u) => !job.tried.has(u));
-  if (next && state.books[id] && !state.books[id].cover) {
-    job.tried.add(next);
-    state.books[id].cover = next;
-    save();
-    render();
+  // On essaie chaque couverture possible et on garde la première qui s'affiche vraiment.
+  for (const url of job.list) {
+    if (job.tried.has(url)) continue;
+    job.tried.add(url);
+    if (await imageWorks(url)) {
+      if (state.books[id]) {
+        state.books[id].cover = url;
+        save();
+        render();
+      }
+      break;
+    }
   }
+  job.busy = false;
+}
+
+function imageWorks(url) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    const timer = setTimeout(() => resolve(false), 8000);
+    img.onload = () => {
+      clearTimeout(timer);
+      resolve(img.naturalWidth >= 20 || !url.includes('amazon'));
+    };
+    img.onerror = () => {
+      clearTimeout(timer);
+      resolve(false);
+    };
+    img.src = url;
+  });
 }
 
 async function fillPages(id) {
