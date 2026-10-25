@@ -354,7 +354,7 @@ function demoBackend() {
 // Les messages d'erreur de Firebase, en clair.
 function explain(e) {
   const code = String(e?.code || e?.message || '');
-  if (code.includes('permission-denied')) return 'Firebase refuse l’accès : vérifie que tu as bien collé et publié les règles (étape 3).';
+  if (code.includes('permission-denied')) return 'Firebase refuse l’accès : vérifie que tu as bien collé et publié les règles dans l’onglet Sécurité (étape 3).';
   if (code.includes('not-found') || code.includes('does not exist')) return 'La base Firestore n’existe pas encore : refais l’étape 2 (« Créer une base de données »).';
   if (code.includes('invalid-api-key') || code.includes('api-key')) return 'Le code collé n’est pas le bon : recopie tout le bloc « firebaseConfig » (étape 4).';
   if (code.includes('timeout')) return 'Firebase ne répond pas. Vérifie ta connexion internet et que la base Firestore est bien créée (étape 2).';
@@ -466,7 +466,7 @@ function renderSetup() {
       <li><div><b class="step-title">Crée la base</b>
         <p>Dans le menu : <strong>Créer</strong> (ou « Build ») › <strong>Firestore Database</strong> › <strong>Créer une base de données</strong>. Emplacement : <strong>eur3 (Europe)</strong>. Choisis <strong>mode production</strong>, puis <strong>Créer</strong>.</p></div></li>
       <li><div><b class="step-title">Colle les règles</b>
-        <p>Dans Firestore, onglet <strong>Règles</strong> : efface tout, colle ce texte, puis <strong>Publier</strong>. Il autorise seulement les personnes qui ont votre lien secret.</p>
+        <p>Dans Firestore, onglet <strong>Sécurité</strong> (ou « Règles ») : efface tout, colle ce texte, puis <strong>Publier</strong>. Il autorise seulement les personnes qui ont votre lien secret.</p>
         <div class="copy-box">${esc(RULES)}</div>
         <button class="small-btn" data-copy="rules">Copier les règles</button></div></li>
       <li><div><b class="step-title">Récupère le code</b>
