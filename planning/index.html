@@ -1,0 +1,916 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Planning">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#ECEEF4">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&display=swap" rel="stylesheet">
+<title>Notre planning</title>
+<style>
+/* Un agenda papier posé sur la table : feuille crème, encre noire, le jour même surligné au fluo.
+   Chaque personne a sa couleur d'encre. */
+:root {
+  --paper: #ECEEF4;
+  --card: #FFFFFF;
+  --ink: #1E1C18;
+  --ink-2: #5A554B;
+  --ink-3: #8A8477;
+  --line: rgba(30, 28, 24, .12);
+  --accent: #2F5BD3;
+  --accent-ink: #FFFFFF;
+  --highlight: #FFE066;
+  --danger: #B23A26;
+  --ok: #2E7D4F;
+  --radius: 18px;
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+  --display: "Bricolage Grotesque", var(--font);
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; }
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font: 17px/1.4 var(--font);
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+  overscroll-behavior-y: contain;
+}
+::selection { background: var(--highlight); color: var(--ink); }
+button, input, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+a { color: var(--accent); text-underline-offset: 3px; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; border-radius: 8px; }
+input, textarea { caret-color: var(--accent); }
+
+#app { min-height: 100vh; padding: env(safe-area-inset-top) max(18px, env(safe-area-inset-right)) calc(110px + env(safe-area-inset-bottom)) max(18px, env(safe-area-inset-left)); max-width: 640px; margin: 0 auto; }
+
+/* En-tête : nom du planning, qui en fait partie, inviter. */
+.top { display: flex; align-items: center; gap: 12px; padding-top: 16px; }
+.top h1 { font: 800 22px/1.15 var(--display); margin: 0; flex: 1; min-width: 0; letter-spacing: -.01em; }
+.people { display: flex; }
+.dot-avatar { width: 34px; height: 34px; border-radius: 50%; color: #fff; font-weight: 800; font-size: 15px; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 0 3px var(--paper); }
+.dot-avatar + .dot-avatar { margin-left: -8px; }
+.icon-btn { min-height: 44px; padding: 0 14px; border-radius: 999px; border: 1.5px solid var(--line); background: var(--card); font-weight: 700; font-size: 15px; display: inline-flex; align-items: center; gap: 6px; }
+.icon-btn svg { width: 18px; height: 18px; }
+.sync { font-size: 13px; color: var(--ink-2); margin-top: 4px; display: flex; align-items: center; gap: 6px; }
+.sync i { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); display: inline-block; }
+.sync.off i { background: #C28A1A; }
+
+/* Aujourd'hui, en grand. */
+.today { margin-top: 18px; background: var(--card); border-radius: 24px; padding: 18px 18px 8px; box-shadow: 0 1px 0 rgba(30, 28, 24, .04), 0 10px 30px -18px rgba(30, 28, 24, .35); }
+.today-date { font: 800 30px/1.05 var(--display); letter-spacing: -.02em; margin: 0; }
+.today-date mark { background: linear-gradient(transparent 55%, var(--highlight) 55%, var(--highlight) 92%, transparent 92%); color: inherit; padding: 0 2px; }
+.today-sub { color: var(--ink-2); font-size: 15px; margin: 4px 0 6px; }
+.tomorrow { margin-top: 12px; border-top: 1px dashed var(--line); padding-top: 12px; }
+.tomorrow h3 { margin: 0 0 2px; font: 700 15px/1.2 var(--font); color: var(--ink-2); }
+
+/* Une activité. */
+.ev { display: flex; align-items: flex-start; gap: 10px; padding: 8px 0; }
+.check { width: 30px; height: 30px; border-radius: 9px; border: 2px solid var(--ink-3); background: transparent; flex: 0 0 auto; display: flex; align-items: center; justify-content: center; padding: 0; margin-top: 1px; }
+.check svg { width: 18px; height: 18px; opacity: 0; }
+.ev.done .check { background: var(--ok); border-color: var(--ok); }
+.ev.done .check svg { opacity: 1; }
+.ev-body { flex: 1; min-width: 0; text-align: left; background: none; border: 0; padding: 2px 0; display: block; }
+.ev-title { font-weight: 700; font-size: 17px; line-height: 1.3; display: block; overflow-wrap: anywhere; }
+.ev.done .ev-title { text-decoration: line-through; text-decoration-thickness: 2px; color: var(--ink-3); }
+.ev-meta { font-size: 14px; color: var(--ink-2); display: flex; align-items: center; gap: 6px; margin-top: 2px; flex-wrap: wrap; }
+.ev-meta .who { display: inline-flex; align-items: center; gap: 5px; font-weight: 600; }
+.ev-meta .who i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+.ev-time { font-variant-numeric: tabular-nums; font-weight: 800; color: var(--ink); }
+.nothing { color: var(--ink-2); font-size: 15px; padding: 6px 0 12px; margin: 0; }
+
+/* La semaine : une ligne par jour, comme un agenda papier. */
+.week-head { display: flex; align-items: center; gap: 8px; margin: 30px 0 8px; }
+.week-head h2 { flex: 1; margin: 0; font: 800 21px/1.2 var(--display); letter-spacing: -.01em; }
+.nav { width: 44px; height: 44px; border-radius: 50%; border: 1.5px solid var(--line); background: var(--card); display: flex; align-items: center; justify-content: center; padding: 0; }
+.nav svg { width: 18px; height: 18px; }
+.back-now { min-height: 44px; border: 0; background: none; color: var(--accent); font-weight: 700; font-size: 15px; padding: 0 4px; }
+.days { background: var(--card); border-radius: var(--radius); box-shadow: 0 10px 30px -22px rgba(30, 28, 24, .4); overflow: hidden; }
+.day { display: grid; grid-template-columns: 64px 1fr; border-top: 1px solid var(--line); min-height: 64px; }
+.day:first-child { border-top: 0; }
+.day-num { padding: 12px 0 10px 14px; display: flex; flex-direction: column; }
+.day-num b { font: 800 26px/1 var(--display); font-variant-numeric: tabular-nums; }
+.day-num span { font-size: 13px; color: var(--ink-2); font-weight: 600; margin-top: 3px; text-transform: capitalize; }
+.day.is-today .day-num b { background: linear-gradient(transparent 50%, var(--highlight) 50%, var(--highlight) 95%, transparent 95%); align-self: flex-start; padding: 0 2px; margin-left: -2px; }
+.day.is-past { background: rgba(30, 28, 24, .025); }
+.day.is-past .day-num b { color: var(--ink-3); }
+.day-list { padding: 4px 8px 4px 0; min-width: 0; display: flex; flex-direction: column; }
+.day-add { align-self: stretch; min-height: 44px; border: 0; background: none; text-align: left; color: var(--ink-3); font-size: 15px; padding: 0 0 0 40px; border-radius: 10px; }
+.day-list .ev + .day-add { min-height: 36px; }
+
+/* Gros bouton du bas. */
+.footer { position: fixed; left: 0; right: 0; bottom: 0; padding: 12px max(18px, env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom)) max(18px, env(safe-area-inset-left)); background: linear-gradient(rgba(236, 238, 244, 0), var(--paper) 30%); z-index: 5; }
+.footer .btn { max-width: 604px; margin: 0 auto; display: flex; }
+
+/* Boutons. */
+.btn { min-height: 56px; width: 100%; padding: 0 22px; border: 0; background: var(--accent); color: var(--accent-ink); font-weight: 800; font-size: 18px; border-radius: 16px; align-items: center; justify-content: center; gap: 8px; text-decoration: none; display: inline-flex; box-shadow: 0 8px 20px -10px rgba(47, 91, 211, .7); }
+.btn svg { width: 22px; height: 22px; }
+.btn.ghost { background: var(--card); color: var(--ink); border: 1.5px solid var(--line); box-shadow: none; font-weight: 700; font-size: 17px; }
+.btn.danger { background: transparent; color: var(--danger); border: 1.5px solid rgba(178, 58, 38, .4); box-shadow: none; font-size: 17px; }
+.btn:disabled { opacity: .5; }
+.actions { display: flex; flex-direction: column; gap: 10px; margin-top: 22px; }
+
+/* Feuilles (qui montent du bas). */
+.sheet-back { position: fixed; inset: 0; background: rgba(30, 28, 24, .4); z-index: 20; display: flex; align-items: flex-end; justify-content: center; }
+.sheet { background: var(--paper); width: 100%; max-width: 640px; max-height: 92%; overflow-y: auto; border-radius: 26px 26px 0 0; padding: 0 max(18px, env(safe-area-inset-right)) calc(24px + env(safe-area-inset-bottom)) max(18px, env(safe-area-inset-left)); }
+.sheet .band { width: 40px; height: 5px; border-radius: 3px; background: rgba(30, 28, 24, .2); margin: 10px auto 0; }
+.sheet-head { display: flex; align-items: flex-start; gap: 12px; padding-top: 14px; }
+.sheet-head h3 { flex: 1; margin: 0; font: 800 24px/1.15 var(--display); letter-spacing: -.01em; overflow-wrap: anywhere; }
+.close { width: 40px; height: 40px; border-radius: 50%; border: 0; background: rgba(30, 28, 24, .08); display: flex; align-items: center; justify-content: center; flex: 0 0 auto; padding: 0; }
+.close svg { width: 16px; height: 16px; }
+.label { display: block; font-weight: 700; font-size: 16px; margin: 20px 0 8px; }
+.field { width: 100%; min-height: 54px; border: 1.5px solid var(--line); background: var(--card); border-radius: 14px; padding: 12px 14px; font-size: 18px; }
+textarea.field { min-height: 90px; resize: vertical; font-size: 17px; }
+.field::placeholder { color: var(--ink-3); }
+.row { display: flex; gap: 10px; flex-wrap: wrap; }
+.chip { min-height: 46px; padding: 0 16px; border-radius: 999px; border: 1.5px solid var(--line); background: var(--card); font-weight: 700; font-size: 16px; }
+.chip[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+.date-field { flex: 1 1 160px; }
+.detail-meta { color: var(--ink-2); margin: 6px 0 0; font-size: 16px; }
+.detail-note { background: var(--card); border-radius: 14px; padding: 12px 14px; margin: 14px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.hint { color: var(--ink-2); font-size: 15px; margin: 8px 0 0; }
+
+/* Mise en route. */
+.hello { padding-top: 40px; }
+.hello h1 { font: 800 40px/1 var(--display); letter-spacing: -.025em; margin: 0; }
+.hello h1 mark { background: linear-gradient(transparent 55%, var(--highlight) 55%, var(--highlight) 92%, transparent 92%); color: inherit; padding: 0 3px; }
+.hello p.lead { font-size: 18px; color: var(--ink-2); margin: 14px 0 0; max-width: 34ch; }
+.steps { list-style: none; counter-reset: step; padding: 0; margin: 20px 0 0; display: flex; flex-direction: column; gap: 14px; }
+.steps > li { counter-increment: step; background: var(--card); border-radius: var(--radius); padding: 16px; display: grid; grid-template-columns: 34px 1fr; gap: 12px; }
+.steps > li::before { content: counter(step); width: 34px; height: 34px; border-radius: 50%; background: var(--highlight); font: 800 17px/34px var(--display); text-align: center; }
+.steps > li > div { min-width: 0; }
+.steps b.step-title { display: block; font-size: 17px; margin-top: 5px; }
+.steps p { margin: 6px 0 0; color: var(--ink-2); font-size: 15px; }
+.steps p strong { color: var(--ink); }
+.copy-box { margin-top: 10px; background: var(--paper); border-radius: 12px; padding: 10px; font: 13px/1.45 ui-monospace, Menlo, monospace; white-space: pre; overflow-x: auto; color: var(--ink); }
+.small-btn { margin-top: 10px; min-height: 44px; padding: 0 16px; border-radius: 999px; border: 1.5px solid var(--line); background: var(--paper); font-weight: 700; font-size: 15px; display: inline-flex; align-items: center; text-decoration: none; color: var(--ink); }
+.error { color: var(--danger); font-weight: 600; font-size: 15px; margin: 10px 0 0; }
+.status { color: var(--ink-2); font-size: 15px; margin: 10px 0 0; }
+.banner { margin-top: 14px; background: var(--highlight); border-radius: 14px; padding: 12px 14px; font-size: 15px; display: flex; gap: 10px; align-items: flex-start; }
+.banner p { margin: 0; flex: 1; }
+.banner button { border: 0; background: none; font-weight: 800; min-height: 32px; padding: 0 4px; }
+
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(96px + env(safe-area-inset-bottom)); background: var(--ink); color: var(--paper); padding: 12px 18px; font-weight: 700; z-index: 30; max-width: calc(100% - 32px); text-align: center; border-radius: 999px; box-shadow: 0 10px 30px -10px rgba(0, 0, 0, .5); }
+
+/* Retour visuel immédiat quand on touche. */
+.btn, .chip, .nav, .check, .ev-body, .day-add, .icon-btn, .close, .small-btn { transition: transform .14s cubic-bezier(.2, .8, .2, 1), opacity .12s ease-out, background-color .14s ease-out; }
+.btn:active, .chip:active, .nav:active, .check:active, .icon-btn:active, .small-btn:active { transform: scale(.96); }
+.ev-body:active, .day-add:active, .close:active { opacity: .55; }
+/* L'arrivée de la feuille : elle monte vite puis freine. */
+.sheet { animation: rise .32s cubic-bezier(.16, 1, .3, 1); }
+@keyframes rise { from { transform: translateY(40px); opacity: .4; } }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+'use strict';
+
+// ---------- Réglages gardés dans ce téléphone ----------
+// Tout ce qu'il faut est aussi dans l'adresse de la page (?p=…&c=…&m=…) :
+// ainsi l'app ajoutée à l'écran d'accueil de l'iPhone retrouve le planning.
+
+const LOCAL_KEY = 'planning-v1';
+const FB_VERSION = '12.17.1';
+const COLORS = ['#2F5BD3', '#D9573B', '#2E7D4F', '#8A4FBF', '#B7791F', '#C2417A'];
+const DEMO = new URLSearchParams(location.search).has('demo');
+
+const RULES = `rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /plannings/{planId}/{document=**} {
+      allow read, write: if planId.size() >= 20;
+    }
+  }
+}`;
+
+function loadLocal() {
+  try {
+    return JSON.parse(localStorage.getItem(LOCAL_KEY)) || {};
+  } catch (e) {
+    return {};
+  }
+}
+function saveLocal() {
+  try {
+    localStorage.setItem(LOCAL_KEY, JSON.stringify(local));
+  } catch (e) {}
+}
+
+const b64 = (o) => btoa(unescape(encodeURIComponent(JSON.stringify(o)))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const unb64 = (s) => JSON.parse(decodeURIComponent(escape(atob(s.replace(/-/g, '+').replace(/_/g, '/')))));
+
+let local = loadLocal();
+(function readUrl() {
+  const q = new URLSearchParams(location.search);
+  try {
+    if (q.get('c')) local.cfg = unb64(q.get('c'));
+  } catch (e) {}
+  if (q.get('p') && q.get('p') !== local.planId) {
+    // Lien d'invitation vers un autre planning : on le rejoint (nouvelle identité dans ce planning).
+    if (local.planId) delete local.memberId;
+    local.planId = q.get('p');
+  }
+  if (q.get('m') && q.get('p') === local.planId) local.memberId = q.get('m');
+  saveLocal();
+})();
+
+// L'adresse de la page porte le planning : l'icône de l'écran d'accueil l'ouvrira directement.
+function syncUrl() {
+  if (!local.planId || !local.cfg) return;
+  const q = new URLSearchParams();
+  if (DEMO) q.set('demo', '1');
+  q.set('p', local.planId);
+  q.set('c', b64(local.cfg));
+  if (local.memberId) q.set('m', local.memberId);
+  history.replaceState(null, '', location.pathname + '?' + q);
+}
+
+function inviteUrl() {
+  const q = new URLSearchParams();
+  if (DEMO) q.set('demo', '1');
+  q.set('p', local.planId);
+  q.set('c', b64(local.cfg));
+  return location.origin + location.pathname + '?' + q;
+}
+
+const randomId = (n) => {
+  const abc = 'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  return Array.from(crypto.getRandomValues(new Uint8Array(n)), (x) => abc[x % abc.length]).join('');
+};
+
+// ---------- Le serveur (Firebase Firestore) ----------
+
+const backend = DEMO ? demoBackend() : firebaseBackend();
+
+function firebaseBackend() {
+  let fs, db;
+  return {
+    async init(cfg) {
+      if (db) return;
+      const base = `https://www.gstatic.com/firebasejs/${FB_VERSION}/`;
+      const { initializeApp } = await import(base + 'firebase-app.js');
+      fs = await import(base + 'firebase-firestore.js');
+      const app = initializeApp({ apiKey: cfg.apiKey, authDomain: cfg.authDomain, projectId: cfg.projectId, appId: cfg.appId });
+      // Cache dans le téléphone : l'app marche hors connexion et envoie les changements plus tard.
+      db = fs.initializeFirestore(app, { localCache: fs.persistentLocalCache({ tabManager: fs.persistentMultipleTabManager() }) });
+    },
+    createPlan: (p, data) => fs.setDoc(fs.doc(db, 'plannings', p), { ...data, createdAt: fs.serverTimestamp() }),
+    joinPlan: (p, m, member) => fs.updateDoc(fs.doc(db, 'plannings', p), { ['members.' + m]: member }),
+    watchPlan: (p, cb, err) =>
+      fs.onSnapshot(fs.doc(db, 'plannings', p), { includeMetadataChanges: true }, (s) => cb(s.exists() ? s.data() : null, s.metadata), err),
+    watchEvents: (p, since, cb, err) =>
+      fs.onSnapshot(
+        fs.query(fs.collection(db, 'plannings', p, 'events'), fs.where('date', '>=', since)),
+        { includeMetadataChanges: true },
+        (qs) => cb(qs.docs.map((d) => ({ ...d.data(), id: d.id })), qs.metadata),
+        err,
+      ),
+    saveEvent: (p, ev) => fs.setDoc(fs.doc(db, 'plannings', p, 'events', ev.id), ev, { merge: true }),
+    removeEvent: (p, id) => fs.deleteDoc(fs.doc(db, 'plannings', p, 'events', id)),
+  };
+}
+
+// Mode démo (?demo=1) : même fonctionnement, rangé dans le navigateur (pour tester sans Firebase).
+function demoBackend() {
+  const K = 'planning-demo-db';
+  const read = () => JSON.parse(localStorage.getItem(K) || '{}');
+  const write = (dbv) => {
+    localStorage.setItem(K, JSON.stringify(dbv));
+    listeners.forEach((f) => f());
+  };
+  const listeners = new Set();
+  addEventListener('storage', (e) => e.key === K && listeners.forEach((f) => f()));
+  const meta = { hasPendingWrites: false, fromCache: false };
+  return {
+    async init() {},
+    async createPlan(p, data) {
+      const d = read();
+      d[p] = { plan: { ...data, createdAt: Date.now() }, events: {} };
+      write(d);
+    },
+    async joinPlan(p, m, member) {
+      const d = read();
+      if (!d[p]) throw Object.assign(new Error('absent'), { code: 'not-found' });
+      d[p].plan.members[m] = member;
+      write(d);
+    },
+    watchPlan(p, cb) {
+      const f = () => cb(read()[p]?.plan || null, meta);
+      listeners.add(f);
+      setTimeout(f);
+      return () => listeners.delete(f);
+    },
+    watchEvents(p, since, cb) {
+      const f = () => cb(Object.values(read()[p]?.events || {}).filter((e) => e.date >= since), meta);
+      listeners.add(f);
+      setTimeout(f);
+      return () => listeners.delete(f);
+    },
+    async saveEvent(p, ev) {
+      const d = read();
+      d[p].events[ev.id] = { ...(d[p].events[ev.id] || {}), ...ev };
+      write(d);
+    },
+    async removeEvent(p, id) {
+      const d = read();
+      delete d[p].events[id];
+      write(d);
+    },
+  };
+}
+
+// Les messages d'erreur de Firebase, en clair.
+function explain(e) {
+  const code = String(e?.code || e?.message || '');
+  if (code.includes('permission-denied')) return 'Firebase refuse l’accès : vérifie que tu as bien collé et publié les règles (étape 3).';
+  if (code.includes('not-found') || code.includes('does not exist')) return 'La base Firestore n’existe pas encore : refais l’étape 2 (« Créer une base de données »).';
+  if (code.includes('invalid-api-key') || code.includes('api-key')) return 'Le code collé n’est pas le bon : recopie tout le bloc « firebaseConfig » (étape 4).';
+  if (code.includes('timeout')) return 'Firebase ne répond pas. Vérifie ta connexion internet et que la base Firestore est bien créée (étape 2).';
+  return 'Ça n’a pas marché (' + code.slice(0, 80) + '). Vérifie ta connexion, puis réessaie.';
+}
+
+const withTimeout = (promise, ms) =>
+  Promise.race([promise, new Promise((_, reject) => setTimeout(() => reject(Object.assign(new Error('timeout'), { code: 'timeout' })), ms))]);
+
+// ---------- Dates ----------
+
+const pad = (n) => String(n).padStart(2, '0');
+const iso = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const parseIso = (s) => {
+  const [y, m, d] = s.split('-').map(Number);
+  return new Date(y, m - 1, d);
+};
+const addDays = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
+const startOfWeek = (d) => addDays(d, -((d.getDay() + 6) % 7));
+const todayIso = () => iso(new Date());
+const fmt = (d, o) => d.toLocaleDateString('fr-FR', o);
+const capital = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+
+function dayLabel(s) {
+  const t = todayIso();
+  if (s === t) return 'aujourd’hui';
+  if (s === iso(addDays(new Date(), 1))) return 'demain';
+  if (s === iso(addDays(new Date(), -1))) return 'hier';
+  return fmt(parseIso(s), { weekday: 'long', day: 'numeric', month: 'long' });
+}
+
+// ---------- État de l'écran ----------
+
+let plan = null; // { name, members: { id: { name, color } } }
+let events = [];
+let synced = true;
+let ui = { weekStart: startOfWeek(new Date()), screen: 'loading', error: '' };
+const app = document.getElementById('app');
+
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+let toastTimer;
+function toast(text) {
+  document.querySelector('.toast')?.remove();
+  const el = document.createElement('div');
+  el.className = 'toast';
+  el.setAttribute('role', 'status');
+  el.textContent = text;
+  document.body.appendChild(el);
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.remove(), 2200);
+}
+
+const icons = {
+  plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>',
+  invite: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M19 8v6M16 11h6"/></svg>',
+  left: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>',
+  right: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>',
+  check: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+  close: '<svg viewBox="0 0 22 22" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M4 4l14 14M18 4L4 18"/></svg>',
+  cal: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M8 3v4M16 3v4M3.5 10h17M12 13v4M10 15h4"/></svg>',
+};
+
+const member = (id) => plan?.members?.[id] || { name: 'Quelqu’un', color: '#8A8477' };
+
+// ---------- Écrans ----------
+
+function render() {
+  const screens = { loading: renderLoading, welcome: renderWelcome, setup: renderSetup, name: renderName, main: renderMain, error: renderError };
+  app.innerHTML = screens[ui.screen]();
+  document.querySelector('.footer')?.remove();
+  if (ui.screen === 'main') {
+    const f = document.createElement('div');
+    f.className = 'footer';
+    f.innerHTML = `<button class="btn" data-add="${todayIso()}">${icons.plus} Ajouter</button>`;
+    document.body.appendChild(f);
+  }
+  bind();
+}
+
+const renderLoading = () => `<p class="status" style="padding-top:40px">Je charge le planning…</p>`;
+
+function renderError() {
+  return `<div class="hello"><h1>Oups</h1><p class="lead">${esc(ui.error)}</p>
+    <div class="actions"><button class="btn" data-action="reload">Réessayer</button>
+    <button class="btn ghost" data-action="reset">Recommencer à zéro</button></div></div>`;
+}
+
+function renderWelcome() {
+  return `<div class="hello">
+    <h1>Notre <mark>planning</mark></h1>
+    <p class="lead">Écrivez ce que vous avez prévu, jour par jour, et invitez la personne de votre choix pour avoir le même planning tous les deux.</p>
+    <div class="actions"><button class="btn" data-action="setup">Créer notre planning</button></div>
+    <p class="hint">Tu as reçu une invitation ? Ouvre simplement le lien qu’on t’a envoyé.</p>
+  </div>`;
+}
+
+// Mise en route : créer la base Firebase gratuite (une seule fois).
+function renderSetup() {
+  if (local.cfg) return renderName();
+  return `<div class="hello" style="padding-top:24px">
+    <h1>Une seule fois</h1>
+    <p class="lead">Le planning est rangé dans une base gratuite de Google (Firebase). Tu la crées une fois, ensuite la personne invitée n’aura rien à faire.</p>
+    <ol class="steps">
+      <li><div><b class="step-title">Crée le projet</b>
+        <p>Connecte-toi avec ton compte Google, touche <strong>Créer un projet</strong>, appelle-le <strong>planning</strong>, refuse Google Analytics, puis <strong>Créer le projet</strong>.</p>
+        <a class="small-btn" href="https://console.firebase.google.com/" target="_blank" rel="noopener">Ouvrir Firebase</a></div></li>
+      <li><div><b class="step-title">Crée la base</b>
+        <p>Dans le menu : <strong>Créer</strong> (ou « Build ») › <strong>Firestore Database</strong> › <strong>Créer une base de données</strong>. Emplacement : <strong>eur3 (Europe)</strong>. Choisis <strong>mode production</strong>, puis <strong>Créer</strong>.</p></div></li>
+      <li><div><b class="step-title">Colle les règles</b>
+        <p>Dans Firestore, onglet <strong>Règles</strong> : efface tout, colle ce texte, puis <strong>Publier</strong>. Il autorise seulement les personnes qui ont votre lien secret.</p>
+        <div class="copy-box">${esc(RULES)}</div>
+        <button class="small-btn" data-copy="rules">Copier les règles</button></div></li>
+      <li><div><b class="step-title">Récupère le code</b>
+        <p>Roue ⚙ › <strong>Paramètres du projet</strong> › en bas, <strong>Vos applications</strong> › icône <strong>&lt;/&gt;</strong> (Web). Surnom : <strong>Planning</strong> › <strong>Enregistrer l’application</strong>. Firebase montre un bloc qui commence par <strong>const firebaseConfig = {</strong> : copie tout le bloc.</p></div></li>
+      <li><div><b class="step-title">Colle-le ici</b>
+        <form id="cfg-form">
+          <label class="label" for="cfg" style="margin-top:8px">Le bloc firebaseConfig</label>
+          <textarea id="cfg" class="field" autocapitalize="off" autocomplete="off" spellcheck="false" placeholder="const firebaseConfig = { apiKey: …"></textarea>
+          <div class="actions" style="margin-top:12px"><button class="btn" type="submit">Continuer</button></div>
+          ${ui.error ? `<p class="error" role="alert">${esc(ui.error)}</p>` : ''}
+        </form></div></li>
+    </ol>
+  </div>`;
+}
+
+// Ton prénom (et, pour la personne qui crée, le nom du planning).
+function renderName() {
+  const joining = !!plan;
+  const owner = joining ? (plan.members || {})[plan.owner]?.name : '';
+  return `<div class="hello">
+    <h1>${joining ? `Bienvenue dans <mark>${esc(plan.name)}</mark>` : 'Presque <mark>fini</mark>'}</h1>
+    <p class="lead">${joining ? `${esc(owner || 'Quelqu’un')} t’invite à partager son planning. Comment tu t’appelles ?` : 'Comment tu t’appelles, et comment on appelle ce planning ?'}</p>
+    <form id="name-form">
+      <label class="label" for="me">Ton prénom</label>
+      <input id="me" class="field" autocomplete="given-name" enterkeyhint="${joining ? 'done' : 'next'}" required>
+      ${joining ? '' : `<label class="label" for="plan-name">Nom du planning</label><input id="plan-name" class="field" value="Notre planning" enterkeyhint="done">`}
+      <div class="actions"><button class="btn" type="submit">${joining ? 'Rejoindre le planning' : 'Créer le planning'}</button></div>
+      ${ui.error ? `<p class="error" role="alert">${esc(ui.error)}</p>` : ''}
+    </form>
+  </div>`;
+}
+
+function evHtml(e) {
+  const m = member(e.by);
+  return `<div class="ev${e.done ? ' done' : ''}">
+    <button class="check" data-done="${esc(e.id)}" aria-label="${e.done ? 'Pas encore fait' : 'Fait'} : ${esc(e.title)}" aria-pressed="${!!e.done}">${icons.check}</button>
+    <button class="ev-body" data-open="${esc(e.id)}">
+      <span class="ev-title">${esc(e.title)}</span>
+      <span class="ev-meta">${e.time ? `<span class="ev-time">${esc(e.time.replace(':', ' h '))}</span>` : ''}<span class="who"><i style="background:${esc(m.color)}"></i>${esc(m.name)}</span>${e.note ? '<span>· note</span>' : ''}</span>
+    </button>
+  </div>`;
+}
+
+const sortEvents = (list) => list.slice().sort((a, b) => (a.time || '99') .localeCompare(b.time || '99') || (a.createdAt || 0) - (b.createdAt || 0));
+const eventsOn = (day) => sortEvents(events.filter((e) => e.date === day));
+
+function renderMain() {
+  const today = new Date();
+  const t = iso(today);
+  const tomorrow = iso(addDays(today, 1));
+  const todays = eventsOn(t);
+  const left = todays.filter((e) => !e.done).length;
+  const members = Object.values(plan.members || {});
+  let html = `<header class="top">
+      <div style="flex:1;min-width:0"><h1>${esc(plan.name)}</h1>
+        <div class="sync${synced ? '' : ' off'}" role="status"><i aria-hidden="true"></i>${synced ? 'À jour' : 'Hors connexion : envoyé dès le retour du réseau'}</div></div>
+      <div class="people" aria-label="${esc(members.map((m) => m.name).join(', '))}">${members.map((m) => `<span class="dot-avatar" style="background:${esc(m.color)}" title="${esc(m.name)}">${esc((m.name || '?').charAt(0).toUpperCase())}</span>`).join('')}</div>
+      <button class="icon-btn" data-action="invite">${icons.invite} Inviter</button>
+    </header>`;
+
+  if (!local.dismissedHome && !matchMedia('(display-mode: standalone)').matches && !navigator.standalone) {
+    html += `<div class="banner"><p>Ajoute le planning à ton écran d’accueil : touche <b>Partager</b>, puis <b>Sur l’écran d’accueil</b>.</p><button data-action="hide-banner" aria-label="Masquer">OK</button></div>`;
+  }
+
+  html += `<section class="today" aria-label="Aujourd’hui">
+      <h2 class="today-date"><mark>${esc(capital(fmt(today, { weekday: 'long' })))}</mark> ${esc(fmt(today, { day: 'numeric', month: 'long' }))}</h2>
+      <p class="today-sub">${todays.length ? (left ? `${left} chose${left > 1 ? 's' : ''} à faire aujourd’hui` : 'Tout est fait pour aujourd’hui, bravo !') : 'Rien de prévu aujourd’hui.'}</p>
+      ${todays.map(evHtml).join('')}
+      <div class="tomorrow"><h3>Demain</h3>${eventsOn(tomorrow).map(evHtml).join('') || '<p class="nothing">Rien de prévu pour l’instant.</p>'}</div>
+    </section>`;
+
+  const ws = ui.weekStart;
+  const we = addDays(ws, 6);
+  const isThisWeek = iso(ws) === iso(startOfWeek(today));
+  const range = ws.getMonth() === we.getMonth() ? `${ws.getDate()} au ${fmt(we, { day: 'numeric', month: 'long' })}` : `${fmt(ws, { day: 'numeric', month: 'short' })} au ${fmt(we, { day: 'numeric', month: 'short' })}`;
+  const offset = Math.round((ws - startOfWeek(today)) / (7 * 864e5));
+  const weekName = offset === 0 ? 'Cette semaine' : offset === 1 ? 'Semaine prochaine' : offset === -1 ? 'Semaine dernière' : capital(range);
+  html += `<div class="week-head">
+      <h2>${esc(weekName)}</h2>
+      ${isThisWeek ? '' : '<button class="back-now" data-action="this-week">Aujourd’hui</button>'}
+      <button class="nav" data-week="-1" aria-label="Semaine précédente">${icons.left}</button>
+      <button class="nav" data-week="1" aria-label="Semaine suivante">${icons.right}</button>
+    </div>
+    ${Math.abs(offset) <= 1 ? `<p class="hint" style="margin:-4px 0 10px">Du ${esc(range)}</p>` : ''}
+    <div class="days">`;
+  for (let i = 0; i < 7; i++) {
+    const d = addDays(ws, i);
+    const ds = iso(d);
+    const list = eventsOn(ds);
+    html += `<div class="day${ds === t ? ' is-today' : ''}${ds < t ? ' is-past' : ''}">
+        <div class="day-num"><b>${d.getDate()}</b><span>${esc(fmt(d, { weekday: 'short' }).replace('.', ''))}</span></div>
+        <div class="day-list">${list.map(evHtml).join('')}<button class="day-add" data-add="${ds}" aria-label="Ajouter le ${esc(fmt(d, { weekday: 'long', day: 'numeric', month: 'long' }))}">+ Ajouter</button></div>
+      </div>`;
+  }
+  html += `</div>`;
+  return html;
+}
+
+// ---------- Actions ----------
+
+function bind() {
+  document.getElementById('cfg-form')?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const cfg = parseConfig(document.getElementById('cfg').value);
+    if (!cfg) {
+      ui.error = 'Je ne trouve pas le code : copie tout le bloc qui commence par « const firebaseConfig = { » et qui contient apiKey, projectId et appId.';
+      return render();
+    }
+    local.cfg = cfg;
+    saveLocal();
+    ui.error = '';
+    ui.screen = 'name';
+    render();
+  });
+  document.getElementById('name-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const name = document.getElementById('me').value.trim();
+    if (!name) return;
+    const btn = e.target.querySelector('button[type=submit]');
+    btn.disabled = true;
+    btn.textContent = 'Un instant…';
+    ui.error = '';
+    try {
+      await backend.init(local.cfg);
+      const memberId = randomId(10);
+      if (plan) {
+        const color = COLORS[Object.keys(plan.members || {}).length % COLORS.length];
+        await withTimeout(backend.joinPlan(local.planId, memberId, { name, color }), 15000);
+      } else {
+        const planId = randomId(24);
+        const planName = document.getElementById('plan-name').value.trim() || 'Notre planning';
+        await withTimeout(backend.createPlan(planId, { name: planName, owner: memberId, members: { [memberId]: { name, color: COLORS[0] } } }), 15000);
+        local.planId = planId;
+      }
+      local.memberId = memberId;
+      local.name = name;
+      saveLocal();
+      syncUrl();
+      start();
+    } catch (err) {
+      ui.error = explain(err);
+      render();
+    }
+  });
+}
+
+// Le bloc copié depuis Firebase : on y lit apiKey, projectId, appId…
+function parseConfig(text) {
+  const cfg = {};
+  for (const m of text.matchAll(/["']?(apiKey|authDomain|projectId|storageBucket|messagingSenderId|appId)["']?\s*:\s*["']([^"']+)["']/g)) cfg[m[1]] = m[2].trim();
+  if (!cfg.apiKey || !cfg.projectId || !cfg.appId) return null;
+  cfg.authDomain = cfg.authDomain || cfg.projectId + '.firebaseapp.com';
+  return { apiKey: cfg.apiKey, authDomain: cfg.authDomain, projectId: cfg.projectId, appId: cfg.appId };
+}
+
+async function copyText(text, done) {
+  try {
+    await navigator.clipboard.writeText(text);
+    toast(done || 'Copié !');
+  } catch (e) {
+    toast('Copie impossible : sélectionne le texte à la main.');
+  }
+}
+
+document.addEventListener('click', (e) => {
+  if (e.target.closest('.sheet-back')) return;
+  const copy = e.target.closest('[data-copy]');
+  if (copy) return copyText(RULES, 'Règles copiées !');
+  const add = e.target.closest('[data-add]');
+  if (add) return openEditor(null, add.dataset.add);
+  const done = e.target.closest('[data-done]');
+  if (done) return toggleDone(done.dataset.done);
+  const open = e.target.closest('[data-open]');
+  if (open) return openDetail(open.dataset.open);
+  const week = e.target.closest('[data-week]');
+  if (week) {
+    ui.weekStart = addDays(ui.weekStart, 7 * Number(week.dataset.week));
+    return render();
+  }
+  const action = e.target.closest('[data-action]')?.dataset.action;
+  if (action === 'setup') {
+    ui.screen = 'setup';
+    render();
+    window.scrollTo(0, 0);
+  } else if (action === 'invite') openInvite();
+  else if (action === 'this-week') {
+    ui.weekStart = startOfWeek(new Date());
+    render();
+  } else if (action === 'hide-banner') {
+    local.dismissedHome = true;
+    saveLocal();
+    render();
+  } else if (action === 'reload') location.reload();
+  else if (action === 'reset') {
+    if (!confirm('Oublier ce planning sur ce téléphone ? (Il reste chez les autres personnes.)')) return;
+    localStorage.removeItem(LOCAL_KEY);
+    location.href = location.pathname + (DEMO ? '?demo=1' : '');
+  }
+});
+
+function toggleDone(id) {
+  const ev = events.find((x) => x.id === id);
+  if (!ev) return;
+  ev.done = !ev.done;
+  render();
+  backend.saveEvent(local.planId, { id, done: ev.done, updatedAt: Date.now() }).catch((err) => toast(explain(err)));
+  if (ev.done) toast('Bien joué !');
+}
+
+// ---------- Feuilles ----------
+
+function showSheet(inner) {
+  closeSheet();
+  const back = document.createElement('div');
+  back.className = 'sheet-back';
+  back.innerHTML = `<div class="sheet" role="dialog" aria-modal="true"><div class="band"></div>${inner}</div>`;
+  back.addEventListener('click', (e) => {
+    if (e.target === back || e.target.closest('.close')) closeSheet();
+  });
+  document.body.appendChild(back);
+  document.body.style.overflow = 'hidden';
+  return back;
+}
+
+function closeSheet() {
+  document.querySelector('.sheet-back')?.remove();
+  document.body.style.overflow = '';
+}
+
+const closeBtn = `<button class="close" aria-label="Fermer">${icons.close}</button>`;
+
+// Ajouter ou modifier une activité.
+function openEditor(id, day) {
+  const ev = id ? events.find((x) => x.id === id) : null;
+  let date = ev?.date || day || todayIso();
+  const t = todayIso();
+  const tm = iso(addDays(new Date(), 1));
+  const back = showSheet(`<div class="sheet-head"><h3>${ev ? 'Modifier' : 'Ajouter au planning'}</h3>${closeBtn}</div>
+    <form id="ev-form">
+      <label class="label" for="ev-title">Qu’est-ce qui est prévu ?</label>
+      <input id="ev-title" class="field" value="${esc(ev?.title || '')}" placeholder="ex. Dîner chez Léa" enterkeyhint="done" required maxlength="140">
+      <span class="label">Quel jour ?</span>
+      <div class="row">
+        <button type="button" class="chip" data-day="${t}" aria-pressed="${date === t}">Aujourd’hui</button>
+        <button type="button" class="chip" data-day="${tm}" aria-pressed="${date === tm}">Demain</button>
+        <input type="date" class="field date-field" id="ev-date" value="${date}" aria-label="Choisir une date">
+      </div>
+      <label class="label" for="ev-time">À quelle heure ? <span style="font-weight:500;color:var(--ink-2)">(facultatif)</span></label>
+      <input id="ev-time" type="time" class="field" value="${esc(ev?.time || '')}" style="max-width:180px">
+      <label class="label" for="ev-note">Note <span style="font-weight:500;color:var(--ink-2)">(facultatif)</span></label>
+      <textarea id="ev-note" class="field" placeholder="Adresse, choses à prendre…">${esc(ev?.note || '')}</textarea>
+      <div class="actions"><button class="btn" type="submit">${ev ? 'Enregistrer' : 'Ajouter'}</button></div>
+    </form>`);
+  const dateInput = back.querySelector('#ev-date');
+  const syncChips = () => back.querySelectorAll('[data-day]').forEach((c) => c.setAttribute('aria-pressed', String(c.dataset.day === date)));
+  back.addEventListener('click', (e) => {
+    const c = e.target.closest('[data-day]');
+    if (!c) return;
+    date = c.dataset.day;
+    dateInput.value = date;
+    syncChips();
+  });
+  dateInput.addEventListener('change', () => {
+    date = dateInput.value || date;
+    syncChips();
+  });
+  back.querySelector('#ev-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const title = back.querySelector('#ev-title').value.trim();
+    if (!title) return;
+    const data = {
+      id: ev?.id || randomId(16),
+      title,
+      date,
+      time: back.querySelector('#ev-time').value || '',
+      note: back.querySelector('#ev-note').value.trim(),
+      updatedAt: Date.now(),
+    };
+    if (!ev) Object.assign(data, { by: local.memberId, done: false, createdAt: Date.now() });
+    // Affiché tout de suite, envoyé au serveur en arrière-plan (marche aussi hors connexion).
+    const i = events.findIndex((x) => x.id === data.id);
+    if (i >= 0) events[i] = { ...events[i], ...data };
+    else events.push(data);
+    backend.saveEvent(local.planId, data).catch((err) => toast(explain(err)));
+    closeSheet();
+    // On montre la semaine de l'activité.
+    ui.weekStart = startOfWeek(parseIso(date));
+    render();
+    toast(ev ? 'Modifié !' : `Ajouté pour ${dayLabel(date)} !`);
+  });
+  if (!ev) setTimeout(() => back.querySelector('#ev-title').focus(), 60);
+}
+
+function openDetail(id) {
+  const ev = events.find((x) => x.id === id);
+  if (!ev) return;
+  const m = member(ev.by);
+  let confirmDel = false;
+  const back = showSheet(`<div class="sheet-head"><h3>${esc(ev.title)}</h3>${closeBtn}</div>
+    <p class="detail-meta">${esc(capital(dayLabel(ev.date)))}${ev.time ? ' à ' + esc(ev.time.replace(':', ' h ')) : ''}</p>
+    <p class="detail-meta"><span class="ev-meta" style="display:inline-flex"><span class="who"><i style="background:${esc(m.color)}"></i>Ajouté par ${esc(m.name)}</span></span></p>
+    ${ev.note ? `<p class="detail-note">${esc(ev.note)}</p>` : ''}
+    <div class="actions">
+      <a class="btn" href="${calendarUrl(ev)}" target="_blank" rel="noopener">${icons.cal} Ajouter à mon agenda iPhone</a>
+      <a class="btn ghost" href="${googleUrl(ev)}" target="_blank" rel="noopener">Ajouter à Google Agenda</a>
+      <button class="btn ghost" data-edit>Modifier</button>
+      <button class="btn ghost" data-toggle>${ev.done ? 'Remettre « à faire »' : 'C’est fait !'}</button>
+      <button class="btn danger" data-del>Supprimer</button>
+    </div>
+    <p class="hint">L’agenda de l’iPhone te préviendra ${ev.time ? '1 heure avant' : 'la veille à 9 h'}.</p>`);
+  back.addEventListener('click', (e) => {
+    if (e.target.closest('[data-edit]')) return openEditor(id);
+    if (e.target.closest('[data-toggle]')) {
+      closeSheet();
+      return toggleDone(id);
+    }
+    const del = e.target.closest('[data-del]');
+    if (del) {
+      if (!confirmDel) {
+        confirmDel = true;
+        del.textContent = 'Appuie encore pour supprimer';
+        return;
+      }
+      events = events.filter((x) => x.id !== id);
+      backend.removeEvent(local.planId, id).catch((err) => toast(explain(err)));
+      closeSheet();
+      render();
+      toast('Supprimé.');
+    }
+  });
+}
+
+// ---------- Agenda (rappel du téléphone) ----------
+
+const icsDate = (s) => s.replace(/-/g, '');
+const icsText = (s) => String(s || '').replace(/[\\;,]/g, (c) => '\\' + c).replace(/\n/g, '\\n');
+
+function calendarUrl(ev) {
+  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Notre planning//FR', 'BEGIN:VEVENT', `UID:${ev.id}@notre-planning`, `DTSTAMP:${new Date().toISOString().replace(/[-:]/g, '').slice(0, 15)}Z`];
+  if (ev.time) {
+    const start = parseIso(ev.date);
+    const [h, m] = ev.time.split(':').map(Number);
+    start.setHours(h, m);
+    const end = new Date(start.getTime() + 3600e3);
+    const stamp = (d) => `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}T${pad(d.getHours())}${pad(d.getMinutes())}00`;
+    lines.push(`DTSTART:${stamp(start)}`, `DTEND:${stamp(end)}`);
+  } else {
+    lines.push(`DTSTART;VALUE=DATE:${icsDate(ev.date)}`, `DTEND;VALUE=DATE:${icsDate(iso(addDays(parseIso(ev.date), 1)))}`);
+  }
+  lines.push(`SUMMARY:${icsText(ev.title)}`);
+  if (ev.note) lines.push(`DESCRIPTION:${icsText(ev.note)}`);
+  lines.push('BEGIN:VALARM', 'ACTION:DISPLAY', `DESCRIPTION:${icsText(ev.title)}`, `TRIGGER:${ev.time ? '-PT1H' : '-PT15H'}`, 'END:VALARM', 'END:VEVENT', 'END:VCALENDAR');
+  return 'data:text/calendar;charset=utf-8,' + encodeURIComponent(lines.join('\r\n'));
+}
+
+function googleUrl(ev) {
+  let dates;
+  if (ev.time) {
+    const [h, m] = ev.time.split(':').map(Number);
+    const s = parseIso(ev.date);
+    s.setHours(h, m);
+    const e = new Date(s.getTime() + 3600e3);
+    const g = (d) => `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}T${pad(d.getHours())}${pad(d.getMinutes())}00`;
+    dates = `${g(s)}/${g(e)}`;
+  } else dates = `${icsDate(ev.date)}/${icsDate(iso(addDays(parseIso(ev.date), 1)))}`;
+  return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(ev.title)}&dates=${dates}&details=${encodeURIComponent(ev.note || '')}&ctz=Europe/Paris`;
+}
+
+// ---------- Inviter ----------
+
+function openInvite() {
+  const url = inviteUrl();
+  const members = Object.values(plan.members || {});
+  const back = showSheet(`<div class="sheet-head"><h3>Inviter quelqu’un</h3>${closeBtn}</div>
+    <p class="hint">Envoie ce lien à la personne de ton choix (SMS, WhatsApp…). Elle l’ouvre, écrit son prénom, et vous avez le même planning. Elle n’a rien à installer.</p>
+    <div class="actions">
+      <button class="btn" data-share>${icons.invite} Envoyer le lien</button>
+      <button class="btn ghost" data-copy-link>Copier le lien</button>
+    </div>
+    <span class="label">Dans ce planning</span>
+    ${members.map((m) => `<p class="detail-meta"><span class="ev-meta" style="display:inline-flex;font-size:16px"><span class="who"><i style="background:${esc(m.color)}"></i>${esc(m.name)}</span></span></p>`).join('')}
+    <p class="hint">Garde ce lien pour vous : toute personne qui l’a peut voir et modifier le planning.</p>`);
+  back.addEventListener('click', async (e) => {
+    if (e.target.closest('[data-copy-link]')) return copyText(url, 'Lien copié !');
+    if (e.target.closest('[data-share]')) {
+      if (navigator.share) {
+        try {
+          await navigator.share({ title: plan.name, text: `Rejoins « ${plan.name} » pour qu’on ait le même planning :`, url });
+        } catch (err) {}
+      } else copyText(url, 'Lien copié !');
+    }
+  });
+}
+
+// ---------- Démarrage ----------
+
+let unsub = [];
+async function start() {
+  unsub.forEach((f) => f && f());
+  unsub = [];
+  if (!local.cfg) {
+    ui.screen = 'welcome';
+    return render();
+  }
+  if (!local.planId) {
+    ui.screen = 'setup';
+    return render();
+  }
+  ui.screen = 'loading';
+  render();
+  try {
+    await backend.init(local.cfg);
+  } catch (e) {
+    ui.screen = 'error';
+    ui.error = 'Impossible de charger Firebase. Vérifie ta connexion internet, puis réessaie.';
+    return render();
+  }
+  syncUrl();
+  let first = true;
+  unsub.push(
+    backend.watchPlan(
+      local.planId,
+      (data, meta) => {
+        if (!data) {
+          // Le cache du téléphone peut être vide au premier lancement : on attend la réponse du serveur.
+          if (meta.fromCache) return;
+          ui.screen = 'error';
+          ui.error = 'Ce planning n’existe pas (ou plus). Vérifie le lien d’invitation.';
+          return render();
+        }
+        plan = data;
+        synced = !meta.hasPendingWrites && !meta.fromCache;
+        const wasName = ui.screen === 'name';
+        const known = local.memberId && plan.members?.[local.memberId];
+        ui.screen = known ? 'main' : 'name';
+        // Ne pas effacer ce qu'on est en train d'écrire.
+        if (!(wasName && ui.screen === 'name' && !first)) render();
+        first = false;
+      },
+      (err) => {
+        ui.screen = 'error';
+        ui.error = explain(err);
+        render();
+      },
+    ),
+  );
+  unsub.push(
+    backend.watchEvents(
+      local.planId,
+      iso(addDays(new Date(), -90)),
+      (list, meta) => {
+        events = list;
+        synced = !meta.hasPendingWrites && !meta.fromCache;
+        if (ui.screen === 'main' && !document.querySelector('.sheet-back')) render();
+      },
+      (err) => toast(explain(err)),
+    ),
+  );
+}
+
+// Minuit passé ou retour sur l'app : « Aujourd'hui » doit être à jour.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && ui.screen === 'main' && !document.querySelector('.sheet-back')) render();
+});
+
+start();
+</script>
+</body>
+</html>
