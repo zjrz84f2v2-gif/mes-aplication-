@@ -94,6 +94,27 @@ input, textarea { caret-color: var(--accent); }
 .nav { width: 44px; height: 44px; border-radius: 50%; border: 1.5px solid var(--line); background: var(--card); display: flex; align-items: center; justify-content: center; padding: 0; }
 .nav svg { width: 18px; height: 18px; }
 .back-now { min-height: 44px; border: 0; background: none; color: var(--accent); font-weight: 700; font-size: 15px; padding: 0 4px; }
+/* Choix de la vue : semaine ou mois. */
+.switch { display: flex; background: rgba(30, 28, 24, .07); border-radius: 14px; padding: 4px; margin-top: 26px; }
+.switch button { flex: 1; min-height: 44px; border: 0; background: none; border-radius: 11px; font-weight: 700; font-size: 16px; color: var(--ink-2); }
+.switch button[aria-pressed="true"] { background: var(--card); color: var(--ink); box-shadow: 0 2px 8px -3px rgba(30, 28, 24, .3); }
+.switch + .week-head { margin-top: 18px; }
+/* Le mois : une grille, des points de couleur sur les jours occupés. */
+.month { background: var(--card); border-radius: var(--radius); box-shadow: 0 10px 30px -22px rgba(30, 28, 24, .4); padding: 10px 8px 8px; }
+.month-names, .month-grid { display: grid; grid-template-columns: repeat(7, 1fr); }
+.month-names span { text-align: center; font-size: 12px; font-weight: 700; color: var(--ink-2); padding: 2px 0 6px; text-transform: capitalize; }
+.mday { min-height: 54px; border: 0; background: none; border-radius: 12px; padding: 6px 0 4px; display: flex; flex-direction: column; align-items: center; gap: 4px; font: 700 17px/1 var(--font); font-variant-numeric: tabular-nums; color: var(--ink); }
+.mday.out { color: var(--ink-3); opacity: .5; }
+.mday.past { color: var(--ink-3); }
+.mday.is-today b { background: linear-gradient(transparent 45%, var(--highlight) 45%, var(--highlight) 95%, transparent 95%); padding: 0 3px; }
+.mday[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+.mday[aria-pressed="true"].is-today b { background: none; }
+.mdots { display: flex; gap: 3px; height: 7px; }
+.mdots i { width: 7px; height: 7px; border-radius: 50%; display: block; }
+.mday[aria-pressed="true"] .mdots i { box-shadow: 0 0 0 1.5px var(--paper); }
+.picked { margin-top: 14px; background: var(--card); border-radius: var(--radius); padding: 14px 14px 6px; box-shadow: 0 10px 30px -22px rgba(30, 28, 24, .4); }
+.picked h3 { margin: 0 0 4px; font: 800 19px/1.2 var(--display); }
+.picked .day-add { padding-left: 40px; }
 .days { background: var(--card); border-radius: var(--radius); box-shadow: 0 10px 30px -22px rgba(30, 28, 24, .4); overflow: hidden; }
 .day { display: grid; grid-template-columns: 64px 1fr; border-top: 1px solid var(--line); min-height: 64px; }
 .day:first-child { border-top: 0; }
@@ -353,6 +374,7 @@ const parseIso = (s) => {
 };
 const addDays = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
 const startOfWeek = (d) => addDays(d, -((d.getDay() + 6) % 7));
+const firstOfMonth = (d) => new Date(d.getFullYear(), d.getMonth(), 1);
 const todayIso = () => iso(new Date());
 const fmt = (d, o) => d.toLocaleDateString('fr-FR', o);
 const capital = (s) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -370,7 +392,7 @@ function dayLabel(s) {
 let plan = null; // { name, members: { id: { name, color } } }
 let events = [];
 let synced = true;
-let ui = { weekStart: startOfWeek(new Date()), screen: 'loading', error: '' };
+let ui = { weekStart: startOfWeek(new Date()), month: firstOfMonth(new Date()), selected: iso(new Date()), view: local.view === 'month' ? 'month' : 'week', screen: 'loading', error: '' };
 const app = document.getElementById('app');
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -516,6 +538,16 @@ function renderMain() {
       <div class="tomorrow"><h3>Demain</h3>${eventsOn(tomorrow).map(evHtml).join('') || '<p class="nothing">Rien de prévu pour l’instant.</p>'}</div>
     </section>`;
 
+  html += `<div class="switch" role="group" aria-label="Affichage">
+      <button data-view="week" aria-pressed="${ui.view === 'week'}">Semaine</button>
+      <button data-view="month" aria-pressed="${ui.view === 'month'}">Mois</button>
+    </div>`;
+  return html + (ui.view === 'month' ? monthHtml(today) : weekHtml(today));
+}
+
+function weekHtml(today) {
+  const t = iso(today);
+  let html = '';
   const ws = ui.weekStart;
   const we = addDays(ws, 6);
   const isThisWeek = iso(ws) === iso(startOfWeek(today));
@@ -540,6 +572,41 @@ function renderMain() {
       </div>`;
   }
   html += `</div>`;
+  return html;
+}
+
+function monthHtml(today) {
+  const t = iso(today);
+  const m0 = ui.month;
+  const isThisMonth = iso(m0) === iso(firstOfMonth(today));
+  const gridStart = startOfWeek(m0);
+  const last = new Date(m0.getFullYear(), m0.getMonth() + 1, 0);
+  const gridEnd = addDays(startOfWeek(last), 6);
+  let html = `<div class="week-head">
+      <h2>${esc(capital(fmt(m0, { month: 'long', year: 'numeric' })))}</h2>
+      ${isThisMonth ? '' : '<button class="back-now" data-action="this-week">Aujourd’hui</button>'}
+      <button class="nav" data-month="-1" aria-label="Mois précédent">${icons.left}</button>
+      <button class="nav" data-month="1" aria-label="Mois suivant">${icons.right}</button>
+    </div>
+    <div class="month">
+      <div class="month-names" aria-hidden="true">${[0, 1, 2, 3, 4, 5, 6].map((i) => `<span>${esc(fmt(addDays(gridStart, i), { weekday: 'short' }).replace('.', '').slice(0, 3))}</span>`).join('')}</div>
+      <div class="month-grid">`;
+  for (let d = gridStart; d <= gridEnd; d = addDays(d, 1)) {
+    const ds = iso(d);
+    const list = eventsOn(ds);
+    const label = `${fmt(d, { weekday: 'long', day: 'numeric', month: 'long' })}${list.length ? ', ' + list.length + ' activité' + (list.length > 1 ? 's' : '') : ''}`;
+    html += `<button class="mday${d.getMonth() !== m0.getMonth() ? ' out' : ''}${ds === t ? ' is-today' : ''}${ds < t ? ' past' : ''}" data-pick-day="${ds}" aria-pressed="${ds === ui.selected}" aria-label="${esc(label)}">
+        <b>${d.getDate()}</b><span class="mdots">${list.slice(0, 3).map((e) => `<i style="background:${esc(member(e.by).color)}"></i>`).join('')}</span>
+      </button>`;
+  }
+  const sel = ui.selected;
+  const list = eventsOn(sel);
+  html += `</div></div>
+    <section class="picked" aria-live="polite">
+      <h3>${esc(capital(dayLabel(sel)))}</h3>
+      ${list.map(evHtml).join('') || '<p class="nothing">Rien de prévu ce jour-là.</p>'}
+      <button class="day-add" data-add="${sel}">+ Ajouter ce jour-là</button>
+    </section>`;
   return html;
 }
 
@@ -619,6 +686,24 @@ document.addEventListener('click', (e) => {
   if (done) return toggleDone(done.dataset.done);
   const open = e.target.closest('[data-open]');
   if (open) return openDetail(open.dataset.open);
+  const view = e.target.closest('[data-view]');
+  if (view) {
+    ui.view = local.view = view.dataset.view;
+    saveLocal();
+    return render();
+  }
+  const month = e.target.closest('[data-month]');
+  if (month) {
+    ui.month = new Date(ui.month.getFullYear(), ui.month.getMonth() + Number(month.dataset.month), 1);
+    return render();
+  }
+  const pick = e.target.closest('[data-pick-day]');
+  if (pick) {
+    ui.selected = pick.dataset.pickDay;
+    const d = parseIso(ui.selected);
+    if (d.getMonth() !== ui.month.getMonth()) ui.month = firstOfMonth(d);
+    return render();
+  }
   const week = e.target.closest('[data-week]');
   if (week) {
     ui.weekStart = addDays(ui.weekStart, 7 * Number(week.dataset.week));
@@ -632,6 +717,8 @@ document.addEventListener('click', (e) => {
   } else if (action === 'invite') openInvite();
   else if (action === 'this-week') {
     ui.weekStart = startOfWeek(new Date());
+    ui.month = firstOfMonth(new Date());
+    ui.selected = todayIso();
     render();
   } else if (action === 'hide-banner') {
     local.dismissedHome = true;
@@ -732,6 +819,8 @@ function openEditor(id, day) {
     closeSheet();
     // On montre la semaine de l'activité.
     ui.weekStart = startOfWeek(parseIso(date));
+    ui.month = firstOfMonth(parseIso(date));
+    ui.selected = date;
     render();
     toast(ev ? 'Modifié !' : `Ajouté pour ${dayLabel(date)} !`);
   });
