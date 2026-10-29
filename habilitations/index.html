@@ -1,0 +1,827 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Habilitations">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#F1F4F8">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-180.png">
+<title>Habilitations</title>
+<style>
+/* Un tableau de bord d'atelier : fond acier clair, fiches blanches, et les niveaux I · L · U
+   dessinés comme sur la feuille de polyvalence (un trait, deux côtés, trois côtés d'un carré). */
+:root {
+  --bg: #F1F4F8;
+  --card: #FFFFFF;
+  --ink: #16202C;
+  --ink-2: #4E5B6B;
+  --ink-3: #626E7E;
+  --line: rgba(22, 32, 44, .1);
+  --accent: #1D5BD8;
+  --accent-soft: #E6EEFC;
+  --danger: #C2321F;
+  --danger-soft: #FCEBE8;
+  --ok: #17803D;
+  --ok-soft: #E5F4EA;
+  --warn: #B45309;
+  --radius: 18px;
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; }
+body { background: var(--bg); color: var(--ink); font: 17px/1.4 var(--font); -webkit-tap-highlight-color: transparent; -webkit-text-size-adjust: 100%; }
+::selection { background: var(--accent); color: #fff; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; border-radius: 8px; }
+input, textarea { caret-color: var(--accent); }
+
+#app { max-width: 1080px; margin: 0 auto; padding: env(safe-area-inset-top) max(16px, env(safe-area-inset-right)) calc(104px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
+h1.page { font-size: 30px; line-height: 1.1; font-weight: 800; letter-spacing: -.02em; margin: 22px 0 4px; }
+.sub { color: var(--ink-2); font-size: 15px; margin: 0; }
+.section-title { font-size: 19px; font-weight: 800; margin: 28px 0 10px; display: flex; align-items: center; gap: 8px; }
+.section-title small { color: var(--ink-3); font-weight: 700; font-size: 15px; }
+
+/* Les niveaux I, L, U. */
+.lvl { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 8px; flex: 0 0 auto; }
+.lvl svg { width: 18px; height: 18px; }
+.lvl.letter { font-weight: 900; font-size: 14px; color: #fff; }
+.lvl-chip { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; font-size: 14px; }
+
+/* Avatars. */
+.av { width: 44px; height: 44px; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 17px; color: #fff; flex: 0 0 auto; position: relative; }
+.av.small { width: 34px; height: 34px; border-radius: 11px; font-size: 14px; }
+.av.big { width: 64px; height: 64px; border-radius: 20px; font-size: 26px; }
+.av.absent { filter: grayscale(1); opacity: .45; }
+
+/* Cartes. */
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+.card { background: var(--card); border-radius: var(--radius); border: 1px solid var(--line); box-shadow: 0 1px 2px rgba(22, 32, 44, .04); }
+button.card { text-align: left; width: 100%; padding: 14px; display: flex; gap: 12px; align-items: center; }
+.card-title { font-weight: 800; font-size: 17px; line-height: 1.25; overflow-wrap: anywhere; }
+.card-meta { color: var(--ink-2); font-size: 14px; margin-top: 2px; }
+.card .grow { flex: 1; min-width: 0; }
+.chevron { color: var(--ink-3); width: 18px; height: 18px; flex: 0 0 auto; }
+.lvls-row { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 8px; }
+.face-row { display: flex; margin-top: 10px; }
+.face-row .av { box-shadow: 0 0 0 2px var(--card); }
+.face-row { gap: 4px; flex-wrap: wrap; }
+.badge { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; font-weight: 800; padding: 3px 9px; border-radius: 999px; }
+.badge.red { background: var(--danger-soft); color: var(--danger); }
+.badge.green { background: var(--ok-soft); color: var(--ok); }
+.badge.grey { background: var(--bg); color: var(--ink-2); }
+
+/* Recherche et filtres. */
+.search { width: 100%; height: 50px; border-radius: 14px; border: 1px solid var(--line); background: var(--card); padding: 0 14px 0 42px; font-size: 17px; }
+.search-wrap { position: relative; margin-top: 14px; }
+.search-wrap svg { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; color: var(--ink-3); }
+.chips { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; margin: 12px -16px 0; padding: 0 16px 2px; }
+.chips::-webkit-scrollbar { display: none; }
+.chip { flex: 0 0 auto; min-height: 42px; padding: 0 14px; border-radius: 999px; border: 1.5px solid var(--line); background: var(--card); font-weight: 700; font-size: 15px; display: inline-flex; align-items: center; gap: 6px; }
+.chip[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: #fff; }
+
+/* Aujourd'hui. */
+.date-row { display: flex; gap: 10px; align-items: center; margin-top: 14px; flex-wrap: wrap; }
+.date-input { height: 46px; border-radius: 12px; border: 1px solid var(--line); background: var(--card); padding: 0 12px; font-size: 16px; }
+.people-pick { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 8px; margin-top: 12px; }
+.pick { background: var(--card); border: 1.5px solid var(--line); border-radius: 16px; padding: 10px 6px 8px; display: flex; flex-direction: column; align-items: center; gap: 6px; font-weight: 700; font-size: 14px; min-height: 96px; }
+.pick span { max-width: 100%; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; text-align: center; line-height: 1.2; overflow-wrap: anywhere; }
+.pick[aria-pressed="true"] { border-color: var(--danger); background: var(--danger-soft); color: var(--danger); }
+.pick[aria-pressed="true"] .av { filter: grayscale(1); opacity: .5; }
+.summary { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+.absent-card { padding: 14px; }
+.absent-head { display: flex; align-items: center; gap: 12px; }
+.replace { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 10px; display: flex; flex-direction: column; gap: 10px; }
+.replace-row { display: flex; gap: 10px; align-items: flex-start; }
+.replace-poste { width: 120px; flex: 0 0 auto; font-weight: 700; font-size: 15px; padding-top: 6px; overflow-wrap: anywhere; display: flex; gap: 6px; align-items: flex-start; }
+.cands { display: flex; flex-wrap: wrap; gap: 6px; flex: 1; min-width: 0; }
+.cand { display: inline-flex; align-items: center; gap: 6px; background: var(--bg); border-radius: 999px; padding: 3px 10px 3px 3px; font-weight: 700; font-size: 14px; border: 0; }
+.cand .lvl { width: 24px; height: 24px; border-radius: 999px; }
+.cand .lvl svg { width: 15px; height: 15px; }
+.nobody { color: var(--danger); font-weight: 800; font-size: 14px; padding-top: 6px; }
+
+/* Fiche (feuille qui monte du bas, panneau centré sur ordinateur). */
+.sheet-back { position: fixed; inset: 0; background: rgba(22, 32, 44, .4); z-index: 20; display: flex; align-items: flex-end; justify-content: center; }
+.sheet { background: var(--bg); width: 100%; max-width: 620px; max-height: 92%; overflow-y: auto; border-radius: 26px 26px 0 0; padding: 0 max(16px, env(safe-area-inset-right)) calc(24px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); animation: rise .28s cubic-bezier(.16, 1, .3, 1); }
+@media (min-width: 760px) { .sheet-back { align-items: center; } .sheet { border-radius: 26px; max-height: 86%; } }
+@keyframes rise { from { transform: translateY(32px); opacity: .5; } }
+.band { width: 40px; height: 5px; border-radius: 3px; background: rgba(22, 32, 44, .18); margin: 10px auto 0; }
+.sheet-head { display: flex; gap: 14px; align-items: center; padding-top: 14px; }
+.sheet-head h2 { margin: 0; font-size: 23px; line-height: 1.15; font-weight: 800; overflow-wrap: anywhere; }
+.sheet-head p { margin: 3px 0 0; color: var(--ink-2); font-size: 15px; }
+.close { width: 40px; height: 40px; border-radius: 50%; border: 0; background: rgba(22, 32, 44, .08); display: flex; align-items: center; justify-content: center; flex: 0 0 auto; margin-left: auto; padding: 0; align-self: flex-start; }
+.close svg { width: 16px; height: 16px; }
+.label { display: block; font-weight: 800; font-size: 15px; margin: 20px 0 8px; color: var(--ink); }
+.field { width: 100%; min-height: 50px; border-radius: 14px; border: 1.5px solid var(--line); background: var(--card); padding: 10px 14px; font-size: 17px; }
+.field::placeholder, .search::placeholder { color: var(--ink-3); }
+.row-wrap { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* Une habilitation dans la fiche : poste + sélecteur de niveau. */
+.skill { display: flex; align-items: center; gap: 10px; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 10px 10px 10px 14px; }
+.skill + .skill { margin-top: 8px; }
+.skill-name { flex: 1; min-width: 0; font-weight: 700; overflow-wrap: anywhere; }
+.skill-name small { display: block; color: var(--ink-3); font-weight: 600; font-size: 13px; }
+.seg { display: flex; background: var(--bg); border-radius: 12px; padding: 3px; gap: 2px; flex: 0 0 auto; }
+.seg button { min-width: 44px; height: 40px; border: 0; background: none; border-radius: 9px; display: flex; align-items: center; justify-content: center; padding: 0 6px; font-weight: 800; font-size: 14px; color: var(--ink-3); }
+.seg button svg { width: 18px; height: 18px; }
+.seg button[aria-pressed="true"] { background: var(--card); box-shadow: 0 1px 4px rgba(22, 32, 44, .18); }
+.seg button.none[aria-pressed="true"] { color: var(--ink); }
+.seg button:not([aria-pressed="true"]) svg { opacity: .35; }
+
+/* Boutons. */
+.btn { min-height: 52px; width: 100%; border: 0; border-radius: 15px; background: var(--accent); color: #fff; font-weight: 800; font-size: 17px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 0 20px; }
+.btn svg { width: 20px; height: 20px; }
+.btn.ghost { background: var(--card); color: var(--ink); border: 1.5px solid var(--line); font-weight: 700; }
+.btn.danger { background: transparent; color: var(--danger); border: 1.5px solid rgba(194, 50, 31, .35); font-weight: 700; }
+.btn.small { width: auto; min-height: 44px; font-size: 15px; border-radius: 12px; }
+.actions { display: flex; flex-direction: column; gap: 10px; margin-top: 22px; }
+.empty { background: var(--card); border: 1.5px dashed rgba(22, 32, 44, .2); border-radius: var(--radius); padding: 22px 18px; text-align: center; color: var(--ink-2); }
+.empty b { display: block; color: var(--ink); font-size: 18px; margin-bottom: 4px; }
+.empty .btn { margin-top: 14px; width: auto; }
+
+/* Réglages. */
+.set-row { display: flex; align-items: center; gap: 10px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 6px 6px 6px 12px; }
+.set-row + .set-row { margin-top: 8px; }
+.set-row input { flex: 1; min-width: 0; height: 42px; border: 0; background: none; font-size: 16px; font-weight: 700; }
+.icon-btn { width: 42px; height: 42px; border-radius: 11px; border: 0; background: var(--bg); display: flex; align-items: center; justify-content: center; padding: 0; color: var(--ink-2); flex: 0 0 auto; }
+.icon-btn svg { width: 18px; height: 18px; }
+.icon-btn:disabled { opacity: .35; }
+.level-edit { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 12px; }
+.level-edit + .level-edit { margin-top: 10px; }
+.level-edit .top { display: flex; gap: 10px; align-items: center; }
+.level-edit input.letter { width: 56px; height: 44px; text-align: center; font-weight: 900; font-size: 18px; border-radius: 10px; border: 1.5px solid var(--line); text-transform: uppercase; }
+.level-edit textarea { width: 100%; margin-top: 8px; min-height: 60px; border-radius: 10px; border: 1.5px solid var(--line); padding: 8px 10px; font-size: 15px; resize: vertical; }
+.hint { color: var(--ink-2); font-size: 14px; margin: 8px 0 0; }
+
+/* Barre d'onglets : en bas sur téléphone, en haut sur ordinateur. */
+.tabs { position: fixed; left: 10px; right: 10px; bottom: calc(10px + env(safe-area-inset-bottom)); display: flex; background: rgba(255, 255, 255, .86); backdrop-filter: blur(20px) saturate(160%); -webkit-backdrop-filter: blur(20px) saturate(160%); border: 1px solid var(--line); border-radius: 24px; padding: 6px; z-index: 10; box-shadow: 0 10px 30px -12px rgba(22, 32, 44, .35); max-width: 560px; margin: 0 auto; }
+.tabs button { flex: 1; min-height: 56px; border: 0; background: none; border-radius: 18px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; font-size: 11px; font-weight: 800; color: var(--ink-3); }
+.tabs svg { width: 23px; height: 23px; }
+.tabs button[aria-selected="true"] { background: var(--accent-soft); color: var(--accent); }
+@media (min-width: 900px) {
+  .tabs { top: 14px; bottom: auto; left: 50%; right: auto; transform: translateX(-50%); width: 560px; }
+  .tabs button { flex-direction: row; gap: 8px; font-size: 14px; min-height: 46px; }
+  .tabs svg { width: 20px; height: 20px; }
+  #app { padding-top: 76px; padding-bottom: 40px; }
+}
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(96px + env(safe-area-inset-bottom)); background: var(--ink); color: #fff; padding: 12px 18px; border-radius: 999px; font-weight: 700; z-index: 30; max-width: calc(100% - 32px); text-align: center; box-shadow: 0 10px 30px -10px rgba(0, 0, 0, .45); }
+
+.btn, .chip, .pick, button.card, .seg button, .tabs button, .icon-btn, .close, .cand { transition: transform .14s cubic-bezier(.2, .8, .2, 1), background-color .15s ease-out, opacity .12s ease-out; }
+.btn:active, .chip:active, .pick:active, button.card:active, .seg button:active, .tabs button:active, .icon-btn:active { transform: scale(.97); }
+@media (hover: hover) { button.card:hover, .pick:hover { border-color: rgba(22, 32, 44, .25); } }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<nav class="tabs" role="tablist" aria-label="Sections">
+  <button role="tab" data-tab="jour" aria-selected="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M8 3v4M16 3v4M3.5 10h17"/><path d="M9 15l2 2 4-4"/></svg>Aujourd’hui</button>
+  <button role="tab" data-tab="equipe" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17.5" cy="9" r="2.5"/><path d="M16 14.2a5 5 0 0 1 6 4.8"/></svg>Équipe</button>
+  <button role="tab" data-tab="postes" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7.5" height="7.5" rx="2"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="2"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="2"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="2"/></svg>Postes</button>
+  <button role="tab" data-tab="reglages" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2.2"/><circle cx="10" cy="17" r="2.2"/></svg>Réglages</button>
+</nav>
+<script>
+'use strict';
+
+// ---------- Données (gardées dans cet appareil) ----------
+
+const STORE_KEY = 'habilitations-v1';
+const ROLE_COLORS = ['#1D5BD8', '#B45309', '#0F766E', '#7C3AED', '#BE185D', '#4B5563', '#0369A1', '#A16207'];
+const LEVEL_COLORS = ['#D97706', '#1D5BD8', '#17803D', '#7C3AED', '#BE185D', '#0F766E'];
+
+function defaultState() {
+  return {
+    version: 1,
+    roles: [
+      { id: 'r1', name: 'Opérateur', color: '#1D5BD8' },
+      { id: 'r2', name: 'Alternant', color: '#B45309' },
+      { id: 'r3', name: 'Technicien', color: '#0F766E' },
+      { id: 'r4', name: 'Manageur', color: '#7C3AED' },
+    ],
+    // Du plus bas au plus haut : l'ordre sert à proposer les meilleurs remplaçants d'abord.
+    levels: [
+      { id: 'I', letter: 'I', shape: 'I', color: '#D97706', desc: 'Connaissance de base. Opérationnel, mais peut avoir besoin d’aide.' },
+      { id: 'L', letter: 'L', shape: 'L', color: '#1D5BD8', desc: 'Poste maîtrisé.' },
+      { id: 'U', letter: 'U', shape: 'U', color: '#17803D', desc: 'Poste maîtrisé, et sait former et transmettre.' },
+    ],
+    postes: [],
+    people: [],
+    absences: {},
+  };
+}
+
+function load() {
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    if (raw) return { ...defaultState(), ...JSON.parse(raw) };
+  } catch (e) {}
+  return defaultState();
+}
+
+let state = load();
+let ui = { tab: 'jour', day: iso(new Date()), query: '', roleFilter: 'all' };
+
+function save() {
+  try {
+    localStorage.setItem(STORE_KEY, JSON.stringify(state));
+  } catch (e) {
+    toast('Impossible d’enregistrer sur cet appareil.');
+  }
+}
+
+const uid = (p) => p + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+const person = (id) => state.people.find((p) => p.id === id);
+const poste = (id) => state.postes.find((p) => p.id === id);
+const role = (id) => state.roles.find((r) => r.id === id);
+const level = (id) => state.levels.find((l) => l.id === id);
+const rank = (id) => state.levels.findIndex((l) => l.id === id);
+const byName = (a, b) => a.name.localeCompare(b.name, 'fr');
+
+// ---------- Petits outils ----------
+
+function iso(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+const parseIso = (s) => {
+  const [y, m, d] = s.split('-').map(Number);
+  return new Date(y, m - 1, d);
+};
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const initials = (name) =>
+  String(name || '?')
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((w) => w.charAt(0).toUpperCase())
+    .join('');
+
+let toastTimer;
+function toast(text) {
+  document.querySelector('.toast')?.remove();
+  const el = document.createElement('div');
+  el.className = 'toast';
+  el.setAttribute('role', 'status');
+  el.textContent = text;
+  document.body.appendChild(el);
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.remove(), 2200);
+}
+
+const icons = {
+  plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>',
+  close: '<svg viewBox="0 0 22 22" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M4 4l14 14M18 4L4 18"/></svg>',
+  chevron: '<svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>',
+  search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5l5 5"/></svg>',
+  up: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 13l6-6 6 6"/></svg>',
+  trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>',
+  swap: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4L3 8l4 4M3 8h14M17 20l4-4-4-4M21 16H7"/></svg>',
+};
+
+// Le dessin du niveau : I = un côté, L = deux côtés, U = trois côtés d'un carré.
+function levelSvg(lv, color) {
+  const c = color || lv.color;
+  const paths = { I: 'M5 3v14', L: 'M5 3v14h10', U: 'M5 3v14h10V3' };
+  return `<svg viewBox="0 0 20 20" fill="none" stroke="${c}" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${paths[lv.shape]}"/></svg>`;
+}
+
+function lvlHtml(id) {
+  const lv = level(id);
+  if (!lv) return '';
+  if (lv.shape && lv.shape !== 'letter') return `<span class="lvl" style="background:${lv.color}1A" title="${esc(lv.letter)} : ${esc(lv.desc)}" aria-label="Niveau ${esc(lv.letter)}">${levelSvg(lv)}</span>`;
+  return `<span class="lvl letter" style="background:${lv.color}" title="${esc(lv.letter)} : ${esc(lv.desc)}" aria-label="Niveau ${esc(lv.letter)}">${esc(lv.letter)}</span>`;
+}
+
+function avHtml(p, cls = '') {
+  const r = role(p.role);
+  return `<span class="av ${cls}" style="background:${r?.color || '#4B5563'}" aria-hidden="true">${esc(initials(p.name))}</span>`;
+}
+
+const absentOn = (day) => new Set(state.absences[day] || []);
+
+// Qui peut tenir ce poste (en dehors de certaines personnes), les plus habiles d'abord.
+function candidates(posteId, exclude) {
+  return state.people
+    .filter((p) => !exclude.has(p.id) && p.skills?.[posteId] && level(p.skills[posteId]))
+    .sort((a, b) => rank(b.skills[posteId]) - rank(a.skills[posteId]) || byName(a, b));
+}
+
+// ---------- Écrans ----------
+
+const app = document.getElementById('app');
+
+function render() {
+  document.querySelectorAll('.tabs button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === ui.tab)));
+  const screens = { jour: renderToday, equipe: renderTeam, postes: renderPostes, reglages: renderSettings };
+  app.innerHTML = screens[ui.tab]();
+  bind();
+}
+
+function firstSteps() {
+  if (!state.postes.length)
+    return `<div class="empty"><b>Commence par tes postes</b>Ajoute les postes de ton atelier (Poste 1, Contrôle…), puis les personnes de l’équipe et leurs habilitations.<br><button class="btn" data-action="add-poste">${icons.plus} Ajouter un poste</button></div>`;
+  if (!state.people.length)
+    return `<div class="empty"><b>Ajoute ton équipe</b>Une fiche par personne, avec son rôle et ses habilitations.<br><button class="btn" data-action="add-person">${icons.plus} Ajouter une personne</button></div>`;
+  return '';
+}
+
+// Aujourd'hui : on coche les absents, l'appli propose des remplaçants pour chacun de leurs postes.
+function renderToday() {
+  const day = ui.day;
+  const d = parseIso(day);
+  const isToday = day === iso(new Date());
+  let html = `<h1 class="page">${isToday ? 'Aujourd’hui' : esc(cap(d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })))}</h1>
+    <p class="sub">Touche les personnes absentes : l’appli te dit qui peut les remplacer.</p>
+    <div class="date-row"><input type="date" class="date-input" id="day" value="${day}" aria-label="Choisir le jour">${isToday ? '' : '<button class="btn ghost small" data-action="today">Revenir à aujourd’hui</button>'}</div>`;
+  const steps = firstSteps();
+  if (steps) return html + `<div style="margin-top:18px">${steps}</div>`;
+
+  const absent = absentOn(day);
+  const people = state.people.slice().sort(byName);
+  html += `<div class="section-title">Qui est absent ?<small>${absent.size ? absent.size + ' absent' + (absent.size > 1 ? 's' : '') : ''}</small></div>
+    <div class="people-pick">${people
+      .map((p) => `<button class="pick" data-absent="${p.id}" aria-pressed="${absent.has(p.id)}">${avHtml(p)}<span>${esc(p.name)}</span></button>`)
+      .join('')}</div>`;
+
+  if (!absent.size) return html + `<p class="hint" style="margin-top:14px">Personne n’est noté absent ce jour-là.</p>`;
+
+  // Postes que plus personne de présent ne sait tenir.
+  const uncovered = state.postes.filter((po) => state.people.some((p) => absent.has(p.id) && p.skills?.[po.id]) && !candidates(po.id, absent).length);
+  html += `<div class="summary">${uncovered.length ? `<span class="badge red">${uncovered.length} poste${uncovered.length > 1 ? 's' : ''} sans remplaçant : ${esc(uncovered.map((p) => p.name).join(', '))}</span>` : '<span class="badge green">Tous les postes ont un remplaçant possible</span>'}</div>
+    <div class="section-title">Remplaçants possibles</div><div class="grid">`;
+  for (const id of absent) {
+    const p = person(id);
+    if (!p) continue;
+    const skills = Object.keys(p.skills || {}).filter((k) => poste(k) && level(p.skills[k]));
+    html += `<div class="card absent-card"><div class="absent-head">${avHtml(p, 'absent')}<div class="grow"><div class="card-title">${esc(p.name)}</div><div class="card-meta">${esc(role(p.role)?.name || '')} · absent</div></div></div>
+      <div class="replace">${
+        skills.length
+          ? skills
+              .map((k) => poste(k))
+              .sort(byName)
+              .map((po) => {
+                const c = candidates(po.id, absent);
+                return `<div class="replace-row"><div class="replace-poste">${esc(po.name)}</div>${
+                  c.length
+                    ? `<div class="cands">${c.slice(0, 6).map((x) => `<button class="cand" data-person="${x.id}">${lvlHtml(x.skills[po.id])}${esc(x.name)}</button>`).join('')}${c.length > 6 ? `<span class="badge grey">+${c.length - 6}</span>` : ''}</div>`
+                    : '<div class="nobody">Personne de disponible</div>'
+                }</div>`;
+              })
+              .join('')
+          : '<p class="hint" style="margin:0">Aucune habilitation renseignée pour cette personne.</p>'
+      }</div></div>`;
+  }
+  return html + `</div>`;
+}
+
+const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+
+function renderTeam() {
+  let html = `<h1 class="page">Équipe</h1><p class="sub">${state.people.length} personne${state.people.length > 1 ? 's' : ''}</p>`;
+  const steps = firstSteps();
+  if (steps && !state.people.length) return html + `<div style="margin-top:18px">${steps}</div>`;
+  html += `<div class="search-wrap">${icons.search}<input class="search" id="q" type="search" placeholder="Chercher une personne" value="${esc(ui.query)}" autocomplete="off" aria-label="Chercher une personne"></div>
+    <div class="chips" role="group" aria-label="Filtrer par rôle">
+      <button class="chip" data-role-filter="all" aria-pressed="${ui.roleFilter === 'all'}">Tous</button>
+      ${state.roles.map((r) => `<button class="chip" data-role-filter="${r.id}" aria-pressed="${ui.roleFilter === r.id}"><span class="lvl" style="width:12px;height:12px;border-radius:4px;background:${r.color}"></span>${esc(r.name)}</button>`).join('')}
+    </div>
+    <div class="actions" style="margin-top:14px"><button class="btn" data-action="add-person">${icons.plus} Ajouter une personne</button></div>
+    <div class="grid" style="margin-top:14px" id="people-list">${peopleCards()}</div>`;
+  return html;
+}
+
+function peopleCards() {
+  const q = ui.query.trim().toLowerCase();
+  const list = state.people
+    .filter((p) => (ui.roleFilter === 'all' || p.role === ui.roleFilter) && (!q || p.name.toLowerCase().includes(q)))
+    .sort(byName);
+  if (!list.length) return `<p class="hint">Personne ne correspond.</p>`;
+  return list
+    .map((p) => {
+      const skills = Object.keys(p.skills || {}).filter((k) => poste(k) && level(p.skills[k]));
+      return `<button class="card" data-person="${p.id}">${avHtml(p)}<div class="grow"><div class="card-title">${esc(p.name)}</div>
+        <div class="card-meta">${esc(role(p.role)?.name || 'Sans rôle')} · ${skills.length} poste${skills.length > 1 ? 's' : ''}</div>
+        ${skills.length ? `<div class="lvls-row">${skills.sort((a, b) => rank(p.skills[b]) - rank(p.skills[a])).slice(0, 8).map((k) => `<span class="lvl-chip">${lvlHtml(p.skills[k])}</span>`).join('')}</div>` : ''}
+      </div>${icons.chevron}</button>`;
+    })
+    .join('');
+}
+
+function renderPostes() {
+  let html = `<h1 class="page">Postes</h1><p class="sub">Les habilitations de l’atelier, et qui sait tenir chaque poste.</p>
+    <div class="actions" style="margin-top:14px"><button class="btn" data-action="add-poste">${icons.plus} Ajouter un poste</button></div>`;
+  if (!state.postes.length) return html + `<div style="margin-top:14px">${firstSteps()}</div>`;
+  const absent = absentOn(iso(new Date()));
+  html += `<div class="grid" style="margin-top:14px">${state.postes
+    .map((po) => {
+      const who = state.people.filter((p) => p.skills?.[po.id] && level(p.skills[po.id])).sort((a, b) => rank(b.skills[po.id]) - rank(a.skills[po.id]));
+      const counts = state.levels.map((lv) => [lv, who.filter((p) => p.skills[po.id] === lv.id).length]).filter(([, n]) => n);
+      const present = who.filter((p) => !absent.has(p.id)).length;
+      return `<button class="card" data-poste="${po.id}" style="align-items:flex-start"><div class="grow">
+        <div class="card-title">${esc(po.name)}</div>
+        <div class="card-meta">${po.training ? 'Formation : ' + esc(po.training) + ' · ' : ''}${who.length} habilité${who.length > 1 ? 's' : ''}</div>
+        ${counts.length ? `<div class="lvls-row">${counts.map(([lv, n]) => `<span class="lvl-chip">${lvlHtml(lv.id)}${n}</span>`).join('')}</div>` : '<div class="lvls-row"><span class="badge red">Personne n’est habilité</span></div>'}
+        ${who.length ? `<div class="face-row">${who.slice(0, 7).map((p) => avHtml(p, 'small' + (absent.has(p.id) ? ' absent' : ''))).join('')}</div>` : ''}
+        ${who.length && !present ? '<div class="lvls-row"><span class="badge red">Aucun habilité présent aujourd’hui</span></div>' : ''}
+      </div>${icons.chevron}</button>`;
+    })
+    .join('')}</div>`;
+  return html;
+}
+
+// Réglages : rôles et niveaux modifiables (pour ajouter ce qui manque), et sauvegarde.
+function renderSettings() {
+  return `<h1 class="page">Réglages</h1><p class="sub">Ajoute ou renomme les rôles et les niveaux qui te manquent.</p>
+    <div class="section-title">Rôles</div>
+    ${state.roles
+      .map(
+        (r, i) => `<div class="set-row"><span class="lvl" style="width:18px;height:18px;border-radius:6px;background:${r.color}"></span>
+        <input value="${esc(r.name)}" data-rename-role="${r.id}" aria-label="Nom du rôle ${i + 1}">
+        <button class="icon-btn" data-up-role="${r.id}" aria-label="Monter ${esc(r.name)}" ${i ? '' : 'disabled'}>${icons.up}</button>
+        <button class="icon-btn" data-del-role="${r.id}" aria-label="Supprimer ${esc(r.name)}">${icons.trash}</button></div>`,
+      )
+      .join('')}
+    <div class="actions" style="margin-top:10px"><button class="btn ghost" data-action="add-role">${icons.plus} Ajouter un rôle</button></div>
+
+    <div class="section-title">Niveaux</div>
+    <p class="hint" style="margin:-4px 0 10px">Du plus bas au plus haut : l’appli propose d’abord les remplaçants du niveau le plus haut.</p>
+    ${state.levels
+      .map(
+        (lv, i) => `<div class="level-edit"><div class="top">${lvlHtml(lv.id)}
+          <input class="letter" value="${esc(lv.letter)}" maxlength="3" data-level-letter="${lv.id}" aria-label="Lettre du niveau">
+          <span class="grow"></span>
+          <button class="icon-btn" data-up-level="${lv.id}" aria-label="Monter le niveau ${esc(lv.letter)}" ${i ? '' : 'disabled'}>${icons.up}</button>
+          <button class="icon-btn" data-del-level="${lv.id}" aria-label="Supprimer le niveau ${esc(lv.letter)}">${icons.trash}</button></div>
+          <textarea data-level-desc="${lv.id}" aria-label="Description du niveau ${esc(lv.letter)}">${esc(lv.desc)}</textarea></div>`,
+      )
+      .join('')}
+    <div class="actions" style="margin-top:10px"><button class="btn ghost" data-action="add-level">${icons.plus} Ajouter un niveau</button></div>
+
+    <div class="section-title">Sauvegarde</div>
+    <p class="hint" style="margin:-4px 0 12px">Tout est gardé sur cet appareil. Pour passer du téléphone à l’ordinateur (ou l’inverse), sauvegarde dans un fichier puis récupère-le sur l’autre appareil.</p>
+    <div class="actions" style="margin-top:0">
+      <button class="btn" data-action="export">Sauvegarder dans un fichier</button>
+      <button class="btn ghost" data-action="import">Récupérer une sauvegarde</button>
+      <input type="file" id="import-file" accept="application/json,.json" hidden>
+    </div>`;
+}
+
+// ---------- Interactions ----------
+
+function bind() {
+  document.getElementById('day')?.addEventListener('change', (e) => {
+    if (e.target.value) ui.day = e.target.value;
+    render();
+  });
+  document.getElementById('q')?.addEventListener('input', (e) => {
+    ui.query = e.target.value;
+    document.getElementById('people-list').innerHTML = peopleCards();
+  });
+  document.getElementById('import-file')?.addEventListener('change', importBackup);
+  // Réglages : on enregistre en tapant, sans tout redessiner (le clavier reste ouvert).
+  app.querySelectorAll('[data-rename-role]').forEach((el) =>
+    el.addEventListener('input', () => {
+      role(el.dataset.renameRole).name = el.value.trim() || 'Sans nom';
+      save();
+    }),
+  );
+  app.querySelectorAll('[data-level-letter]').forEach((el) =>
+    el.addEventListener('change', () => {
+      const lv = level(el.dataset.levelLetter);
+      lv.letter = el.value.trim().toUpperCase() || lv.letter;
+      save();
+      render();
+    }),
+  );
+  app.querySelectorAll('[data-level-desc]').forEach((el) =>
+    el.addEventListener('input', () => {
+      level(el.dataset.levelDesc).desc = el.value;
+      save();
+    }),
+  );
+}
+
+document.addEventListener('click', (e) => {
+  if (e.target.closest('.sheet-back')) return;
+  const tab = e.target.closest('.tabs button');
+  if (tab) {
+    ui.tab = tab.dataset.tab;
+    render();
+    return window.scrollTo(0, 0);
+  }
+  const ab = e.target.closest('[data-absent]');
+  if (ab) {
+    const list = new Set(state.absences[ui.day] || []);
+    list.has(ab.dataset.absent) ? list.delete(ab.dataset.absent) : list.add(ab.dataset.absent);
+    if (list.size) state.absences[ui.day] = [...list];
+    else delete state.absences[ui.day];
+    save();
+    return render();
+  }
+  const p = e.target.closest('[data-person]');
+  if (p) return openPerson(p.dataset.person);
+  const po = e.target.closest('[data-poste]');
+  if (po) return openPoste(po.dataset.poste);
+  const rf = e.target.closest('[data-role-filter]');
+  if (rf) {
+    ui.roleFilter = rf.dataset.roleFilter;
+    return render();
+  }
+  const settings = settingsClick(e);
+  if (settings) return;
+  const a = e.target.closest('[data-action]')?.dataset.action;
+  if (a === 'add-person') openPersonEditor();
+  else if (a === 'add-poste') openPosteEditor();
+  else if (a === 'today') {
+    ui.day = iso(new Date());
+    render();
+  } else if (a === 'export') exportBackup();
+  else if (a === 'import') document.getElementById('import-file').click();
+});
+
+function settingsClick(e) {
+  const t = (sel) => e.target.closest(sel);
+  let el;
+  if ((el = t('[data-up-role]'))) {
+    const i = state.roles.findIndex((r) => r.id === el.dataset.upRole);
+    [state.roles[i - 1], state.roles[i]] = [state.roles[i], state.roles[i - 1]];
+  } else if ((el = t('[data-del-role]'))) {
+    const r = role(el.dataset.delRole);
+    const used = state.people.filter((p) => p.role === r.id).length;
+    if (!confirm(`Supprimer le rôle « ${r.name} » ?${used ? ` ${used} personne${used > 1 ? 's' : ''} n’aura plus de rôle.` : ''}`)) return true;
+    state.roles = state.roles.filter((x) => x.id !== r.id);
+    state.people.forEach((p) => p.role === r.id && (p.role = ''));
+  } else if (t('[data-action="add-role"]')) {
+    state.roles.push({ id: uid('r'), name: 'Nouveau rôle', color: ROLE_COLORS[state.roles.length % ROLE_COLORS.length] });
+  } else if ((el = t('[data-up-level]'))) {
+    const i = state.levels.findIndex((l) => l.id === el.dataset.upLevel);
+    [state.levels[i - 1], state.levels[i]] = [state.levels[i], state.levels[i - 1]];
+  } else if ((el = t('[data-del-level]'))) {
+    if (state.levels.length <= 1) return toast('Il faut garder au moins un niveau.'), true;
+    const lv = level(el.dataset.delLevel);
+    const used = state.people.filter((p) => Object.values(p.skills || {}).includes(lv.id)).length;
+    if (!confirm(`Supprimer le niveau « ${lv.letter} » ?${used ? ` Les habilitations de ce niveau (${used} personne${used > 1 ? 's' : ''}) seront retirées.` : ''}`)) return true;
+    state.levels = state.levels.filter((x) => x.id !== lv.id);
+    state.people.forEach((p) => Object.keys(p.skills || {}).forEach((k) => p.skills[k] === lv.id && delete p.skills[k]));
+  } else if (t('[data-action="add-level"]')) {
+    const letters = 'ABCDEFGHJKMNOPQRSTVWXYZ'.split('').filter((c) => !state.levels.some((l) => l.letter === c));
+    state.levels.push({ id: uid('l'), letter: letters[0] || '?', shape: 'letter', color: LEVEL_COLORS[state.levels.length % LEVEL_COLORS.length], desc: 'À décrire.' });
+  } else return false;
+  save();
+  render();
+  return true;
+}
+
+// ---------- Fiches ----------
+
+function showSheet(inner) {
+  closeSheet();
+  const back = document.createElement('div');
+  back.className = 'sheet-back';
+  back.innerHTML = `<div class="sheet" role="dialog" aria-modal="true"><div class="band"></div>${inner}</div>`;
+  back.addEventListener('click', (e) => {
+    if (e.target === back || e.target.closest('.close')) closeSheet();
+  });
+  document.body.appendChild(back);
+  document.body.style.overflow = 'hidden';
+  return back;
+}
+
+function closeSheet() {
+  document.querySelector('.sheet-back')?.remove();
+  document.body.style.overflow = '';
+}
+
+const closeBtn = `<button class="close" aria-label="Fermer">${icons.close}</button>`;
+
+// Sélecteur de niveau : —, I, L, U (et les niveaux ajoutés).
+function segHtml(current, attr) {
+  return `<div class="seg" role="group" aria-label="Niveau">
+    <button class="none" data-${attr}="" aria-pressed="${!current}" aria-label="Pas habilité">–</button>
+    ${state.levels
+      .map((lv) => `<button data-${attr}="${lv.id}" aria-pressed="${current === lv.id}" aria-label="Niveau ${esc(lv.letter)}" title="${esc(lv.desc)}">${lv.shape && lv.shape !== 'letter' ? levelSvg(lv) : `<span style="color:${current === lv.id ? lv.color : 'inherit'}">${esc(lv.letter)}</span>`}</button>`)
+      .join('')}
+  </div>`;
+}
+
+// Fiche d'une personne : rôle, habilitations poste par poste, et qui peut la remplacer.
+function openPerson(id) {
+  const p = person(id);
+  if (!p) return;
+  p.skills = p.skills || {};
+  const absent = absentOn(iso(new Date()));
+  absent.add(p.id);
+  const known = state.postes.filter((po) => p.skills[po.id] && level(p.skills[po.id]));
+  const others = state.postes.filter((po) => !known.includes(po));
+  let replaceHtml = '';
+  if (known.length) {
+    replaceHtml = `<span class="label">Qui peut remplacer ${esc(p.name)} ?</span><div class="card" style="padding:12px"><div class="replace" style="margin:0;border:0;padding:0">${known
+      .map((po) => {
+        const c = candidates(po.id, absent);
+        return `<div class="replace-row"><div class="replace-poste">${esc(po.name)}</div>${c.length ? `<div class="cands">${c.slice(0, 6).map((x) => `<button class="cand" data-go-person="${x.id}">${lvlHtml(x.skills[po.id])}${esc(x.name)}</button>`).join('')}</div>` : '<div class="nobody">Personne</div>'}</div>`;
+      })
+      .join('')}</div></div><p class="hint">Sans compter les absents du jour.</p>`;
+  }
+  const back = showSheet(`<div class="sheet-head">${avHtml(p, 'big')}<div style="min-width:0"><h2>${esc(p.name)}</h2><p>${esc(role(p.role)?.name || 'Sans rôle')} · ${known.length} habilitation${known.length > 1 ? 's' : ''}</p></div>${closeBtn}</div>
+    <span class="label">Rôle</span>
+    <div class="row-wrap">${state.roles.map((r) => `<button class="chip" data-set-role="${r.id}" aria-pressed="${p.role === r.id}">${esc(r.name)}</button>`).join('')}</div>
+    <span class="label">Habilitations</span>
+    ${known.length ? known.map((po) => skillRow(p, po)).join('') : '<p class="hint" style="margin:0">Aucune pour l’instant. Ajoute-en ci-dessous.</p>'}
+    ${others.length ? `<span class="label">Ajouter une habilitation</span><div class="row-wrap">${others.map((po) => `<button class="chip" data-add-skill="${po.id}">${icons.plus.replace('<svg', '<svg style="width:16px;height:16px"')} ${esc(po.name)}</button>`).join('')}</div>` : ''}
+    ${state.postes.length ? '' : '<p class="hint">Crée d’abord des postes dans l’onglet « Postes ».</p>'}
+    ${replaceHtml}
+    <div class="actions"><button class="btn ghost" data-edit>Modifier le nom</button><button class="btn danger" data-del>Retirer de l’équipe</button></div>`);
+  let confirmDel = false;
+  back.addEventListener('click', (e) => {
+    let el;
+    if ((el = e.target.closest('[data-set-role]'))) {
+      p.role = el.dataset.setRole;
+    } else if ((el = e.target.closest('[data-skill]'))) {
+      const [posteId, lv] = el.dataset.skill.split('|');
+      if (lv) p.skills[posteId] = lv;
+      else delete p.skills[posteId];
+    } else if ((el = e.target.closest('[data-add-skill]'))) {
+      // Nouvelle habilitation : on commence au premier niveau (I), à ajuster ensuite.
+      p.skills[el.dataset.addSkill] = state.levels[0].id;
+      toast(`${poste(el.dataset.addSkill).name} ajouté : choisis le niveau.`);
+    } else if ((el = e.target.closest('[data-go-person]'))) {
+      return openPerson(el.dataset.goPerson);
+    } else if (e.target.closest('[data-edit]')) {
+      return openPersonEditor(p.id);
+    } else if ((el = e.target.closest('[data-del]'))) {
+      if (!confirmDel) {
+        confirmDel = true;
+        el.textContent = 'Appuie encore pour confirmer';
+        return;
+      }
+      state.people = state.people.filter((x) => x.id !== p.id);
+      Object.keys(state.absences).forEach((d) => (state.absences[d] = state.absences[d].filter((x) => x !== p.id)));
+      save();
+      closeSheet();
+      render();
+      return toast(`${p.name} retiré de l’équipe.`);
+    } else return;
+    save();
+    render();
+    const y = back.querySelector('.sheet').scrollTop;
+    openPerson(p.id);
+    document.querySelector('.sheet').scrollTop = y;
+  });
+}
+
+function skillRow(p, po) {
+  return `<div class="skill"><div class="skill-name">${esc(po.name)}${po.training ? `<small>Formation : ${esc(po.training)}</small>` : ''}</div>${segHtml(p.skills[po.id], 'skill').replace(/data-skill="([^"]*)"/g, `data-skill="${po.id}|$1"`)}</div>`;
+}
+
+function openPersonEditor(id) {
+  const p = id ? person(id) : null;
+  const back = showSheet(`<div class="sheet-head"><h2>${p ? 'Modifier' : 'Nouvelle personne'}</h2>${closeBtn}</div>
+    <form id="person-form">
+      <label class="label" for="pname">Prénom et nom</label>
+      <input id="pname" class="field" value="${esc(p?.name || '')}" required autocomplete="off" enterkeyhint="done" placeholder="ex. Marc Dupont">
+      ${p ? '' : `<span class="label">Rôle</span><div class="row-wrap">${state.roles.map((r, i) => `<button type="button" class="chip" data-pick-role="${r.id}" aria-pressed="${i === 0}">${esc(r.name)}</button>`).join('')}</div>`}
+      <div class="actions"><button class="btn" type="submit">${p ? 'Enregistrer' : 'Ajouter'}</button></div>
+    </form>`);
+  let roleId = state.roles[0]?.id || '';
+  back.addEventListener('click', (e) => {
+    const r = e.target.closest('[data-pick-role]');
+    if (!r) return;
+    roleId = r.dataset.pickRole;
+    back.querySelectorAll('[data-pick-role]').forEach((b) => b.setAttribute('aria-pressed', String(b === r)));
+  });
+  back.querySelector('#person-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const name = back.querySelector('#pname').value.trim();
+    if (!name) return;
+    if (p) p.name = name;
+    else state.people.push({ id: uid('p'), name, role: roleId, skills: {} });
+    save();
+    render();
+    const target = p || state.people[state.people.length - 1];
+    openPerson(target.id);
+    if (!p) toast(`${name} ajouté. Ajoute ses habilitations.`);
+  });
+  setTimeout(() => back.querySelector('#pname').focus(), 60);
+}
+
+// Fiche d'un poste : qui est habilité, à quel niveau, et habiliter quelqu'un de plus.
+function openPoste(id) {
+  const po = poste(id);
+  if (!po) return;
+  const who = state.people.filter((p) => p.skills?.[po.id] && level(p.skills[po.id])).sort((a, b) => rank(b.skills[po.id]) - rank(a.skills[po.id]) || byName(a, b));
+  const rest = state.people.filter((p) => !who.includes(p)).sort(byName);
+  const back = showSheet(`<div class="sheet-head"><div style="min-width:0"><h2>${esc(po.name)}</h2><p>${po.training ? 'Temps de formation : ' + esc(po.training) + ' · ' : ''}${who.length} habilité${who.length > 1 ? 's' : ''}</p></div>${closeBtn}</div>
+    <span class="label">Qui est habilité</span>
+    ${who.length ? who.map((p) => `<div class="skill"><span class="skill-name" style="display:flex;align-items:center;gap:10px">${avHtml(p, 'small')}<span style="min-width:0">${esc(p.name)}<small>${esc(role(p.role)?.name || '')}</small></span></span>${segHtml(p.skills[po.id], 'pskill').replace(/data-pskill="([^"]*)"/g, `data-pskill="${p.id}|$1"`)}</div>`).join('') : '<p class="hint" style="margin:0">Personne pour l’instant.</p>'}
+    ${rest.length ? `<span class="label">Habiliter quelqu’un</span><div class="row-wrap">${rest.map((p) => `<button class="chip" data-habilite="${p.id}">${icons.plus.replace('<svg', '<svg style="width:16px;height:16px"')} ${esc(p.name)}</button>`).join('')}</div>` : ''}
+    <div class="actions"><button class="btn ghost" data-edit>Modifier le poste</button><button class="btn danger" data-del>Supprimer le poste</button></div>`);
+  let confirmDel = false;
+  back.addEventListener('click', (e) => {
+    let el;
+    if ((el = e.target.closest('[data-pskill]'))) {
+      const [pid, lv] = el.dataset.pskill.split('|');
+      const p = person(pid);
+      if (lv) p.skills[po.id] = lv;
+      else delete p.skills[po.id];
+    } else if ((el = e.target.closest('[data-habilite]'))) {
+      const p = person(el.dataset.habilite);
+      p.skills = p.skills || {};
+      p.skills[po.id] = state.levels[0].id;
+      toast(`${p.name} habilité : choisis le niveau.`);
+    } else if (e.target.closest('[data-edit]')) {
+      return openPosteEditor(po.id);
+    } else if ((el = e.target.closest('[data-del]'))) {
+      if (!confirmDel) {
+        confirmDel = true;
+        el.textContent = 'Appuie encore : les habilitations de ce poste seront retirées';
+        return;
+      }
+      state.postes = state.postes.filter((x) => x.id !== po.id);
+      state.people.forEach((p) => p.skills && delete p.skills[po.id]);
+      save();
+      closeSheet();
+      render();
+      return toast('Poste supprimé.');
+    } else return;
+    save();
+    render();
+    const y = back.querySelector('.sheet').scrollTop;
+    openPoste(po.id);
+    document.querySelector('.sheet').scrollTop = y;
+  });
+}
+
+function openPosteEditor(id) {
+  const po = id ? poste(id) : null;
+  const back = showSheet(`<div class="sheet-head"><h2>${po ? 'Modifier le poste' : 'Nouveau poste'}</h2>${closeBtn}</div>
+    <form id="poste-form">
+      <label class="label" for="poname">Nom du poste</label>
+      <input id="poname" class="field" value="${esc(po?.name || '')}" required autocomplete="off" placeholder="ex. Poste 1, Contrôle…">
+      <label class="label" for="potrain">Temps de formation <span style="font-weight:600;color:var(--ink-2)">(facultatif)</span></label>
+      <input id="potrain" class="field" value="${esc(po?.training || '')}" autocomplete="off" placeholder="ex. 1 jour, 2 semaines, 500 heures">
+      <div class="actions"><button class="btn" type="submit">${po ? 'Enregistrer' : 'Ajouter le poste'}</button>
+      ${po ? '' : '<button class="btn ghost" type="submit" data-again>Ajouter et en créer un autre</button>'}</div>
+    </form>`);
+  let again = false;
+  back.querySelector('[data-again]')?.addEventListener('click', () => (again = true));
+  back.querySelector('#poste-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const name = back.querySelector('#poname').value.trim();
+    if (!name) return;
+    const training = back.querySelector('#potrain').value.trim();
+    if (po) Object.assign(po, { name, training });
+    else state.postes.push({ id: uid('po'), name, training });
+    save();
+    render();
+    if (again) {
+      toast(`« ${name} » ajouté.`);
+      return openPosteEditor();
+    }
+    closeSheet();
+    toast(po ? 'Poste modifié.' : `« ${name} » ajouté.`);
+  });
+  setTimeout(() => back.querySelector('#poname').focus(), 60);
+}
+
+// ---------- Sauvegarde ----------
+
+function exportBackup() {
+  const blob = new Blob([JSON.stringify(state, null, 1)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `habilitations-${iso(new Date())}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  toast('Sauvegarde créée.');
+}
+
+function importBackup(e) {
+  const f = e.target.files[0];
+  if (!f) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const data = JSON.parse(reader.result);
+      if (!Array.isArray(data.people) || !Array.isArray(data.postes) || !Array.isArray(data.levels)) throw new Error('format');
+      if (!confirm('Remplacer les données de cet appareil par celles de la sauvegarde ?')) return;
+      state = { ...defaultState(), ...data };
+      save();
+      render();
+      toast('Sauvegarde récupérée !');
+    } catch (err) {
+      toast('Ce fichier n’est pas une sauvegarde des habilitations.');
+    }
+  };
+  reader.readAsText(f);
+}
+
+render();
+</script>
+</body>
+</html>
