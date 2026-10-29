@@ -53,6 +53,10 @@ h1.page { font-size: 30px; line-height: 1.1; font-weight: 800; letter-spacing: -
 .lvl svg { width: 18px; height: 18px; }
 .lvl.letter { font-weight: 900; font-size: 14px; color: #fff; }
 .lvl-chip { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; font-size: 14px; }
+.pchip { display: inline-flex; align-items: center; gap: 6px; background: var(--bg); border-radius: 10px; padding: 3px 10px 3px 3px; font-weight: 700; font-size: 14px; max-width: 100%; }
+.pchip .lvl { width: 24px; height: 24px; border-radius: 7px; }
+.pchip .lvl svg { width: 15px; height: 15px; }
+.pchip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Avatars. */
 .av { width: 44px; height: 44px; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 17px; color: #fff; flex: 0 0 auto; position: relative; }
@@ -91,7 +95,7 @@ button.card { text-align: left; width: 100%; padding: 14px; display: flex; gap: 
 .date-input { height: 46px; border-radius: 12px; border: 1px solid var(--line); background: var(--card); padding: 0 12px; font-size: 16px; }
 .people-pick { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 8px; margin-top: 12px; }
 .pick { background: var(--card); border: 1.5px solid var(--line); border-radius: 16px; padding: 10px 6px 8px; display: flex; flex-direction: column; align-items: center; gap: 6px; font-weight: 700; font-size: 14px; min-height: 96px; }
-.pick span { max-width: 100%; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; text-align: center; line-height: 1.2; overflow-wrap: anywhere; }
+.pick > span:not(.av) { max-width: 100%; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; text-align: center; line-height: 1.2; overflow-wrap: anywhere; }
 .pick[aria-pressed="true"] { border-color: var(--danger); background: var(--danger-soft); color: var(--danger); }
 .pick[aria-pressed="true"] .av { filter: grayscale(1); opacity: .5; }
 .summary { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
@@ -366,7 +370,7 @@ function renderToday() {
               .sort(byName)
               .map((po) => {
                 const c = candidates(po.id, absent);
-                return `<div class="replace-row"><div class="replace-poste">${esc(po.name)}</div>${
+                return `<div class="replace-row"><div class="replace-poste">${lvlHtml(p.skills[po.id])}<span style="padding-top:3px">${esc(po.name)}</span></div>${
                   c.length
                     ? `<div class="cands">${c.slice(0, 6).map((x) => `<button class="cand" data-person="${x.id}">${lvlHtml(x.skills[po.id])}${esc(x.name)}</button>`).join('')}${c.length > 6 ? `<span class="badge grey">+${c.length - 6}</span>` : ''}</div>`
                     : '<div class="nobody">Personne de disponible</div>'
@@ -406,7 +410,7 @@ function peopleCards() {
       const skills = Object.keys(p.skills || {}).filter((k) => poste(k) && level(p.skills[k]));
       return `<button class="card" data-person="${p.id}">${avHtml(p)}<div class="grow"><div class="card-title">${esc(p.name)}</div>
         <div class="card-meta">${esc(role(p.role)?.name || 'Sans rôle')} · ${skills.length} poste${skills.length > 1 ? 's' : ''}</div>
-        ${skills.length ? `<div class="lvls-row">${skills.sort((a, b) => rank(p.skills[b]) - rank(p.skills[a])).slice(0, 8).map((k) => `<span class="lvl-chip">${lvlHtml(p.skills[k])}</span>`).join('')}</div>` : ''}
+        ${skills.length ? `<div class="lvls-row">${skills.sort((a, b) => rank(p.skills[b]) - rank(p.skills[a]) || poste(a).name.localeCompare(poste(b).name, 'fr')).map((k) => `<span class="pchip">${lvlHtml(p.skills[k])}<span>${esc(poste(k).name)}</span></span>`).join('')}</div>` : ''}
       </div>${icons.chevron}</button>`;
     })
     .join('');
@@ -426,7 +430,7 @@ function renderPostes() {
         <div class="card-title">${esc(po.name)}</div>
         <div class="card-meta">${po.training ? 'Formation : ' + esc(po.training) + ' · ' : ''}${who.length} habilité${who.length > 1 ? 's' : ''}</div>
         ${counts.length ? `<div class="lvls-row">${counts.map(([lv, n]) => `<span class="lvl-chip">${lvlHtml(lv.id)}${n}</span>`).join('')}</div>` : '<div class="lvls-row"><span class="badge red">Personne n’est habilité</span></div>'}
-        ${who.length ? `<div class="face-row">${who.slice(0, 7).map((p) => avHtml(p, 'small' + (absent.has(p.id) ? ' absent' : ''))).join('')}</div>` : ''}
+        ${who.length ? `<div class="lvls-row">${who.map((p) => `<span class="pchip"${absent.has(p.id) ? ' style="opacity:.5" title="Absent aujourd’hui"' : ''}>${lvlHtml(p.skills[po.id])}<span>${esc(p.name)}${absent.has(p.id) ? ' (absent)' : ''}</span></span>`).join('')}</div>` : ''}
         ${who.length && !present ? '<div class="lvls-row"><span class="badge red">Aucun habilité présent aujourd’hui</span></div>' : ''}
       </div>${icons.chevron}</button>`;
     })
@@ -623,7 +627,7 @@ function openPerson(id) {
     replaceHtml = `<span class="label">Qui peut remplacer ${esc(p.name)} ?</span><div class="card" style="padding:12px"><div class="replace" style="margin:0;border:0;padding:0">${known
       .map((po) => {
         const c = candidates(po.id, absent);
-        return `<div class="replace-row"><div class="replace-poste">${esc(po.name)}</div>${c.length ? `<div class="cands">${c.slice(0, 6).map((x) => `<button class="cand" data-go-person="${x.id}">${lvlHtml(x.skills[po.id])}${esc(x.name)}</button>`).join('')}</div>` : '<div class="nobody">Personne</div>'}</div>`;
+        return `<div class="replace-row"><div class="replace-poste">${lvlHtml(p.skills[po.id])}<span style="padding-top:3px">${esc(po.name)}</span></div>${c.length ? `<div class="cands">${c.slice(0, 6).map((x) => `<button class="cand" data-go-person="${x.id}">${lvlHtml(x.skills[po.id])}${esc(x.name)}</button>`).join('')}</div>` : '<div class="nobody">Personne</div>'}</div>`;
       })
       .join('')}</div></div><p class="hint">Sans compter les absents du jour.</p>`;
   }
