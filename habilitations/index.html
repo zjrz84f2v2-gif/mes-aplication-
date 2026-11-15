@@ -431,7 +431,11 @@ function renderToday() {
                 }</div>`;
               })
               .join('')
-          : `<p class="hint" style="margin:0;color:var(--danger)">Je ne trouve pas ${esc(p.name)} dans le fichier d’habilitations, donc je ne peux pas proposer de remplaçant. Vérifie que le nom et le prénom sont écrits pareil dans les deux fichiers.</p>`
+          : `<p class="hint" style="margin:0;color:var(--danger)">${
+              p.ambiguous
+                ? `Plusieurs personnes s’appellent ${esc(p.name)} dans le fichier d’habilitations (${esc(p.ambiguous.join(', '))}). Ajoute l’initiale du prénom dans le planning (ex. « ${esc(p.name)} M. ») pour que je sache laquelle.`
+                : `Je ne trouve pas ${esc(p.name)} dans le fichier d’habilitations, donc je ne peux pas proposer de remplaçant. Vérifie que le nom est écrit pareil dans les deux fichiers.`
+            }</p>`
       }</div></div>`;
   }
   return html + `</div>`;
@@ -454,11 +458,16 @@ function renderTeam() {
 
 function peopleCards() {
   const q = ui.query.trim().toLowerCase();
-  const list = state.people
-    .filter((p) => (ui.roleFilter === 'all' || p.role === ui.roleFilter) && (!q || p.name.toLowerCase().includes(q)))
-    .sort(byName);
-  if (!list.length) return `<p class="hint">Personne ne correspond.</p>`;
-  return list
+  const all = state.people.filter((p) => (ui.roleFilter === 'all' || p.role === ui.roleFilter) && (!q || p.name.toLowerCase().includes(q))).sort(byName);
+  const list = all.filter((p) => !p.planOnly);
+  const planOnly = all.filter((p) => p.planOnly);
+  if (!all.length) return `<p class="hint">Personne ne correspond.</p>`;
+  const others = planOnly.length
+    ? `<div style="grid-column:1/-1"><div class="section-title">Seulement dans le planning<small>${planOnly.length}</small></div>
+        <p class="hint" style="margin:-4px 0 8px">Ces personnes sont dans ton planning mais pas dans le fichier d’habilitations (ou leur nom est écrit autrement). L’appli ne connaît donc pas leurs postes.</p>
+        <div class="lvls-row">${planOnly.map((p) => `<span class="pchip"${p.ambiguous ? ' style="background:var(--danger-soft);color:var(--danger)" title="Plusieurs personnes portent ce nom"' : ''}>${esc(p.name)}${p.ambiguous ? ' (' + p.ambiguous.length + ' possibles)' : ''}${p.post ? ' · ' + esc(p.post) : ''}</span>`).join('')}</div></div>`
+    : '';
+  return others + list
     .map((p) => {
       const skills = Object.keys(p.skills || {}).filter((k) => poste(k) && level(p.skills[k]));
       return `<button class="card" data-person="${p.id}">${avHtml(p)}<div class="grow"><div class="card-title">${esc(p.name)}</div>
@@ -497,6 +506,8 @@ function renderSettings() {
     <div class="section-title">Fichiers Excel raccordés</div>
     ${linksHtml()}
     ${wordsHtml()}
+    <div class="actions" style="margin-top:12px"><button class="btn danger" data-action="wipe">Effacer toutes les données de cet appareil</button></div>
+    <p class="hint">Utile pour enlever l’exemple ou repartir de zéro. Tes fichiers Excel ne sont pas touchés : raccorde-les à nouveau ensuite.</p>
     <div class="section-title">Niveaux</div>
     ${state.levels.map((lv) => `<div class="skill"><span class="skill-name">${esc(lv.desc)}</span>${levelTag(lv.id)}</div>`).join('')}
     <div class="section-title">Rôles</div>
@@ -625,6 +636,15 @@ document.addEventListener('click', (e) => {
   else if (a === 'unlink-plan') unlinkFile('plan');
   else if (a === 'refresh-links') refreshLinks(true);
   else if (a === 'demo') loadDemo();
+  else if (a === 'wipe') {
+    if (!confirm('Effacer toutes les personnes, postes et absences de cet appareil ? Tes fichiers Excel ne sont pas touchés.')) return;
+    const keep = { levelMap: state.levelMap, planYear: state.planYear };
+    state = { ...defaultState(), ...keep };
+    save();
+    idbDo('readwrite', (st) => st.clear()).catch(() => {});
+    render();
+    toast('Données effacées. Raccorde tes fichiers Excel.');
+  }
 });
 
 function settingsClick(e) {
@@ -1140,15 +1160,97 @@ function findHeader(rows, also = []) {
 }
 
 const personKey = (prenom, nom) => norm(`${prenom} ${nom}`);
-function findOrCreatePerson(nom, prenom) {
+function mergePlanOnly() {
+  for (const p of state.people.filter((x) => x.planOnly)) {
+    const hits = p.preN
+      ? state.people.filter((x) => !x.planOnly && ((x.nomN === p.nomN && closeEnough(x.preN || '', p.preN)) || (x.nomN === p.preN && closeEnough(x.preN || '', p.nomN))))
+      : findByLastName(p.nomN);
+    if (hits.length !== 1) {
+      p.ambiguous = !p.preN && hits.length > 1 ? hits.map((x) => x.name) : null;
+      continue;
+    }
+    const to = hits[0];
+    for (const day of Object.values(state.absImport || {})) {
+      if (day[p.id]) {
+        day[to.id] = day[p.id];
+        delete day[p.id];
+      }
+    }
+    if (p.post && !to.post) to.post = p.post;
+    if (p.team && !to.team) to.team = p.team;
+    state.people = state.people.filter((x) => x !== p);
+  }
+}
+
+// Une vraie personne : pas une ligne de total (« 37 NOMBRE OPÉRATEURS »), ni un titre.
+function validName(nom, prenom) {
+  const t = norm(`${nom} ${prenom}`);
+  return /[a-z]/.test(t) && !/\d/.test(t) && !/\b(nombre|total|effectif|somme|moyenne|nom|prenom)\b/.test(t);
+}
+
+// Même nom de famille et prénom presque pareil (« Mickael » / « Michaël ») : c'est la même personne.
+function closeEnough(a, b) {
+  if (!a || !b) return false;
+  if (a === b || a.startsWith(b) || b.startsWith(a)) return true;
+  if (Math.abs(a.length - b.length) > 2) return false;
+  const d = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    let prev = d[0];
+    d[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const tmp = d[j];
+      d[j] = Math.min(d[j] + 1, d[j - 1] + 1, prev + (a[i - 1] === b[j - 1] ? 0 : 1));
+      prev = tmp;
+    }
+  }
+  return d[b.length] <= 2;
+}
+
+// Planning avec le nom de famille seul (« SARTELET ») : on cherche ce nom dans le fichier d'habilitations.
+function findByLastName(nom) {
+  const n = norm(nom);
+  const hits = state.people.filter((x) => !x.planOnly && (x.nomN === n || (!x.nomN && norm(x.name).split(' ').slice(1).join(' ') === n)));
+  return hits;
+}
+
+function findOrCreatePerson(nom, prenom, fromPlan) {
+  if (!validName(nom, prenom)) return null;
+  if (fromPlan && !norm(prenom)) {
+    const hits = findByLastName(nom);
+    if (hits.length === 1) return hits[0];
+    // Pas trouvé, ou plusieurs personnes avec ce nom : on garde la ligne du planning à part.
+    const n = norm(nom);
+    let p = state.people.find((x) => x.planOnly && x.nomN === n && !x.preN);
+    if (!p) {
+      p = { id: uid('p'), name: nom.toUpperCase(), role: state.roles[0]?.id || '', skills: {}, planOnly: true, nomN: n, preN: '' };
+      state.people.push(p);
+    }
+    p.ambiguous = hits.length > 1 ? hits.map((x) => x.name) : null;
+    return p;
+  }
   const k = personKey(prenom, nom);
   const k2 = personKey(nom, prenom);
-  let p = state.people.find((x) => x.key === k || norm(x.name) === k || norm(x.name) === k2);
+  const n = norm(nom);
+  const pr = norm(prenom);
+  let p =
+    state.people.find((x) => x.key === k || norm(x.name) === k || norm(x.name) === k2) ||
+    state.people.find((x) => x.nomN && x.preN && ((x.nomN === n && closeEnough(x.preN, pr)) || (x.nomN === pr && closeEnough(x.preN, n))));
   if (!p) {
-    p = { id: uid('p'), name: `${cap(prenom.toLowerCase())} ${nom.toUpperCase()}`.trim(), role: state.roles[0]?.id || '', skills: {} };
+    p = { id: uid('p'), name: `${cap(prenom.toLowerCase())} ${nom.toUpperCase()}`.trim(), role: state.roles[0]?.id || '', skills: {}, planOnly: !!fromPlan };
     state.people.push(p);
   }
-  p.key = k;
+  if (!fromPlan && p.planOnly) {
+    // Une ligne du planning retrouvée dans le fichier d'habilitations : elle prend le nom complet.
+    p.planOnly = false;
+    p.ambiguous = null;
+    p.name = `${cap(prenom.toLowerCase())} ${nom.toUpperCase()}`.trim();
+    p.nomN = n;
+    p.preN = pr;
+    p.key = k;
+  }
+  p.key = p.key || k;
+  p.nomN = p.nomN || n;
+  p.preN = p.preN || pr;
   return p;
 }
 
@@ -1224,7 +1326,7 @@ function importHabilitations(wb) {
     const cPre = col('prenom');
     const cRole = head.findIndex((x) => x === 'role' || x === 'fonction');
     const cTeam = col('equipe');
-    const data = rows.slice(h + 1).filter((r) => r && cellText(r[cNom]) && cellText(r[cPre]));
+    const data = rows.slice(h + 1).filter((r) => r && cellText(r[cNom]) && cellText(r[cPre]) && validName(cellText(r[cNom]), cellText(r[cPre])));
     if (!data.length) continue;
     const width = Math.max(...rows.slice(0, h + 1 + data.length).map((r) => (r ? r.length : 0)));
     // Nom de chaque colonne : le titre, ou le texte au-dessus si le titre est « date ».
@@ -1306,6 +1408,7 @@ function importHabilitations(wb) {
     nPeople = Math.max(nPeople, data.length);
   }
   if (!found) return null;
+  mergePlanOnly();
   state.levelWords = Object.values(seenWords).sort((a, b) => b.n - a.n);
   const unknown = state.levelWords.filter((w) => !w.lv).length;
   if (unknown) return `Importé, mais ${unknown} façon${unknown > 1 ? 's' : ''} d’écrire un niveau ${unknown > 1 ? 'sont inconnues' : 'est inconnue'} : choisis leur sens dans Réglages.`;
@@ -1328,7 +1431,8 @@ function importPlanning(wb) {
       const from = toIso(r[cDu]);
       const to = toIso(r[cAu]) || from;
       if (!from) continue;
-      const p = findOrCreatePerson(cellText(r[cNom]), cellText(r[cPre]));
+      const p = findOrCreatePerson(cellText(r[cNom]), cellText(r[cPre]), true);
+      if (!p) continue;
       const info = { type: cellText(r[cType]) || 'Absent' };
       if (cNote >= 0 && cellText(r[cNote])) info.note = cellText(r[cNote]);
       for (let d = parseIso(from), i = 0; d <= parseIso(to) && i < 400; d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1), i++) {
@@ -1337,6 +1441,7 @@ function importPlanning(wb) {
       n++;
     }
     state.absImport = abs;
+    mergePlanOnly();
     return `Planning importé : ${n} absence${n > 1 ? 's' : ''}.`;
   }
   return importPlanningGrid(wb);
@@ -1377,7 +1482,7 @@ function importPlanningGrid(wb) {
     let h = -1;
     let cName = -1;
     for (let r = 0; r < Math.min(rows.length, 40) && h < 0; r++) {
-      const i = (rows[r] || []).findIndex((v) => norm(cellText(v)) === 'nom prenom' || norm(cellText(v)) === 'nom et prenom');
+      const i = (rows[r] || []).findIndex((v) => ['nom prenom', 'nom et prenom', 'nom', 'noms', 'nom prenoms'].includes(norm(cellText(v))));
       if (i >= 0) [h, cName] = [r, i];
     }
     if (h < 0) continue;
@@ -1421,9 +1526,13 @@ function importPlanningGrid(wb) {
       if (!full) continue;
       // « NOM Prénom » : les mots en majuscules sont le nom.
       const words = full.split(' ');
-      const nomW = words.filter((w) => w === w.toUpperCase() && /[A-Z]/.test(w));
-      const preW = words.filter((w) => !nomW.includes(w));
-      const p = findOrCreatePerson(nomW.join(' ') || words[0], preW.join(' ') || words.slice(1).join(' '));
+      // Une initiale (« M. ») est le début du prénom, pas le nom.
+      const isInitial = (w) => /^[A-Za-zÀ-ÿ]\.?$/.test(w);
+      const nomW = words.filter((w) => w === w.toUpperCase() && /[A-Z]/.test(w) && !isInitial(w));
+      const preW = words.filter((w) => !nomW.includes(w)).map((w) => w.replace(/\.$/, ''));
+      // Sans majuscules (« Collin ») : le premier mot est le nom.
+      const p = nomW.length ? findOrCreatePerson(nomW.join(' '), preW.join(' '), true) : findOrCreatePerson(words[0], words.slice(1).join(' '), true);
+      if (!p) continue;
       if (cPoste >= 0 && cellText(row[cPoste])) p.post = cellText(row[cPoste]);
       if (row.__team) p.team = row.__team;
       seen.add(p.id);
@@ -1437,6 +1546,9 @@ function importPlanningGrid(wb) {
   }
   if (!found) return null;
   state.absImport = abs;
+  mergePlanOnly();
+  const unknown = state.people.filter((p) => p.planOnly).length;
+  if (unknown) return `Planning importé. ${unknown} nom${unknown > 1 ? 's' : ''} du planning ${unknown > 1 ? 'ne sont' : 'n’est'} pas dans le fichier d’habilitations : voir Équipe.`;
   return `Planning importé : ${seen.size} personnes, ${days} jour${days > 1 ? 's' : ''} d’absence.`;
 }
 
