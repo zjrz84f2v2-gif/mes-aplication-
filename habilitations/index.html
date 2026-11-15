@@ -262,6 +262,7 @@ function defaultState() {
     echeances: [],
     // Absences lues dans le planning Excel : { jour: { personne: { type, note } } }.
     absImport: {},
+    shifts: {},
     links: {},
   };
 }
@@ -368,15 +369,37 @@ function avHtml(p, cls = '') {
 const shown = (p) => p && !(p.planOnly && !p.ambiguous);
 const absentOn = (day) => new Set(Object.keys(state.absImport?.[day] || {}).filter((id) => shown(person(id))));
 const absInfo = (day, id) => state.absImport?.[day]?.[id] || null;
+// Quarts de travail écrits dans le planning : la personne est là.
+const SHIFT_CODES = { qm: 'Quart matin', qam: 'Quart après-midi', qn: 'Quart nuit', qj: 'Quart de jour' };
+const shiftOf = (day, id) => state.shifts?.[day]?.[id] || '';
+const dayHasShifts = (day) => Object.keys(state.shifts?.[day] || {}).length > 0;
+const shortShift = (label) => (Object.entries(SHIFT_CODES).find(([, v]) => v === label)?.[0] || '').toUpperCase() || label;
+
+// Est-ce que la personne est là ce jour-là ?
+function presence(day, p) {
+  const a = absInfo(day, p.id);
+  if (a) return { here: false, text: 'Absent · ' + a.type, color: absColor(a.type) };
+  const sh = shiftOf(day, p.id);
+  if (sh) return { here: true, text: 'Là · ' + sh, color: 'var(--ok)' };
+  if (dayHasShifts(day)) return { here: false, text: 'Pas de quart ce jour-là', color: '#6B7280' };
+  if (state.links.plan || Object.keys(state.absImport || {}).length) return { here: true, text: 'Là', color: 'var(--ok)' };
+  return { here: null, text: 'Pas de planning', color: '#6B7280' };
+}
+const presenceBadge = (day, p) => {
+  const pr = presence(day, p);
+  return `<span class="abs-type" style="background:${pr.color}">${esc(pr.text)}</span>`;
+};
 const ABS_COLORS = { conge: '#3F8F1F', 'conge annuel': '#3F8F1F', rtt: '#7C3AED', arret: '#C2321F', absence: '#0A84C6', formation: '#B4581E', autre: '#4B5563' };
 const absColor = (type) => ABS_COLORS[norm(type).replace(/s$/, '')] || ABS_COLORS[Object.keys(ABS_COLORS).find((k) => norm(type).startsWith(norm(k)))] || '#4B5563';
 const absBadge = (info) => (info ? `<span class="abs-type" style="background:${absColor(info.type)}">${esc(info.type)}</span>` : '');
 const norm = (t) => String(t ?? '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
 
 // Qui peut tenir ce poste (en dehors de certaines personnes), les plus habiles d'abord.
-function candidates(posteId, exclude) {
+function candidates(posteId, exclude, day = ui.day) {
+  const shifts = dayHasShifts(day);
   return state.people
     .filter((p) => !exclude.has(p.id) && p.skills?.[posteId] && level(p.skills[posteId]) && level(p.skills[posteId]).replace !== false)
+    .filter((p) => !shifts || shiftOf(day, p.id))
     .sort((a, b) => rank(b.skills[posteId]) - rank(a.skills[posteId]) || byName(a, b));
 }
 
@@ -418,8 +441,7 @@ function showFinder(input) {
     ? hits
         .map((p) => {
           const n = Object.keys(p.skills || {}).filter((k) => poste(k) && level(p.skills[k])).length;
-          const abs = absInfo(iso(new Date()), p.id);
-          return `<button data-person="${p.id}">${avHtml(p, 'small' + (today.has(p.id) ? ' absent' : ''))}<span class="grow"><b>${esc(p.name)}</b><small>${esc([role(p.role)?.name, p.team, p.post, n + ' poste' + (n > 1 ? 's' : '')].filter(Boolean).join(' · '))}</small></span>${abs ? absBadge(abs) : ''}</button>`;
+          return `<button data-person="${p.id}">${avHtml(p, 'small' + (today.has(p.id) ? ' absent' : ''))}<span class="grow"><b>${esc(p.name)}</b><small>${esc([role(p.role)?.name, p.team, p.post, n + ' poste' + (n > 1 ? 's' : '')].filter(Boolean).join(' · '))}</small></span>${presenceBadge(iso(new Date()), p)}</button>`;
         })
         .join('')
     : `<p class="hint" style="padding:8px">Personne ne s’appelle « ${esc(q)} ».</p>`;
@@ -481,7 +503,7 @@ function renderToday() {
   const people = state.people.filter(shown).sort(byName);
   html += `<div class="section-title">L’équipe ce jour-là<small>${absent.size ? absent.size + ' absent' + (absent.size > 1 ? 's' : '') : ''}</small></div>
     <div class="people-pick">${people
-      .map((p) => `<button class="pick" data-absent="${p.id}" aria-pressed="${absent.has(p.id)}">${avHtml(p)}<span>${esc(p.name)}</span>${absBadge(absInfo(day, p.id))}</button>`)
+      .map((p) => `<button class="pick" data-absent="${p.id}" aria-pressed="${absent.has(p.id)}">${avHtml(p)}<span>${esc(p.name)}</span>${absBadge(absInfo(day, p.id)) || (shiftOf(day, p.id) ? `<span class="abs-type" style="background:var(--ok)">${esc(shortShift(shiftOf(day, p.id)))}</span>` : '')}</button>`)
       .join('')}</div>`;
 
   if (!absent.size) return html + `<p class="hint" style="margin-top:14px">${state.links.plan || Object.keys(state.absImport || {}).length ? 'Personne n’est absent ce jour-là dans le planning.' : 'Aucun planning raccordé : va dans Réglages pour choisir ton planning Excel.'}</p>`;
@@ -504,7 +526,7 @@ function renderToday() {
                 const c = candidates(po.id, absent);
                 return `<div class="replace-row"><div class="replace-poste">${lvlHtml(p.skills[po.id])}<span style="padding-top:3px">${esc(po.name)}</span></div>${
                   c.length
-                    ? `<div class="cands">${c.slice(0, 3).map((x) => `<button class="cand" data-person="${x.id}">${lvlHtml(x.skills[po.id])}${esc(x.name)}</button>`).join('')}${c.length > 3 ? `<button class="badge grey" data-poste="${po.id}" style="border:0">+${c.length - 3} autres</button>` : ''}</div>`
+                    ? `<div class="cands">${c.slice(0, 3).map((x) => `<button class="cand" data-person="${x.id}">${lvlHtml(x.skills[po.id])}${esc(x.name)}${shiftOf(day, x.id) ? ` <small style="color:var(--ink-2)">${esc(shortShift(shiftOf(day, x.id)))}</small>` : ''}</button>`).join('')}${c.length > 3 ? `<button class="badge grey" data-poste="${po.id}" style="border:0">+${c.length - 3} autres</button>` : ''}</div>`
                     : '<div class="nobody">Personne de disponible</div>'
                 }</div>`;
               })
@@ -812,12 +834,12 @@ function openPerson(id) {
   if (known.length) {
     replaceHtml = `<span class="label">Qui peut remplacer ${esc(p.name)} ?</span><div class="card" style="padding:12px"><div class="replace" style="margin:0;border:0;padding:0">${known
       .map((po) => {
-        const c = candidates(po.id, absent);
+        const c = candidates(po.id, absent, iso(new Date()));
         return `<div class="replace-row"><div class="replace-poste">${lvlHtml(p.skills[po.id])}<span style="padding-top:3px">${esc(po.name)}</span></div>${c.length ? `<div class="cands">${c.slice(0, 6).map((x) => `<button class="cand" data-go-person="${x.id}">${lvlHtml(x.skills[po.id])}${esc(x.name)}</button>`).join('')}</div>` : '<div class="nobody">Personne</div>'}</div>`;
       })
       .join('')}</div></div><p class="hint">Sans compter les absents du jour.</p>`;
   }
-  const back = showSheet(`<div class="sheet-head">${avHtml(p, 'big')}<div style="min-width:0"><h2>${esc(p.name)}</h2><p>${esc(role(p.role)?.name || 'Sans rôle')}${p.team ? ' · ' + esc(p.team) : ''} · ${known.length} poste${known.length > 1 ? 's' : ''}</p></div>${closeBtn}</div>
+  const back = showSheet(`<div class="sheet-head">${avHtml(p, 'big')}<div style="min-width:0"><h2>${esc(p.name)}</h2><p>${esc(role(p.role)?.name || 'Sans rôle')}${p.team ? ' · ' + esc(p.team) : ''} · ${known.length} poste${known.length > 1 ? 's' : ''}</p><p style="margin-top:6px">Aujourd’hui : ${presenceBadge(iso(new Date()), p)}</p></div>${closeBtn}</div>
     ${p.post ? `<p class="hint">Poste habituel : <b>${esc(p.post)}</b></p>` : ''}
     <span class="label">Habilitations</span>
     ${known.length ? known.map((po) => skillRow(p, po)).join('') : '<p class="hint" style="margin:0">Aucune habilitation de poste dans le fichier.</p>'}
@@ -1101,7 +1123,7 @@ async function idbDo(mode, fn) {
   });
 }
 
-const KIND_NAME = { hab: 'Habilitations', plan: 'Planning des absences' };
+const KIND_NAME = { hab: 'Habilitations', plan: 'Planning (absences et quarts)' };
 
 function linksHtml() {
   const card = (kind, desc) => {
@@ -1114,7 +1136,7 @@ function linksHtml() {
   };
   return `<p class="hint" style="margin:-4px 0 12px">${canLink ? 'Sur cet ordinateur, l’appli relit tes fichiers toute seule dès que tu les enregistres dans Excel.' : 'Sur ce téléphone, choisis le fichier à chaque fois que tu veux mettre l’appli à jour. Sur un ordinateur (Chrome ou Edge), la mise à jour est automatique.'} Les fichiers restent sur ton appareil : rien n’est envoyé sur internet.</p>
     ${card('hab', 'Ton fichier : nom, prénom, rôle, postes en I / L / U et dates d’échéance.')}
-    ${card('plan', 'Ton planning annuel : un onglet par mois, une ligne par personne, et un code par jour (CA, RTT, ABS, For).')}
+    ${card('plan', 'Ton planning annuel : un onglet par mois, une ligne par personne, et un code par jour : CA, RTT, ABS, For pour les absences, QM, QAM, QN, QJ pour les quarts.')}
     <div class="ech-edit" style="margin-top:10px"><label class="grow" for="plan-year">Année du planning (si le fichier n’écrit que les numéros des jours)</label>
       <input id="plan-year" type="number" inputmode="numeric" min="2020" max="2100" value="${Number(state.planYear) || new Date().getFullYear()}" style="width:96px"></div>`;
 }
@@ -1141,7 +1163,10 @@ async function linkFile(kind) {
 async function unlinkFile(kind) {
   delete handles[kind];
   delete state.links[kind];
-  if (kind === 'plan') state.absImport = {};
+  if (kind === 'plan') {
+    state.absImport = {};
+    state.shifts = {};
+  }
   save();
   try {
     await idbDo('readwrite', (st) => st.delete(kind));
@@ -1249,7 +1274,7 @@ function mergePlanOnly() {
       continue;
     }
     const to = hits[0];
-    for (const day of Object.values(state.absImport || {})) {
+    for (const day of [...Object.values(state.absImport || {}), ...Object.values(state.shifts || {})]) {
       if (day[p.id]) {
         day[to.id] = day[p.id];
         delete day[p.id];
@@ -1506,6 +1531,7 @@ function importPlanning(wb) {
     const [cNom, cPre, cType, cDu, cAu] = ['nom', 'prenom', 'type', 'du', 'au'].map(col);
     const cNote = head.findIndex((x) => x.startsWith('comment') || x.startsWith('motif'));
     const abs = {};
+    const shifts = {};
     let n = 0;
     for (const r of rows.slice(h + 1)) {
       if (!r || !cellText(r[cNom]) || !cellText(r[cPre])) continue;
@@ -1516,12 +1542,15 @@ function importPlanning(wb) {
       if (!p) continue;
       const info = { type: cellText(r[cType]) || 'Absent' };
       if (cNote >= 0 && cellText(r[cNote])) info.note = cellText(r[cNote]);
+      const shift = SHIFT_CODES[norm(info.type)];
       for (let d = parseIso(from), i = 0; d <= parseIso(to) && i < 400; d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1), i++) {
-        (abs[iso(d)] = abs[iso(d)] || {})[p.id] = info;
+        if (shift) (shifts[iso(d)] = shifts[iso(d)] || {})[p.id] = shift;
+        else (abs[iso(d)] = abs[iso(d)] || {})[p.id] = info;
       }
       n++;
     }
     state.absImport = abs;
+    state.shifts = shifts;
     mergePlanOnly();
     return `Planning importé : ${n} absence${n > 1 ? 's' : ''}.`;
   }
@@ -1555,8 +1584,10 @@ function numberedDays(rows, h, sheetName) {
 const GRID_CODES = { ca: 'Congé annuel', conge: 'Congé annuel', rtt: 'RTT', abs: 'Absence', arret: 'Arrêt', for: 'Formation', formation: 'Formation', am: 'Arrêt' };
 function importPlanningGrid(wb) {
   const abs = {};
+  const shifts = {};
   let found = false;
   let days = 0;
+  let nShifts = 0;
   const seen = new Set();
   for (const name of wb.SheetNames) {
     const rows = sheetRows(wb.Sheets[name]);
@@ -1620,6 +1651,12 @@ function importPlanningGrid(wb) {
       dates.forEach((d, j) => {
         const code = cellText(row[j]);
         if (!d || !code || /^(eq|equipe)\s*\S+$/.test(norm(code))) return;
+        const shift = SHIFT_CODES[norm(code)];
+        if (shift) {
+          (shifts[d] = shifts[d] || {})[p.id] = shift;
+          nShifts++;
+          return;
+        }
         (abs[d] = abs[d] || {})[p.id] = { type: GRID_CODES[norm(code)] || code };
         days++;
       });
@@ -1627,10 +1664,11 @@ function importPlanningGrid(wb) {
   }
   if (!found) return null;
   state.absImport = abs;
+  state.shifts = shifts;
   mergePlanOnly();
   const unknown = state.people.filter((p) => p.planOnly && p.ambiguous).length;
   if (unknown) return `Planning importé. ${unknown} nom${unknown > 1 ? 's' : ''} à vérifier (homonymes) : voir Équipe.`;
-  return `Planning importé : ${seen.size} personnes, ${days} jour${days > 1 ? 's' : ''} d’absence.`;
+  return `Planning importé : ${seen.size} personnes, ${days} jour${days > 1 ? 's' : ''} d’absence${nShifts ? `, ${nShifts} quart${nShifts > 1 ? 's' : ''} de travail` : ''}.`;
 }
 
 // L'exemple : les deux fichiers Excel publiés à côté de l'appli (noms inventés).
