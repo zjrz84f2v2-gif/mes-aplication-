@@ -361,7 +361,7 @@ function render() {
 
 function firstSteps() {
   if (!state.postes.length)
-    return `<div class="empty"><b>Commence par tes postes</b>Ajoute les postes de ton atelier (Poste 1, Contrôle…), puis les personnes de l’équipe et leurs habilitations.<br><button class="btn" data-action="add-poste">${icons.plus} Ajouter un poste</button></div>`;
+    return `<div class="empty"><b>L’appli est vide sur cet appareil</b>Charge tes fichiers Excel (Réglages › Fichiers Excel raccordés), ou essaie d’abord avec l’exemple : 29 personnes inventées, leurs habilitations et le planning de l’année.<br><button class="btn" data-action="demo">Charger l’exemple</button><br><button class="btn ghost" data-tab-go="reglages" style="margin-top:8px">Raccorder mes fichiers Excel</button><br><button class="btn ghost" data-action="add-poste" style="margin-top:8px">${icons.plus} Ajouter un poste à la main</button></div>`;
   if (!state.people.length)
     return `<div class="empty"><b>Ajoute ton équipe</b>Une fiche par personne, avec son rôle et ses habilitations.<br><button class="btn" data-action="add-person">${icons.plus} Ajouter une personne</button></div>`;
   return '';
@@ -597,6 +597,7 @@ document.addEventListener('click', (e) => {
   else if (a === 'unlink-hab') unlinkFile('hab');
   else if (a === 'unlink-plan') unlinkFile('plan');
   else if (a === 'refresh-links') refreshLinks(true);
+  else if (a === 'demo') loadDemo();
 });
 
 function settingsClick(e) {
@@ -1313,6 +1314,24 @@ function importPlanningGrid(wb) {
   if (!found) return null;
   state.absImport = abs;
   return `Planning importé : ${seen.size} personnes, ${days} jour${days > 1 ? 's' : ''} d’absence.`;
+}
+
+// L'exemple : les deux fichiers Excel publiés à côté de l'appli (noms inventés).
+async function loadDemo() {
+  toast('Je charge l’exemple…');
+  try {
+    for (const [kind, file] of [['hab', 'mes-habilitations.xlsx'], ['plan', 'planning-annuel.xlsx']]) {
+      const res = await fetch('excel/' + file, { cache: 'no-store' });
+      if (!res.ok) throw new Error(res.status);
+      await importExcel(new File([await res.blob()], file), kind, false);
+      delete state.links[kind];
+    }
+    save();
+    render();
+    toast('Exemple chargé : 29 personnes inventées.');
+  } catch (e) {
+    toast('Impossible de charger l’exemple : vérifie ta connexion internet.');
+  }
 }
 
 // Relecture automatique : à l'ouverture, au retour sur l'appli et toutes les 30 secondes.
