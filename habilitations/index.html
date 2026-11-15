@@ -100,6 +100,14 @@ button.card { text-align: left; width: 100%; padding: 14px; display: flex; gap: 
 .pick > span:not(.av) { max-width: 100%; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; text-align: center; line-height: 1.2; overflow-wrap: anywhere; }
 .pick[aria-pressed="true"] { border-color: var(--danger); background: var(--danger-soft); color: var(--danger); }
 .pick[aria-pressed="true"] .av { filter: grayscale(1); opacity: .5; }
+.teams { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 480px), 1fr)); gap: 12px; }
+.team-card { padding: 14px; }
+.team-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.team-head h3 { margin: 0; font-size: 19px; font-weight: 800; }
+.team-head small { margin-left: auto; color: var(--ink-2); font-weight: 700; font-size: 14px; }
+.team-boss { display: flex; gap: 8px; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px dashed var(--line); }
+.team-boss .pick { flex: 0 1 140px; }
+.pick-post { font-size: 12px; color: var(--ink-2); font-weight: 600; margin-top: -4px; }
 .summary { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
 .absent-card { padding: 14px; }
 .absent-head { display: flex; align-items: center; gap: 12px; }
@@ -488,6 +496,34 @@ function firstSteps() {
 }
 
 // Aujourd'hui : on coche les absents, l'appli propose des remplaçants pour chacun de leurs postes.
+// Regrouper par équipe (colonne « équipe » du fichier ou « EQ A » du planning).
+function teamsOf(people) {
+  const map = new Map();
+  for (const p of people) {
+    const t = p.team || 'Sans équipe';
+    if (!map.has(t)) map.set(t, []);
+    map.get(t).push(p);
+  }
+  return [...map.entries()].sort((a, b) => (a[0] === 'Sans équipe') - (b[0] === 'Sans équipe') || a[0].localeCompare(b[0], 'fr'));
+}
+// Le manageur (ou le chef) en haut, puis les chefs de ligne, puis les autres.
+function bossRank(p) {
+  const r = norm(role(p.role)?.name);
+  const post = norm(p.post);
+  if (/manag|chef d equipe|responsable/.test(r) || post === 'chef' || /^(manag|chef d equipe)/.test(post)) return 0;
+  if (post === 'cdl' || /chef de ligne/.test(post)) return 1;
+  return 2;
+}
+// Le quart de l'équipe ce jour-là : celui que la plupart de ses membres font.
+function teamShift(members, day) {
+  const count = {};
+  members.forEach((p) => {
+    const sh = shiftOf(day, p.id);
+    if (sh) count[sh] = (count[sh] || 0) + 1;
+  });
+  return Object.entries(count).sort((a, b) => b[1] - a[1])[0]?.[0] || '';
+}
+
 function renderToday() {
   const day = ui.day;
   const d = parseIso(day);
@@ -500,18 +536,30 @@ function renderToday() {
   if (steps) return html + `<div style="margin-top:18px">${steps}</div>`;
 
   const absent = absentOn(day);
-  const people = state.people.filter(shown).sort(byName);
-  html += `<div class="section-title">L’équipe ce jour-là<small>${absent.size ? absent.size + ' absent' + (absent.size > 1 ? 's' : '') : ''}</small></div>
-    <div class="people-pick">${people
-      .map((p) => `<button class="pick" data-absent="${p.id}" aria-pressed="${absent.has(p.id)}">${avHtml(p)}<span>${esc(p.name)}</span>${absBadge(absInfo(day, p.id)) || (shiftOf(day, p.id) ? `<span class="abs-type" style="background:var(--ok)">${esc(shortShift(shiftOf(day, p.id)))}</span>` : '')}</button>`)
-      .join('')}</div>`;
+  const people = state.people.filter(shown);
+  const tile = (p) =>
+    `<button class="pick" data-absent="${p.id}" aria-pressed="${absent.has(p.id)}">${avHtml(p)}<span>${esc(p.name)}</span>${p.post ? `<small class="pick-post">${esc(p.post)}</small>` : ''}${absBadge(absInfo(day, p.id)) || (shiftOf(day, p.id) ? `<span class="abs-type" style="background:var(--ok)">${esc(shortShift(shiftOf(day, p.id)))}</span>` : '')}</button>`;
+  html += `<div class="section-title">Les équipes ce jour-là<small>${absent.size ? absent.size + ' absent' + (absent.size > 1 ? 's' : '') : ''}</small></div><div class="teams">`;
+  for (const [team, members] of teamsOf(people)) {
+    const sorted = members.slice().sort((a, b) => bossRank(a) - bossRank(b) || byName(a, b));
+    const bosses = sorted.filter((p) => bossRank(p) === 0);
+    const others = sorted.filter((p) => bossRank(p) !== 0);
+    const nAbs = members.filter((p) => absent.has(p.id)).length;
+    const sh = teamShift(members, day);
+    html += `<section class="team-card card">
+        <div class="team-head"><h3>${esc(team)}</h3>${sh ? `<span class="abs-type" style="background:var(--ok)">${esc(sh)}</span>` : dayHasShifts(day) ? '<span class="abs-type" style="background:#6B7280">Pas de quart</span>' : ''}<small>${members.length - nAbs} présent${members.length - nAbs > 1 ? 's' : ''}${nAbs ? ` · ${nAbs} absent${nAbs > 1 ? 's' : ''}` : ''}</small></div>
+        ${bosses.length ? `<div class="team-boss">${bosses.map(tile).join('')}</div>` : ''}
+        <div class="people-pick">${others.map(tile).join('')}</div>
+      </section>`;
+  }
+  html += `</div>`;
 
   if (!absent.size) return html + `<p class="hint" style="margin-top:14px">${state.links.plan || Object.keys(state.absImport || {}).length ? 'Personne n’est absent ce jour-là dans le planning.' : 'Aucun planning raccordé : va dans Réglages pour choisir ton planning Excel.'}</p>`;
 
   // Postes que plus personne de présent ne sait tenir.
   const uncovered = state.postes.filter((po) => state.people.some((p) => absent.has(p.id) && p.skills?.[po.id]) && !candidates(po.id, absent).length);
   html += `<div class="summary">${uncovered.length ? `<span class="badge red">${uncovered.length} poste${uncovered.length > 1 ? 's' : ''} sans remplaçant : ${esc(uncovered.map((p) => p.name).join(', '))}</span>` : '<span class="badge green">Tous les postes ont un remplaçant possible</span>'}</div>
-    <div class="section-title">Remplaçants possibles</div><div class="grid">`;
+    <div class="section-title">Les absents et qui peut les remplacer dans leur équipe</div><div class="grid">`;
   for (const id of absent) {
     const p = person(id);
     if (!p) continue;
@@ -523,10 +571,12 @@ function renderToday() {
               .map((k) => poste(k))
               .sort(byName)
               .map((po) => {
-                const c = candidates(po.id, absent);
+                const all = candidates(po.id, absent);
+                const mine = p.team ? all.filter((x) => x.team === p.team) : all;
+                const c = mine.length ? mine : all;
                 return `<div class="replace-row"><div class="replace-poste">${lvlHtml(p.skills[po.id])}<span style="padding-top:3px">${esc(po.name)}</span></div>${
                   c.length
-                    ? `<div class="cands">${c.slice(0, 3).map((x) => `<button class="cand" data-person="${x.id}">${lvlHtml(x.skills[po.id])}${esc(x.name)}${shiftOf(day, x.id) ? ` <small style="color:var(--ink-2)">${esc(shortShift(shiftOf(day, x.id)))}</small>` : ''}</button>`).join('')}${c.length > 3 ? `<button class="badge grey" data-poste="${po.id}" style="border:0">+${c.length - 3} autres</button>` : ''}</div>`
+                    ? `<div class="cands">${p.team && !mine.length ? `<span class="badge grey">Personne dans ${esc(p.team)} · autre équipe :</span>` : ''}${c.slice(0, 3).map((x) => `<button class="cand" data-person="${x.id}">${lvlHtml(x.skills[po.id])}${esc(x.name)}${shiftOf(day, x.id) ? ` <small style="color:var(--ink-2)">${esc(shortShift(shiftOf(day, x.id)))}</small>` : ''}</button>`).join('')}${c.length > 3 ? `<button class="badge grey" data-poste="${po.id}" style="border:0">+${c.length - 3} autres</button>` : ''}</div>`
                     : '<div class="nobody">Personne de disponible</div>'
                 }</div>`;
               })
@@ -1104,7 +1154,7 @@ document.addEventListener('click', (e) => {
 
 const canLink = 'showOpenFilePicker' in window;
 // À changer quand la façon de lire les fichiers change : les fichiers raccordés sont alors relus.
-const READER_VERSION = '2026-11-15c';
+const READER_VERSION = '2026-11-15d';
 const handles = {};
 let linkNeedsTap = false;
 
