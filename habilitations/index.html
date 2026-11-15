@@ -109,13 +109,14 @@ button.card { text-align: left; width: 100%; padding: 14px; display: flex; gap: 
 .members { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr)); gap: 6px; }
 .team-boss { margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px dashed var(--line); }
 .team-boss .mrow { background: var(--accent-soft); border-color: transparent; }
+.mrow[hidden] { display: none; }
 .mrow { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; align-items: center; gap: 10px; min-height: 52px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); text-align: left; width: 100%; }
 .mrow-text { min-width: 0; display: flex; flex-direction: column; }
 .mrow-text b, .mrow-text small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mrow-text b { font-size: 15px; }
 .mrow-text small { font-size: 12px; color: var(--ink-2); font-weight: 600; }
-.mrow-tags { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; max-width: 46%; min-width: 0; }
-.mrow-tags .abs-type { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mrow-tags { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
+.mrow-tags .abs-type { max-width: 8.5rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 0 0 auto; }
 .mrow.is-absent { background: var(--danger-soft); border-color: rgba(194, 50, 31, .35); }
 .mrow.is-absent b { color: var(--danger); }
 .pick-post { font-size: 12px; color: var(--ink-2); font-weight: 600; margin-top: -4px; }
@@ -580,6 +581,36 @@ function teamShift(members, day) {
   return Object.entries(count).sort((a, b) => b[1] - a[1])[0]?.[0] || '';
 }
 
+// Une ligne par personne : les noms longs sont coupés proprement au lieu de déformer les cases.
+function personRow(p, day, absent, attr = 'data-absent') {
+  return `<button class="mrow${absent.has(p.id) ? ' is-absent' : ''}" ${attr}="${p.id}" title="${esc(p.name)}${p.post ? ' · ' + esc(p.post) : ''}">${avHtml(p, 'small' + (absent.has(p.id) ? ' absent' : ''))}<span class="mrow-text"><b>${esc(p.name)}</b>${p.post ? `<small>${esc(p.post)}</small>` : ''}</span><span class="mrow-tags">${absShort(absInfo(day, p.id)) || (shiftOf(day, p.id) ? `<span class="abs-type" style="background:var(--ok)">${esc(shortShift(shiftOf(day, p.id)))}</span>` : '')}${isDpp(p, day) ? '<span class="abs-type" style="background:#7C3AED" title="Bâtiment AI">DPP</span>' : ''}</span></button>`;
+}
+
+// Les personnes sans équipe : une liste à part, avec sa propre recherche.
+function openNoTeam() {
+  const day = ui.day;
+  const absent = absentOn(day);
+  const list = state.people.filter((p) => shown(p) && !p.team).sort((a, b) => shiftRank(a, day) - shiftRank(b, day) || byName(a, b));
+  const back = showSheet(`<div class="sheet-head"><div style="min-width:0"><h2>Sans équipe</h2><p>${list.length} personne${list.length > 1 ? 's' : ''} sans équipe dans tes fichiers</p></div>${closeBtn}</div>
+    <div class="search-wrap" style="margin-top:14px">${icons.search}<input class="search" id="nt-find" type="search" placeholder="Chercher dans cette liste" autocomplete="off" aria-label="Chercher une personne sans équipe"></div>
+    <p class="hint" id="nt-none" hidden>Personne ne correspond.</p>
+    <div class="members" id="nt-list" style="margin-top:12px">${list.map((p) => personRow(p, day, absent, 'data-go-person')).join('')}</div>`);
+  back.querySelector('#nt-find').addEventListener('input', (e) => {
+    const words = norm(e.target.value).split(' ').filter(Boolean);
+    let n = 0;
+    back.querySelectorAll('#nt-list .mrow').forEach((row) => {
+      const ok = words.every((w) => norm(row.textContent + ' ' + row.title).includes(w));
+      row.hidden = !ok;
+      n += ok;
+    });
+    back.querySelector('#nt-none').hidden = n > 0;
+  });
+  back.addEventListener('click', (e) => {
+    const el = e.target.closest('[data-go-person]');
+    if (el) openPerson(el.dataset.goPerson);
+  });
+}
+
 function renderToday() {
   const day = ui.day;
   const d = parseIso(day);
@@ -593,15 +624,14 @@ function renderToday() {
 
   const absent = absentOn(day);
   const people = state.people.filter(shown);
-  // Une ligne par personne : les noms longs sont coupés proprement au lieu de déformer les cases.
-  const tile = (p) =>
-    `<button class="mrow${absent.has(p.id) ? ' is-absent' : ''}" data-absent="${p.id}" title="${esc(p.name)}${p.post ? ' · ' + esc(p.post) : ''}">${avHtml(p, 'small' + (absent.has(p.id) ? ' absent' : ''))}<span class="mrow-text"><b>${esc(p.name)}</b>${p.post ? `<small>${esc(p.post)}</small>` : ''}</span><span class="mrow-tags">${absShort(absInfo(day, p.id)) || (shiftOf(day, p.id) ? `<span class="abs-type" style="background:var(--ok)">${esc(shortShift(shiftOf(day, p.id)))}</span>` : '')}${isDpp(p, day) ? '<span class="abs-type" style="background:#7C3AED" title="Bâtiment AI">DPP</span>' : ''}</span></button>`;
+  const tile = (p) => personRow(p, day, absent);
   html += `<div class="section-title">Les équipes ce jour-là<small>${absent.size ? absent.size + ' absent' + (absent.size > 1 ? 's' : '') : ''}</small></div><div class="teams">`;
   const teamOrder = (members) => {
     const i = SHIFT_ORDER.indexOf(teamShift(members, day));
     return i >= 0 ? i : 9;
   };
-  for (const [team, members] of teamsOf(people).sort((a, b) => teamOrder(a[1]) - teamOrder(b[1]))) {
+  const noTeam = people.filter((p) => !p.team);
+  for (const [team, members] of teamsOf(people.filter((p) => p.team)).sort((a, b) => teamOrder(a[1]) - teamOrder(b[1]))) {
     const sorted = members.slice().sort((a, b) => shiftRank(a, day) - shiftRank(b, day) || bossRank(a) - bossRank(b) || byName(a, b));
     const bosses = sorted.filter((p) => bossRank(p) === 0);
     const others = sorted.filter((p) => bossRank(p) !== 0);
@@ -615,6 +645,10 @@ function renderToday() {
       </section>`;
   }
   html += `</div>`;
+  if (noTeam.length) {
+    const nAbs = noTeam.filter((p) => absent.has(p.id)).length;
+    html += `<button class="btn ghost" data-action="no-team" style="margin-top:12px">Sans équipe · ${noTeam.length} personne${noTeam.length > 1 ? 's' : ''}${nAbs ? ` (${nAbs} absent${nAbs > 1 ? 's' : ''})` : ''}</button>`;
+  }
 
   if (!absent.size) return html + `<p class="hint" style="margin-top:14px">${state.links.plan || Object.keys(state.absImport || {}).length ? 'Personne n’est absent ce jour-là dans le planning.' : 'Aucun planning raccordé : va dans Réglages pour choisir ton planning Excel.'}</p>`;
 
@@ -824,6 +858,7 @@ document.addEventListener('click', (e) => {
   else if (a === 'unlink-plan') unlinkFile('plan');
   else if (a === 'refresh-links') refreshLinks(true);
   else if (a === 'demo') loadDemo();
+  else if (a === 'no-team') openNoTeam();
   else if (a === 'wipe') {
     if (!confirm('Effacer toutes les personnes, postes et absences de cet appareil ? Tes fichiers Excel ne sont pas touchés.')) return;
     const keep = { levelMap: state.levelMap, planYear: state.planYear };
@@ -1232,7 +1267,7 @@ document.addEventListener('click', (e) => {
 
 const canLink = 'showOpenFilePicker' in window;
 // À changer quand la façon de lire les fichiers change : les fichiers raccordés sont alors relus.
-const READER_VERSION = '2026-11-15i';
+const READER_VERSION = '2026-11-15j';
 const handles = {};
 let linkNeedsTap = false;
 
