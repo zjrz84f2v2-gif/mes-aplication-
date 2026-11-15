@@ -149,7 +149,11 @@ input, textarea { caret-color: var(--accent); }
 .work-row.is-today .wday b { background: linear-gradient(transparent 45%, var(--highlight) 45%, var(--highlight) 95%, transparent 95%); }
 .work-row.is-past .wday b { color: var(--ink-3); }
 .work-row.is-past .wcell { opacity: .55; }
-.wcell { min-height: 40px; min-width: 0; border-radius: 10px; border: 0; padding: 0 4px; background: var(--c); color: var(--i); font-weight: 800; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wcell { min-height: 40px; min-width: 0; border-radius: 10px; border: 0; padding: 3px 4px; background: var(--c); color: var(--i); font-weight: 800; font-size: 15px; line-height: 1.15; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.wcell small { display: block; font-size: 12px; font-weight: 700; opacity: .92; font-variant-numeric: tabular-nums; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.hours { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.hours .field { width: auto; flex: 1 1 120px; max-width: 160px; }
+.hours span { font-weight: 700; color: var(--ink-2); }
 .wcell.empty { background: transparent; border: 1.5px dashed rgba(30, 28, 24, .14); color: var(--ink-3); font-weight: 600; font-size: 18px; }
 .today-work { display: flex; flex-wrap: wrap; gap: 6px; margin: 2px 0 8px; }
 .codes { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
@@ -461,6 +465,9 @@ const WORK = {
   MAL: { one: 'jour de maladie', pl: 'jours de maladie', label: 'Arrêt maladie', short: 'Maladie', c: '#B23A26', i: '#fff' },
 };
 const workId = (m, day) => `${m}_${day}`;
+// « 06:00 » → « 6h », « 13:30 » → « 13h30 ».
+const hh = (t) => (t ? `${Number(t.slice(0, 2))}h${t.slice(3, 5) === '00' ? '' : t.slice(3, 5)}` : '');
+const workHours = (w) => (w?.start || w?.end ? `${hh(w.start) || '?'}–${hh(w.end) || '?'}` : '');
 const workOn = (m, day) => work.find((w) => w.member === m && w.date === day);
 const tagHtml = (code, text) => (WORK[code] ? `<span class="tag" style="--c:${WORK[code].c};--i:${WORK[code].i}">${esc(text ?? WORK[code].label)}</span>` : '');
 // Moi d'abord, puis les autres.
@@ -470,7 +477,7 @@ function workLine(day) {
   const tags = memberIds()
     .map((m) => [m, workOn(m, day)])
     .filter(([, w]) => w && WORK[w.code])
-    .map(([m, w]) => tagHtml(w.code, `${member(m).name} · ${WORK[w.code].short}`));
+    .map(([m, w]) => tagHtml(w.code, `${member(m).name} · ${WORK[w.code].short}${workHours(w) ? ' ' + workHours(w) : ''}`));
   return tags.length ? `<div class="today-work" aria-label="Travail">${tags.join('')}</div>` : '';
 }
 let synced = true;
@@ -737,9 +744,9 @@ function workHtml(today) {
           .map((m) => {
             const w = workOn(m, ds);
             const k = w && WORK[w.code];
-            const label = `${member(m).name}, ${long} : ${k ? k.label : 'rien'}. Modifier`;
+            const label = `${member(m).name}, ${long} : ${k ? k.label + (workHours(w) ? ' de ' + workHours(w).replace('–', ' à ') : '') : 'rien'}. Modifier`;
             return k
-              ? `<button class="wcell" style="--c:${k.c};--i:${k.i}" data-work="${esc(m)}|${ds}" aria-label="${esc(label)}">${esc(k.short)}</button>`
+              ? `<button class="wcell" style="--c:${k.c};--i:${k.i}" data-work="${esc(m)}|${ds}" aria-label="${esc(label)}">${esc(k.short)}${workHours(w) ? `<small>${esc(workHours(w))}</small>` : ''}</button>`
               : `<button class="wcell empty" data-work="${esc(m)}|${ds}" aria-label="${esc(label)}">+</button>`;
           })
           .join('')}
@@ -1022,10 +1029,14 @@ function openWork(m, day) {
     ${ids.length > 1 ? `<span class="label">Pour qui ?</span><div class="who-pick">${ids.map((id) => `<button type="button" class="chip" data-who="${esc(id)}" aria-pressed="${id === who}">${esc(member(id).name)}</button>`).join('')}</div>` : ''}
     <label class="label" for="work-end">Jusqu’au <span style="font-weight:500;color:var(--ink-2)">(plusieurs jours d’un coup)</span></label>
     <input type="date" class="field" id="work-end" value="${day}" min="${day}" style="max-width:220px">
-    <span class="label">Touche ce que c’est</span>
+    <span class="label">Horaires <span style="font-weight:500;color:var(--ink-2)">(facultatif)</span></span>
+    <div class="hours"><span>De</span><input type="time" class="field" id="work-start" value="${esc(cur?.start || '')}" aria-label="Heure de début"><span>à</span><input type="time" class="field" id="work-stop" value="${esc(cur?.end || '')}" aria-label="Heure de fin"></div>
+    <span class="label">Puis touche ce que c’est</span>
     <div class="codes">${Object.entries(WORK).map(([c, k]) => `<button type="button" class="code-btn" style="--c:${k.c};--i:${k.i}" data-code="${c}" aria-pressed="${cur?.code === c}">${esc(k.label)}</button>`).join('')}</div>
     <div class="actions"><button class="btn danger" data-clear>Effacer (repos)</button></div>`);
   const end = back.querySelector('#work-end');
+  const startIn = back.querySelector('#work-start');
+  const stopIn = back.querySelector('#work-stop');
   const days = () => {
     const out = [];
     const last = end.value && end.value > day ? end.value : day;
@@ -1035,7 +1046,9 @@ function openWork(m, day) {
   const apply = (code) => {
     const list = days();
     const now = Date.now();
-    const docs = code ? list.map((ds) => ({ id: workId(who, ds), member: who, date: ds, code, by: local.memberId, updatedAt: now })) : [];
+    const start = startIn.value || '';
+    const stop = stopIn.value || '';
+    const docs = code ? list.map((ds) => ({ id: workId(who, ds), member: who, date: ds, code, start, end: stop, by: local.memberId, updatedAt: now })) : [];
     const removeIds = code ? [] : list.map((ds) => workId(who, ds));
     const touched = new Set(list.map((ds) => workId(who, ds)));
     work = work.filter((w) => !touched.has(w.id)).concat(docs);
@@ -1043,14 +1056,17 @@ function openWork(m, day) {
     closeSheet();
     render();
     const n = list.length > 1 ? ` (${list.length} jours)` : '';
-    toast(code ? `${WORK[code].label}${n} : c’est noté !` : `Effacé${n}.`);
+    toast(code ? `${WORK[code].label}${start || stop ? ' ' + workHours({ start, end: stop }) : ''}${n} : c’est noté !` : `Effacé${n}.`);
   };
   back.addEventListener('click', (e) => {
     const w = e.target.closest('[data-who]');
     if (w) {
       who = w.dataset.who;
       back.querySelectorAll('[data-who]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.who === who)));
-      const c = workOn(who, day)?.code;
+      const cw = workOn(who, day);
+      const c = cw?.code;
+      startIn.value = cw?.start || '';
+      stopIn.value = cw?.end || '';
       back.querySelectorAll('[data-code]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.code === c)));
       return;
     }
