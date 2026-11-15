@@ -431,7 +431,7 @@ function renderToday() {
                 }</div>`;
               })
               .join('')
-          : '<p class="hint" style="margin:0">Aucune habilitation renseignée pour cette personne.</p>'
+          : `<p class="hint" style="margin:0;color:var(--danger)">Je ne trouve pas ${esc(p.name)} dans le fichier d’habilitations, donc je ne peux pas proposer de remplaçant. Vérifie que le nom et le prénom sont écrits pareil dans les deux fichiers.</p>`
       }</div></div>`;
   }
   return html + `</div>`;
@@ -1154,7 +1154,7 @@ function findOrCreatePerson(nom, prenom) {
 
 // Les différentes façons d'écrire un niveau dans les fichiers. « none » = pas habilité.
 const LEVEL_WORDS = {
-  AI: ['ai', 'a initier', 'initier', 'a former', 'pas initie', 'non initie', 'pas encore forme', 'formation a prevoir'],
+  AI: ['ai', 'a initier', 'a initie', 'a faire', 'initier', 'a former', 'pas initie', 'non initie', 'pas encore forme', 'formation a prevoir'],
   EF: ['ef', 'en formation', 'formation en cours', 'en cours de formation', 'en cours', 'initiation', 'apprentissage'],
   I: ['i', 'initie', 'initiee', 'debutant', 'debutante', 'novice', 'decouverte', 'base', 'connaissance de base', 'notions', 'accompagne', 'sous tutelle', 'niveau 1', 'niv 1', 'n1', '1'],
   L: ['l', 'utilisateur', 'utilisatrice', 'utilisateurs', 'habilite', 'habilitee', 'autonome', 'maitrise', 'maitrisee', 'operationnel', 'operationnelle', 'confirme', 'confirmee', 'forme', 'formee', 'valide', 'validee', 'qualifie', 'qualifiee', 'oui', 'ok', 'x', 'niveau 2', 'niv 2', 'n2', '2'],
@@ -1181,7 +1181,8 @@ function wordLevel(t) {
 function levelFromCell(v, track) {
   const t = norm(cellText(v));
   if (!t) return null;
-  const lv = wordLevel(t);
+  // Une date écrite dans la case (« 14/03/2024 ») : la personne a été formée ce jour-là.
+  const lv = /^\d{1,4}[\/.\-]\d{1,2}[\/.\-]\d{2,4}/.test(cellText(v)) && !state.levelMap?.[t] ? 'L' : wordLevel(t);
   if (track) seenWords[t] = seenWords[t] || { text: cellText(v), n: 0, lv };
   if (track) seenWords[t].n++;
   if (lv === 'none') return null;
@@ -1198,7 +1199,7 @@ function looksLikeLevels(vals) {
 }
 
 const META = ['nom', 'prenom', 'visa', 'equipe', 'animateur', 'role', 'fonction', 'type', 'statut', 'matricule', 'mail', 'email'];
-const GENERIC = /^(date.*|echeance|1 fois.*|tous les.*|)$/;
+const GENERIC = /^(date.*|echeance|1 fois.*|tous les.*|oui non|type|occurrence|)$/;
 
 function importHabilitations(wb) {
   let nPeople = 0;
@@ -1211,6 +1212,12 @@ function importHabilitations(wb) {
     const h = findHeader(rows);
     if (h < 0) continue;
     found = true;
+    for (const m of wb.Sheets[name]['!merges'] || []) {
+      const v = rows[m.s.r]?.[m.s.c];
+      for (let r = m.s.r; r <= Math.min(m.e.r, h - 1); r++) for (let c = m.s.c; c <= m.e.c; c++) if (rows[r] && rows[r][c] == null) rows[r][c] = v;
+    }
+    // Onglets « Etat des lieux KF » : le sujet de l'onglet sert de préfixe aux colonnes.
+    const topic = /^etat des lieux /.test(norm(name)) ? name.replace(/^\s*[ée]tat des lieux\s*/i, '').trim() + ' – ' : '';
     const head = rows[h].map((v) => norm(cellText(v)));
     const col = (k) => head.findIndex((x) => x === k || x.startsWith(k));
     const cNom = col('nom');
@@ -1226,7 +1233,7 @@ function importHabilitations(wb) {
       if (own && !GENERIC.test(norm(own))) return own.replace(/\s*\(tous les .*?\)\s*$/i, '').trim();
       // Titre sur deux lignes au-dessus (ex. « BROYEUR » puis « HOSO Micro »).
       const above = [h - 2, h - 1].filter((r) => r >= 0).map((r) => cellText(rows[r]?.[c])).filter((t) => t && !GENERIC.test(norm(t)));
-      if (above.length) return above.join(' ');
+      if (above.length) return [...new Set(above)].join(' ');
       for (let r = h; r >= 0; r--) {
         const t = cellText(rows[r]?.[c]);
         if (t && !GENERIC.test(norm(t))) return t.replace(/\s*\(tous les .*?\)\s*$/i, '').trim();
@@ -1244,10 +1251,15 @@ function importHabilitations(wb) {
     for (let c = 0; c < width; c++) {
       if (c === cNom || c === cPre || c === cRole || c === cTeam || META.includes(head[c])) continue;
       const vals = data.map((r) => r[c]);
-      const title = titleOf(c);
-      if (!title) continue;
-      if (vals.some(isDate)) {
-        const every = everyOf(c);
+      const title0 = titleOf(c);
+      if (!title0) continue;
+      const title = topic && !norm(title0).startsWith(norm(topic)) ? topic + title0 : title0;
+      const every = everyOf(c);
+      const colTxt = [h - 2, h - 1, h].filter((r) => r >= 0).map((r) => norm(cellText(rows[r]?.[c]))).join(' ');
+      // Une date sans fréquence ni « échéance » : c'est la date où la personne a été formée.
+      const trainedOn = vals.some(isDate) && !every && !/echeance/.test(colTxt);
+      if (trainedOn && /date/.test(colTxt)) continue; // date d'une colonne voisine (« date formation ou réhabilitation »)
+      if (vals.some(isDate) && !trainedOn) {
         const years = every === 'par an' || every === 'tous les ans' ? 1 : Number((every.match(/\d+/) || [0])[0]);
         // « Date dernier recyclage », « date de réalisation »… : c'est la date du dernier passage, pas l'échéance.
         const headTxt = [h - 2, h - 1, h].filter((r) => r >= 0).map((r) => norm(cellText(rows[r]?.[c]))).join(' ');
@@ -1267,13 +1279,13 @@ function importHabilitations(wb) {
             nDates++;
           } else delete p.dates[ec.id];
         });
-      } else if (looksLikeLevels(vals)) {
+      } else if (trainedOn || looksLikeLevels(vals)) {
         let po = state.postes.find((x) => norm(x.name) === norm(title));
         if (!po) state.postes.push((po = { id: uid('po'), name: title, training: '' }));
         data.forEach((r) => {
           const p = findOrCreatePerson(cellText(r[cNom]), cellText(r[cPre]));
           p.skills = p.skills || {};
-          const lv = levelFromCell(r[c], true);
+          const lv = isDate(r[c]) ? 'L' : levelFromCell(r[c], true);
           if (lv) {
             p.skills[po.id] = lv;
             nSkills++;
