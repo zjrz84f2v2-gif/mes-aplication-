@@ -271,6 +271,7 @@ function defaultState() {
     // Absences lues dans le planning Excel : { jour: { personne: { type, note } } }.
     absImport: {},
     shifts: {},
+    locs: {},
     links: {},
   };
 }
@@ -381,14 +382,31 @@ const absInfo = (day, id) => state.absImport?.[day]?.[id] || null;
 const SHIFT_CODES = { qm: 'Quart matin', qam: 'Quart après-midi', qn: 'Quart nuit', qj: 'Quart de jour' };
 const shiftOf = (day, id) => state.shifts?.[day]?.[id] || '';
 const dayHasShifts = (day) => Object.keys(state.shifts?.[day] || {}).length > 0;
+// Travaille ce jour-là : un quart, ou « DPP » écrit dans le planning.
+const working = (day, id) => !!(shiftOf(day, id) || state.locs?.[day]?.[id]);
 const shortShift = (label) => (Object.entries(SHIFT_CODES).find(([, v]) => v === label)?.[0] || '').toUpperCase() || label;
+
+// DPP = l'endroit où travaille la personne : le bâtiment AI.
+const DPP_RE = /\bdpp\b|batiment ai|\bbat ai\b/;
+const DPP_POSTE_RE = /\bdpp\b|batiment ai|\bbat ai\b|^ai$/;
+const isDpp = (p, day) => state.locs?.[day]?.[p.id] === 'DPP' || DPP_RE.test(norm(p.post)) || DPP_RE.test(norm(p.team));
+// Le meilleur niveau opérationnel de la personne sur les postes du DPP / bâtiment AI ('' = pas habilitée).
+function dppLevel(p) {
+  let best = '';
+  for (const po of state.postes.filter((x) => DPP_POSTE_RE.test(norm(x.name)))) {
+    const lv = p.skills?.[po.id];
+    if (lv && level(lv) && level(lv).replace !== false && (!best || rank(lv) > rank(best))) best = lv;
+  }
+  return best;
+}
 
 // Est-ce que la personne est là ce jour-là ?
 function presence(day, p) {
   const a = absInfo(day, p.id);
   if (a) return { here: false, text: 'Absent · ' + a.type, color: absColor(a.type) };
   const sh = shiftOf(day, p.id);
-  if (sh) return { here: true, text: 'Là · ' + sh, color: 'var(--ok)' };
+  if (sh) return { here: true, text: 'Là · ' + sh + (isDpp(p, day) ? ' · DPP (bât. AI)' : ''), color: 'var(--ok)' };
+  if (state.locs?.[day]?.[p.id] === 'DPP') return { here: true, text: 'Là · DPP (bât. AI)', color: 'var(--ok)' };
   if (dayHasShifts(day)) return { here: false, text: 'Pas de quart ce jour-là', color: '#6B7280' };
   if (state.links.plan || Object.keys(state.absImport || {}).length) return { here: true, text: 'Là', color: 'var(--ok)' };
   return { here: null, text: 'Pas de planning', color: '#6B7280' };
@@ -407,7 +425,7 @@ function candidates(posteId, exclude, day = ui.day) {
   const shifts = dayHasShifts(day);
   return state.people
     .filter((p) => !exclude.has(p.id) && p.skills?.[posteId] && level(p.skills[posteId]) && level(p.skills[posteId]).replace !== false)
-    .filter((p) => !shifts || shiftOf(day, p.id))
+    .filter((p) => !shifts || working(day, p.id))
     .sort((a, b) => rank(b.skills[posteId]) - rank(a.skills[posteId]) || byName(a, b));
 }
 
@@ -538,16 +556,17 @@ function renderToday() {
   const absent = absentOn(day);
   const people = state.people.filter(shown);
   const tile = (p) =>
-    `<button class="pick" data-absent="${p.id}" aria-pressed="${absent.has(p.id)}">${avHtml(p)}<span>${esc(p.name)}</span>${p.post ? `<small class="pick-post">${esc(p.post)}</small>` : ''}${absBadge(absInfo(day, p.id)) || (shiftOf(day, p.id) ? `<span class="abs-type" style="background:var(--ok)">${esc(shortShift(shiftOf(day, p.id)))}</span>` : '')}</button>`;
+    `<button class="pick" data-absent="${p.id}" aria-pressed="${absent.has(p.id)}">${avHtml(p)}<span>${esc(p.name)}</span>${p.post ? `<small class="pick-post">${esc(p.post)}</small>` : ''}${absBadge(absInfo(day, p.id)) || (shiftOf(day, p.id) ? `<span class="abs-type" style="background:var(--ok)">${esc(shortShift(shiftOf(day, p.id)))}</span>` : '')}${isDpp(p, day) ? '<span class="abs-type" style="background:#7C3AED" title="Bâtiment AI">DPP</span>' : ''}</button>`;
   html += `<div class="section-title">Les équipes ce jour-là<small>${absent.size ? absent.size + ' absent' + (absent.size > 1 ? 's' : '') : ''}</small></div><div class="teams">`;
   for (const [team, members] of teamsOf(people)) {
     const sorted = members.slice().sort((a, b) => bossRank(a) - bossRank(b) || byName(a, b));
     const bosses = sorted.filter((p) => bossRank(p) === 0);
     const others = sorted.filter((p) => bossRank(p) !== 0);
     const nAbs = members.filter((p) => absent.has(p.id)).length;
+    const nDpp = members.filter((p) => !absent.has(p.id) && isDpp(p, day)).length;
     const sh = teamShift(members, day);
     html += `<section class="team-card card">
-        <div class="team-head"><h3>${esc(team)}</h3>${sh ? `<span class="abs-type" style="background:var(--ok)">${esc(sh)}</span>` : dayHasShifts(day) ? '<span class="abs-type" style="background:#6B7280">Pas de quart</span>' : ''}<small>${members.length - nAbs} présent${members.length - nAbs > 1 ? 's' : ''}${nAbs ? ` · ${nAbs} absent${nAbs > 1 ? 's' : ''}` : ''}</small></div>
+        <div class="team-head"><h3>${esc(team)}</h3>${sh ? `<span class="abs-type" style="background:var(--ok)">${esc(sh)}</span>` : dayHasShifts(day) ? '<span class="abs-type" style="background:#6B7280">Pas de quart</span>' : ''}<small>${members.length - nAbs} présent${members.length - nAbs > 1 ? 's' : ''}${nAbs ? ` · ${nAbs} absent${nAbs > 1 ? 's' : ''}` : ''}${nDpp ? ` · ${nDpp} au DPP (bât. AI)` : ''}</small></div>
         ${bosses.length ? `<div class="team-boss">${bosses.map(tile).join('')}</div>` : ''}
         <div class="people-pick">${others.map(tile).join('')}</div>
       </section>`;
@@ -564,20 +583,32 @@ function renderToday() {
     const p = person(id);
     if (!p) continue;
     const skills = Object.keys(p.skills || {}).filter((k) => poste(k) && level(p.skills[k]));
+    const dpp = isDpp(p, day);
+    let dppRow = '';
+    if (dpp) {
+      const pool = state.people
+        .filter((x) => shown(x) && !x.planOnly && !absent.has(x.id) && x.id !== p.id && dppLevel(x) && (!dayHasShifts(day) || working(day, x.id)))
+        .sort((a, b) => (b.team === p.team) - (a.team === p.team) || rank(dppLevel(b)) - rank(dppLevel(a)) || byName(a, b));
+      dppRow = `<div class="replace-row"><div class="replace-poste"><span class="abs-type" style="background:#7C3AED">DPP</span><span style="padding-top:3px">Bâtiment AI</span></div>${
+        pool.length
+          ? `<div class="cands">${pool.slice(0, 4).map((x) => `<button class="cand" data-person="${x.id}">${lvlHtml(dppLevel(x))}${esc(x.name)}${x.team && x.team !== p.team ? ` <small style="color:var(--ink-2)">${esc(x.team)}</small>` : ''}${shiftOf(day, x.id) ? ` <small style="color:var(--ink-2)">${esc(shortShift(shiftOf(day, x.id)))}</small>` : ''}</button>`).join('')}${pool.length > 4 ? `<span class="badge grey">+${pool.length - 4}</span>` : ''}</div>`
+          : '<div class="nobody">Personne d’habilité au DPP de disponible</div>'
+      }</div>`;
+    }
     html += `<div class="card absent-card"><div class="absent-head">${avHtml(p, 'absent')}<div class="grow"><div class="card-title">${esc(p.name)}</div><div class="card-meta">${esc(p.post || role(p.role)?.name || '')} · ${absInfo(day, p.id) ? esc(absInfo(day, p.id).type) + (absInfo(day, p.id).note ? ' (' + esc(absInfo(day, p.id).note) + ')' : '') : 'absent'}</div></div></div>
-      <div class="replace">${
+      <div class="replace">${dppRow}${
         skills.length
           ? skills
               .map((k) => poste(k))
               .sort(byName)
               .map((po) => {
-                const all = candidates(po.id, absent);
+                const all = candidates(po.id, absent).filter((x) => !dpp || dppLevel(x));
                 const mine = p.team ? all.filter((x) => x.team === p.team) : all;
                 const c = mine.length ? mine : all;
                 return `<div class="replace-row"><div class="replace-poste">${lvlHtml(p.skills[po.id])}<span style="padding-top:3px">${esc(po.name)}</span></div>${
                   c.length
                     ? `<div class="cands">${p.team && !mine.length ? `<span class="badge grey">Personne dans ${esc(p.team)} · autre équipe :</span>` : ''}${c.slice(0, 3).map((x) => `<button class="cand" data-person="${x.id}">${lvlHtml(x.skills[po.id])}${esc(x.name)}${shiftOf(day, x.id) ? ` <small style="color:var(--ink-2)">${esc(shortShift(shiftOf(day, x.id)))}</small>` : ''}</button>`).join('')}${c.length > 3 ? `<button class="badge grey" data-poste="${po.id}" style="border:0">+${c.length - 3} autres</button>` : ''}</div>`
-                    : '<div class="nobody">Personne de disponible</div>'
+                    : `<div class="nobody">${dpp ? 'Personne d’habilité au DPP sur ce poste' : 'Personne de disponible'}</div>`
                 }</div>`;
               })
               .join('')
@@ -1154,7 +1185,7 @@ document.addEventListener('click', (e) => {
 
 const canLink = 'showOpenFilePicker' in window;
 // À changer quand la façon de lire les fichiers change : les fichiers raccordés sont alors relus.
-const READER_VERSION = '2026-11-15d';
+const READER_VERSION = '2026-11-15e';
 const handles = {};
 let linkNeedsTap = false;
 
@@ -1189,7 +1220,7 @@ function linksHtml() {
   };
   return `<p class="hint" style="margin:-4px 0 12px">${canLink ? 'Sur cet ordinateur, l’appli relit tes fichiers toute seule dès que tu les enregistres dans Excel.' : 'Sur ce téléphone, choisis le fichier à chaque fois que tu veux mettre l’appli à jour. Sur un ordinateur (Chrome ou Edge), la mise à jour est automatique.'} Les fichiers restent sur ton appareil : rien n’est envoyé sur internet.</p>
     ${card('hab', 'Ton fichier : nom, prénom, rôle, postes en I / L / U et dates d’échéance.')}
-    ${card('plan', 'Ton planning annuel : un onglet par mois, une ligne par personne, et un code par jour : CA, RTT, ABS, For pour les absences, QM, QAM, QN, QJ pour les quarts.')}
+    ${card('plan', 'Ton planning annuel : un onglet par mois, une ligne par personne, et un code par jour : CA, RTT, ABS, For pour les absences, QM, QAM, QN, QJ pour les quarts, DPP pour le bâtiment AI.')}
     <div class="ech-edit" style="margin-top:10px"><label class="grow" for="plan-year">Année du planning (si le fichier n’écrit que les numéros des jours)</label>
       <input id="plan-year" type="number" inputmode="numeric" min="2020" max="2100" value="${Number(state.planYear) || new Date().getFullYear()}" style="width:96px"></div>`;
 }
@@ -1224,6 +1255,7 @@ async function unlinkFile(kind) {
   if (kind === 'plan') {
     state.absImport = {};
     state.shifts = {};
+    state.locs = {};
   }
   save();
   try {
@@ -1340,7 +1372,7 @@ function mergePlanOnly() {
       continue;
     }
     const to = hits[0];
-    for (const day of [...Object.values(state.absImport || {}), ...Object.values(state.shifts || {})]) {
+    for (const day of [...Object.values(state.absImport || {}), ...Object.values(state.shifts || {}), ...Object.values(state.locs || {})]) {
       if (day[p.id]) {
         day[to.id] = day[p.id];
         delete day[p.id];
@@ -1651,6 +1683,7 @@ const GRID_CODES = { ca: 'Congé annuel', conge: 'Congé annuel', rtt: 'RTT', ab
 function importPlanningGrid(wb) {
   const abs = {};
   const shifts = {};
+  const locs = {};
   let found = false;
   let days = 0;
   let nShifts = 0;
@@ -1717,6 +1750,17 @@ function importPlanningGrid(wb) {
       dates.forEach((d, j) => {
         const code = cellText(row[j]);
         if (!d || !code || /^(eq|equipe)\s*\S+$/.test(norm(code))) return;
+        // « DPP », « QM DPP »… : au bâtiment AI ce jour-là, avec le quart s'il est écrit.
+        const tokens = norm(code).split(' ');
+        if (tokens.includes('dpp')) {
+          (locs[d] = locs[d] || {})[p.id] = 'DPP';
+          const rest = tokens.filter((t) => t !== 'dpp').join(' ');
+          if (SHIFT_CODES[rest]) {
+            (shifts[d] = shifts[d] || {})[p.id] = SHIFT_CODES[rest];
+            nShifts++;
+          }
+          return;
+        }
         const shift = SHIFT_CODES[norm(code)];
         if (shift) {
           (shifts[d] = shifts[d] || {})[p.id] = shift;
@@ -1731,6 +1775,7 @@ function importPlanningGrid(wb) {
   if (!found) return null;
   state.absImport = abs;
   state.shifts = shifts;
+  state.locs = locs;
   mergePlanOnly();
   const unknown = state.people.filter((p) => p.planOnly && p.ambiguous).length;
   if (unknown) return `Planning importé. ${unknown} nom${unknown > 1 ? 's' : ''} à vérifier (homonymes) : voir Équipe.`;
