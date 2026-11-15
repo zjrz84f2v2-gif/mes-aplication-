@@ -597,13 +597,25 @@ function shiftRank(p, day) {
 }
 
 // Le manageur (ou le chef) en haut, puis les chefs de ligne, puis les autres.
+// Dans le fichier, le code d'équipe est souvent le VISA du manageur (équipe « NTD » = VISA « NTD_BL »),
+// et la colonne « animateur » donne le VISA de l'animateur.
+const visaCode = (p) => norm(p.visa).split(' ')[0] || '';
 function bossRank(p) {
   const r = norm(role(p.role)?.name);
   const post = norm(p.post);
   if (/manag|chef d equipe|responsable/.test(r) || post === 'chef' || /^(manag|chef d equipe)/.test(post)) return 0;
-  if (post === 'cdl' || /chef de ligne/.test(post)) return 1;
+  if (p.team && visaCode(p) && visaCode(p) === norm(p.team)) return 0;
+  if (post === 'cdl' || /chef de ligne/.test(post) || /animat/.test(r)) return 1;
+  if (visaCode(p) && state.people.some((x) => x.team === p.team && norm(x.anim) === visaCode(p))) return 1;
   return 2;
 }
+// Ce qu'on écrit sous le nom, si le poste ne le dit pas déjà (« Chef », « CDL »).
+const bossLabel = (p) => {
+  const post = norm(p.post);
+  if (bossRank(p) === 0) return post === 'chef' || /manag/.test(post) ? '' : 'Manageur';
+  if (bossRank(p) === 1) return post === 'cdl' || /chef de ligne/.test(post) ? '' : 'Animateur';
+  return '';
+};
 // Le quart de l'équipe ce jour-là : celui que la plupart de ses membres font.
 function teamShift(members, day) {
   const count = {};
@@ -616,7 +628,7 @@ function teamShift(members, day) {
 
 // Une ligne par personne : les noms longs sont coupés proprement au lieu de déformer les cases.
 function personRow(p, day, absent, attr = 'data-absent') {
-  return `<button class="mrow${absent.has(p.id) ? ' is-absent' : ''}" ${attr}="${p.id}" title="${esc(p.name)}${p.post ? ' · ' + esc(p.post) : ''}">${avHtml(p, 'small' + (absent.has(p.id) ? ' absent' : ''))}<span class="mrow-text"><b>${esc(p.name)}</b>${p.post ? `<small>${esc(p.post)}</small>` : ''}</span><span class="mrow-tags">${absShort(absInfo(day, p.id)) || (shiftOf(day, p.id) ? `<span class="abs-type" style="background:var(--ok)">${esc(shortShift(shiftOf(day, p.id)))}</span>` : '')}${isDpp(p, day) ? '<span class="abs-type" style="background:#7C3AED" title="Bâtiment AI">DPP</span>' : ''}</span></button>`;
+  return `<button class="mrow${absent.has(p.id) ? ' is-absent' : ''}" ${attr}="${p.id}" title="${esc(p.name)}${p.post ? ' · ' + esc(p.post) : ''}">${avHtml(p, 'small' + (absent.has(p.id) ? ' absent' : ''))}<span class="mrow-text"><b>${esc(p.name)}</b>${p.post || bossLabel(p) ? `<small>${esc([bossLabel(p), p.post].filter(Boolean).join(' · '))}</small>` : ''}</span><span class="mrow-tags">${absShort(absInfo(day, p.id)) || (shiftOf(day, p.id) ? `<span class="abs-type" style="background:var(--ok)">${esc(shortShift(shiftOf(day, p.id)))}</span>` : '')}${isDpp(p, day) ? '<span class="abs-type" style="background:#7C3AED" title="Bâtiment AI">DPP</span>' : ''}</span></button>`;
 }
 
 // Les personnes sans équipe : une liste à part, avec sa propre recherche.
@@ -671,8 +683,9 @@ function renderToday() {
     const nAbs = members.filter((p) => absent.has(p.id)).length;
     const nDpp = members.filter((p) => !absent.has(p.id) && isDpp(p, day)).length;
     const sh = teamShift(members, day);
+    const boss = members.find((p) => bossRank(p) === 0);
     html += `<section class="team-card card">
-        <div class="team-head"><h3>${esc(team)}</h3>${sh ? `<span class="abs-type" style="background:var(--ok)">${esc(sh)}</span>` : dayHasShifts(day) ? '<span class="abs-type" style="background:#6B7280">Pas de quart</span>' : ''}<small>${members.length - nAbs} présent${members.length - nAbs > 1 ? 's' : ''}${nAbs ? ` · ${nAbs} absent${nAbs > 1 ? 's' : ''}` : ''}${nDpp ? ` · ${nDpp} au DPP (bât. AI)` : ''}</small></div>
+        <div class="team-head"><h3>${esc(team)}${boss && norm(team) === visaCode(boss) ? ` <span style="font-weight:600;color:var(--ink-2);font-size:15px">· ${esc(boss.name)}</span>` : ''}</h3>${sh ? `<span class="abs-type" style="background:var(--ok)">${esc(sh)}</span>` : dayHasShifts(day) ? '<span class="abs-type" style="background:#6B7280">Pas de quart</span>' : ''}<small>${members.length - nAbs} présent${members.length - nAbs > 1 ? 's' : ''}${nAbs ? ` · ${nAbs} absent${nAbs > 1 ? 's' : ''}` : ''}${nDpp ? ` · ${nDpp} au DPP (bât. AI)` : ''}</small></div>
         ${bosses.length ? `<div class="members team-boss">${bosses.map(tile).join('')}</div>` : ''}
         <div class="members">${others.map(tile).join('')}</div>
       </section>`;
@@ -1323,7 +1336,7 @@ document.addEventListener('click', (e) => {
 
 const canLink = 'showOpenFilePicker' in window;
 // À changer quand la façon de lire les fichiers change : les fichiers raccordés sont alors relus.
-const READER_VERSION = '2026-11-15k';
+const READER_VERSION = '2026-11-15l';
 const handles = {};
 let linkNeedsTap = false;
 
@@ -1667,6 +1680,7 @@ function importHabilitations(wb) {
     const cRole = head.findIndex((x) => x === 'role' || x === 'fonction');
     const cTeam = col('equipe');
     const cVisa = col('visa');
+    const cAnim = col('animateur');
     const data = rows.slice(h + 1).filter((r) => r && cellText(r[cNom]) && cellText(r[cPre]) && validName(cellText(r[cNom]), cellText(r[cPre])));
     if (!data.length) continue;
     const width = Math.max(...rows.slice(0, h + 1 + data.length).map((r) => (r ? r.length : 0)));
@@ -1740,6 +1754,7 @@ function importHabilitations(wb) {
       const p = findOrCreatePerson(cellText(r[cNom]), cellText(r[cPre]));
       if (cTeam >= 0 && cellText(r[cTeam])) p.team = cellText(r[cTeam]);
       if (cVisa >= 0 && cellText(r[cVisa])) p.visa = cellText(r[cVisa]);
+      if (cAnim >= 0 && cellText(r[cAnim])) p.anim = cellText(r[cAnim]);
       if (cRole >= 0 && cellText(r[cRole])) {
         const rn = cellText(r[cRole]);
         let ro = state.roles.find((x) => norm(x.name) === norm(rn));
