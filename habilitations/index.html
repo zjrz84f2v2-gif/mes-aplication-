@@ -756,7 +756,7 @@ function peopleCards() {
     .map((p) => {
       const skills = Object.keys(p.skills || {}).filter((k) => poste(k) && level(p.skills[k]));
       return `<button class="card" data-person="${p.id}">${avHtml(p)}<div class="grow"><div class="card-title">${esc(p.name)}</div>
-        <div class="card-meta">${esc(role(p.role)?.name || 'Sans rôle')}${p.team ? ' · ' + esc(p.team) : ''}${p.post && norm(p.post) !== norm(role(p.role)?.name) ? ' · ' + esc(p.post) : ''} · ${skills.length} poste${skills.length > 1 ? 's' : ''}</div>
+        <div class="card-meta">${esc([role(p.role)?.name, p.team, p.post && norm(p.post) !== norm(role(p.role)?.name) ? p.post : '', skills.length + ' poste' + (skills.length > 1 ? 's' : '')].filter(Boolean).join(' · '))}</div>
         ${skills.length ? `<div class="lvls-row">${skills.sort((a, b) => rank(p.skills[b]) - rank(p.skills[a]) || poste(a).name.localeCompare(poste(b).name, 'fr')).map((k) => `<span class="pchip">${lvlHtml(p.skills[k])}<span>${esc(poste(k).name)}</span></span>`).join('')}</div>` : ''}
       </div>${icons.chevron}</button>`;
     })
@@ -1056,7 +1056,7 @@ function openPerson(id) {
       <div id="rp-list">${blocks.join('')}</div>
       <p class="hint">Sans compter les absents du jour${dayHasShifts(today) ? ', et seulement ceux qui travaillent ce jour-là' : ''}.</p>`;
   }
-  const back = showSheet(`<div class="sheet-head">${avHtml(p, 'big')}<div style="min-width:0"><h2>${esc(p.name)}</h2><p>${esc(role(p.role)?.name || 'Sans rôle')}${p.team ? ' · ' + esc(p.team) : ''} · ${known.length} poste${known.length > 1 ? 's' : ''}</p><p style="margin-top:6px">${esc(dayName)} : ${presenceBadge(day, p)}</p></div>${closeBtn}</div>
+  const back = showSheet(`<div class="sheet-head">${avHtml(p, 'big')}<div style="min-width:0"><h2>${esc(p.name)}</h2><p>${esc([role(p.role)?.name, p.team].filter(Boolean).join(' · '))}${role(p.role) || p.team ? ' · ' : ''}${known.length} poste${known.length > 1 ? 's' : ''}</p><p style="margin-top:6px">${esc(dayName)} : ${presenceBadge(day, p)}</p></div>${closeBtn}</div>
     ${p.post ? `<p class="hint">Poste habituel : <b>${esc(p.post)}</b></p>` : ''}
     ${replaceHtml ? '<button class="btn ghost small" data-go-replace style="margin-top:12px">Voir qui peut le remplacer ↓</button>' : ''}
     <span class="label">Habilitations</span>
@@ -1354,7 +1354,7 @@ document.addEventListener('click', (e) => {
 
 const canLink = 'showOpenFilePicker' in window;
 // À changer quand la façon de lire les fichiers change : les fichiers raccordés sont alors relus.
-const READER_VERSION = '2026-11-15n';
+const READER_VERSION = '2026-11-15o';
 const handles = {};
 let linkNeedsTap = false;
 
@@ -1531,13 +1531,13 @@ function findHeader(rows, also = []) {
 }
 
 const personKey = (prenom, nom) => norm(`${prenom} ${nom}`);
-// Le rôle de chacun : ce qui est écrit (colonne Rôle/Fonction/Statut, ou le poste du planning),
-// sinon le manageur se reconnaît à son VISA (code d'équipe = VISA), et par défaut c'est un opérateur.
+// Le rôle de chacun : seulement s'il est écrit (colonne Rôle/Fonction/Statut, ou le poste du planning).
+// Rien d'écrit : pas de rôle.
 const ROLE_RULES = [
   ['Manageur', /\bmanag|chef d equipe|\bchef\b(?! de ligne)|responsable|superviseur|\bencadr/],
   ['Alternant', /altern|apprenti|stagiaire|contrat pro|\binterim/],
   ['Technicien', /techni|\btech\b|maintenance|methode|qualite/],
-  ['Opérateur', /operat|conduct|\bposte\b|controle|\bpilote\b/],
+  ['Opérateur', /operat|conduct/],
 ];
 function roleFromText(t) {
   const n = norm(t);
@@ -1551,13 +1551,8 @@ function applyRoles() {
     return ro.id;
   };
   for (const p of state.people) {
-    const name =
-      roleFromText(p.roleText) ||
-      (p.roleText ? p.roleText : '') ||
-      roleFromText(p.post) ||
-      (p.team && visaCode(p) && visaCode(p) === norm(p.team) ? 'Manageur' : '') ||
-      'Opérateur';
-    p.role = roleId(name);
+    const name = roleFromText(p.roleText) || p.roleText || roleFromText(p.post) || '';
+    p.role = name ? roleId(name) : '';
   }
 }
 
@@ -1624,7 +1619,7 @@ function findOrCreatePerson(nom, prenom, fromPlan) {
     const n = norm(nom);
     let p = state.people.find((x) => x.planOnly && x.nomN === n && !x.preN);
     if (!p) {
-      p = { id: uid('p'), name: nom.toUpperCase(), role: state.roles[0]?.id || '', skills: {}, planOnly: true, nomN: n, preN: '' };
+      p = { id: uid('p'), name: nom.toUpperCase(), role: '', skills: {}, planOnly: true, nomN: n, preN: '' };
       state.people.push(p);
     }
     p.ambiguous = hits.length > 1 ? hits.map((x) => x.name) : null;
@@ -1638,7 +1633,7 @@ function findOrCreatePerson(nom, prenom, fromPlan) {
     state.people.find((x) => x.key === k || norm(x.name) === k || norm(x.name) === k2) ||
     state.people.find((x) => x.nomN && x.preN && ((x.nomN === n && closeEnough(x.preN, pr)) || (x.nomN === pr && closeEnough(x.preN, n))));
   if (!p) {
-    p = { id: uid('p'), name: `${cap(prenom.toLowerCase())} ${nom.toUpperCase()}`.trim(), role: state.roles[0]?.id || '', skills: {}, planOnly: !!fromPlan };
+    p = { id: uid('p'), name: `${cap(prenom.toLowerCase())} ${nom.toUpperCase()}`.trim(), role: '', skills: {}, planOnly: !!fromPlan };
     state.people.push(p);
   }
   if (!fromPlan && p.planOnly) {
