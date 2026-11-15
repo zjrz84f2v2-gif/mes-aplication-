@@ -198,6 +198,15 @@ button.card { text-align: left; width: 100%; padding: 14px; display: flex; gap: 
 .link-state.ok { color: var(--ok); font-weight: 700; }
 .banner { display: flex; align-items: center; gap: 10px; background: var(--accent-soft); color: var(--accent); border-radius: 14px; padding: 10px 12px; margin-top: 14px; font-weight: 700; font-size: 15px; }
 .banner .btn { width: auto; min-height: 40px; font-size: 14px; margin-left: auto; }
+/* Recherche d'une personne, en haut de chaque page. */
+.finder { position: sticky; top: 0; z-index: 8; padding: calc(10px + env(safe-area-inset-top)) 0 6px; margin-top: calc(-1 * env(safe-area-inset-top)); background: linear-gradient(var(--bg) 80%, rgba(241, 244, 248, 0)); }
+.finder .search-wrap { margin-top: 0; }
+.finder-results { position: absolute; left: 0; right: 0; top: 100%; background: var(--card); border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 16px 40px -12px rgba(22, 32, 44, .35); max-height: 60vh; overflow-y: auto; padding: 6px; }
+.finder-results button { width: 100%; display: flex; align-items: center; gap: 10px; padding: 8px; border: 0; background: none; border-radius: 12px; text-align: left; min-height: 52px; }
+.finder-results button:hover, .finder-results button:focus-visible { background: var(--bg); }
+.finder-results .grow { flex: 1; min-width: 0; }
+.finder-results small { display: block; color: var(--ink-2); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (min-width: 900px) { .finder { top: 70px; padding-top: 4px; } }
 .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(96px + env(safe-area-inset-bottom)); background: var(--ink); color: #fff; padding: 12px 18px; border-radius: 999px; font-weight: 700; z-index: 30; max-width: calc(100% - 32px); text-align: center; box-shadow: 0 10px 30px -10px rgba(0, 0, 0, .45); }
 
 .btn, .chip, .pick, button.card, .seg button, .tabs button, .icon-btn, .close, .cand { transition: transform .14s cubic-bezier(.2, .8, .2, 1), background-color .15s ease-out, opacity .12s ease-out; }
@@ -371,6 +380,72 @@ function candidates(posteId, exclude) {
     .sort((a, b) => rank(b.skills[posteId]) - rank(a.skills[posteId]) || byName(a, b));
 }
 
+// ---------- Recherche d'une personne (sur chaque page) ----------
+
+function finderHtml() {
+  if (!state.people.some((p) => !p.planOnly)) return '';
+  return `<div class="finder" role="search"><div class="search-wrap">${icons.search}<input class="search" id="finder" type="search" placeholder="Rechercher une personne (nom, prénom, VISA, poste)" autocomplete="off" aria-label="Rechercher une personne" aria-controls="finder-results"></div><div class="finder-results" id="finder-results" hidden></div></div>`;
+}
+
+function finderMatches(q) {
+  const t = norm(q);
+  if (!t) return [];
+  const words = t.split(' ');
+  return state.people
+    .filter((p) => !p.planOnly)
+    .map((p) => {
+      const hay = norm([p.name, p.visa, p.team, p.post, role(p.role)?.name].filter(Boolean).join(' '));
+      return { p, ok: words.every((w) => hay.includes(w)), first: norm(p.name).split(' ').some((w) => w.startsWith(words[0])) };
+    })
+    .filter((x) => x.ok)
+    .sort((a, b) => b.first - a.first || byName(a.p, b.p))
+    .slice(0, 12)
+    .map((x) => x.p);
+}
+
+function showFinder(input) {
+  const box = document.getElementById('finder-results');
+  if (!box) return;
+  const q = input.value.trim();
+  if (!q) {
+    box.hidden = true;
+    return;
+  }
+  const hits = finderMatches(q);
+  const today = absentOn(iso(new Date()));
+  box.hidden = false;
+  box.innerHTML = hits.length
+    ? hits
+        .map((p) => {
+          const n = Object.keys(p.skills || {}).filter((k) => poste(k) && level(p.skills[k])).length;
+          const abs = absInfo(iso(new Date()), p.id);
+          return `<button data-person="${p.id}">${avHtml(p, 'small' + (today.has(p.id) ? ' absent' : ''))}<span class="grow"><b>${esc(p.name)}</b><small>${esc([role(p.role)?.name, p.team, p.post, n + ' poste' + (n > 1 ? 's' : '')].filter(Boolean).join(' · '))}</small></span>${abs ? absBadge(abs) : ''}</button>`;
+        })
+        .join('')
+    : `<p class="hint" style="padding:8px">Personne ne s’appelle « ${esc(q)} ».</p>`;
+}
+
+document.addEventListener('input', (e) => {
+  if (e.target.id === 'finder') showFinder(e.target);
+});
+document.addEventListener('keydown', (e) => {
+  if (e.target.id !== 'finder') return;
+  if (e.key === 'Escape') {
+    e.target.value = '';
+    showFinder(e.target);
+  }
+  if (e.key === 'Enter') document.querySelector('#finder-results button')?.click();
+});
+document.addEventListener('click', (e) => {
+  const box = document.getElementById('finder-results');
+  if (box && !box.hidden && !e.target.closest('.finder')) box.hidden = true;
+  if (e.target.closest('#finder-results [data-person]')) {
+    const input = document.getElementById('finder');
+    if (input) input.value = '';
+    if (box) box.hidden = true;
+  }
+});
+
 // ---------- Écrans ----------
 
 const app = document.getElementById('app');
@@ -378,7 +453,7 @@ const app = document.getElementById('app');
 function render() {
   document.querySelectorAll('.tabs button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === ui.tab)));
   const screens = { jour: renderToday, equipe: renderTeam, postes: renderPostes, echeances: renderEcheances, reglages: renderSettings };
-  app.innerHTML = screens[ui.tab]();
+  app.innerHTML = finderHtml() + screens[ui.tab]();
   bind();
 }
 
@@ -451,7 +526,7 @@ function renderTeam() {
   let html = `<h1 class="page">Équipe</h1><p class="sub">${nb} personne${nb > 1 ? 's' : ''}</p>`;
   const steps = firstSteps();
   if (steps && !state.people.length) return html + `<div style="margin-top:18px">${steps}</div>`;
-  html += `<div class="search-wrap">${icons.search}<input class="search" id="q" type="search" placeholder="Chercher une personne" value="${esc(ui.query)}" autocomplete="off" aria-label="Chercher une personne"></div>
+  html += `
     <div class="chips" role="group" aria-label="Filtrer par rôle">
       <button class="chip" data-role-filter="all" aria-pressed="${ui.roleFilter === 'all'}">Tous</button>
       ${state.roles.map((r) => `<button class="chip" data-role-filter="${r.id}" aria-pressed="${ui.roleFilter === r.id}"><span class="lvl" style="width:12px;height:12px;border-radius:4px;background:${r.color}"></span>${esc(r.name)}</button>`).join('')}
@@ -1330,6 +1405,7 @@ function importHabilitations(wb) {
     const cPre = col('prenom');
     const cRole = head.findIndex((x) => x === 'role' || x === 'fonction');
     const cTeam = col('equipe');
+    const cVisa = col('visa');
     const data = rows.slice(h + 1).filter((r) => r && cellText(r[cNom]) && cellText(r[cPre]) && validName(cellText(r[cNom]), cellText(r[cPre])));
     if (!data.length) continue;
     const width = Math.max(...rows.slice(0, h + 1 + data.length).map((r) => (r ? r.length : 0)));
@@ -1402,6 +1478,7 @@ function importHabilitations(wb) {
     data.forEach((r) => {
       const p = findOrCreatePerson(cellText(r[cNom]), cellText(r[cPre]));
       if (cTeam >= 0 && cellText(r[cTeam])) p.team = cellText(r[cTeam]);
+      if (cVisa >= 0 && cellText(r[cVisa])) p.visa = cellText(r[cVisa]);
       if (cRole >= 0 && cellText(r[cRole])) {
         const rn = cellText(r[cRole]);
         let ro = state.roles.find((x) => norm(x.name) === norm(rn));
