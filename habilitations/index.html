@@ -336,7 +336,7 @@ function avHtml(p, cls = '') {
 
 const absentOn = (day) => new Set([...(state.absences[day] || []), ...Object.keys(state.absImport?.[day] || {})]);
 const absInfo = (day, id) => state.absImport?.[day]?.[id] || null;
-const ABS_COLORS = { 'congé': '#2F6FC4', rtt: '#7C3AED', 'arrêt': '#C2321F', formation: '#B45309', autre: '#4B5563' };
+const ABS_COLORS = { conge: '#3F8F1F', 'conge annuel': '#3F8F1F', rtt: '#7C3AED', arret: '#C2321F', absence: '#0A84C6', formation: '#B4581E', autre: '#4B5563' };
 const absColor = (type) => ABS_COLORS[norm(type).replace(/s$/, '')] || ABS_COLORS[Object.keys(ABS_COLORS).find((k) => norm(type).startsWith(norm(k)))] || '#4B5563';
 const absBadge = (info) => (info ? `<span class="abs-type" style="background:${absColor(info.type)}">${esc(info.type)}</span>` : '');
 const norm = (t) => String(t ?? '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
@@ -396,7 +396,7 @@ function renderToday() {
     const p = person(id);
     if (!p) continue;
     const skills = Object.keys(p.skills || {}).filter((k) => poste(k) && level(p.skills[k]));
-    html += `<div class="card absent-card"><div class="absent-head">${avHtml(p, 'absent')}<div class="grow"><div class="card-title">${esc(p.name)}</div><div class="card-meta">${esc(role(p.role)?.name || '')} · ${absInfo(day, p.id) ? esc(absInfo(day, p.id).type) + (absInfo(day, p.id).note ? ' (' + esc(absInfo(day, p.id).note) + ')' : '') : 'absent'}</div></div></div>
+    html += `<div class="card absent-card"><div class="absent-head">${avHtml(p, 'absent')}<div class="grow"><div class="card-title">${esc(p.name)}</div><div class="card-meta">${esc(p.post || role(p.role)?.name || '')} · ${absInfo(day, p.id) ? esc(absInfo(day, p.id).type) + (absInfo(day, p.id).note ? ' (' + esc(absInfo(day, p.id).note) + ')' : '') : 'absent'}</div></div></div>
       <div class="replace">${
         skills.length
           ? skills
@@ -406,7 +406,7 @@ function renderToday() {
                 const c = candidates(po.id, absent);
                 return `<div class="replace-row"><div class="replace-poste">${lvlHtml(p.skills[po.id])}<span style="padding-top:3px">${esc(po.name)}</span></div>${
                   c.length
-                    ? `<div class="cands">${c.slice(0, 6).map((x) => `<button class="cand" data-person="${x.id}">${lvlHtml(x.skills[po.id])}${esc(x.name)}</button>`).join('')}${c.length > 6 ? `<span class="badge grey">+${c.length - 6}</span>` : ''}</div>`
+                    ? `<div class="cands">${c.slice(0, 3).map((x) => `<button class="cand" data-person="${x.id}">${lvlHtml(x.skills[po.id])}${esc(x.name)}</button>`).join('')}${c.length > 3 ? `<button class="badge grey" data-poste="${po.id}" style="border:0">+${c.length - 3} autres</button>` : ''}</div>`
                     : '<div class="nobody">Personne de disponible</div>'
                 }</div>`;
               })
@@ -443,7 +443,7 @@ function peopleCards() {
     .map((p) => {
       const skills = Object.keys(p.skills || {}).filter((k) => poste(k) && level(p.skills[k]));
       return `<button class="card" data-person="${p.id}">${avHtml(p)}<div class="grow"><div class="card-title">${esc(p.name)}</div>
-        <div class="card-meta">${esc(role(p.role)?.name || 'Sans rôle')} · ${skills.length} poste${skills.length > 1 ? 's' : ''}</div>
+        <div class="card-meta">${esc(role(p.role)?.name || 'Sans rôle')}${p.team ? ' · ' + esc(p.team) : ''}${p.post ? ' · ' + esc(p.post) : ''} · ${skills.length} poste${skills.length > 1 ? 's' : ''}</div>
         ${skills.length ? `<div class="lvls-row">${skills.sort((a, b) => rank(p.skills[b]) - rank(p.skills[a]) || poste(a).name.localeCompare(poste(b).name, 'fr')).map((k) => `<span class="pchip">${lvlHtml(p.skills[k])}<span>${esc(poste(k).name)}</span></span>`).join('')}</div>` : ''}
       </div>${icons.chevron}</button>`;
     })
@@ -983,7 +983,7 @@ function linksHtml() {
   };
   return `<p class="hint" style="margin:-4px 0 12px">${canLink ? 'Sur cet ordinateur, l’appli relit tes fichiers toute seule dès que tu les enregistres dans Excel.' : 'Sur ce téléphone, choisis le fichier à chaque fois que tu veux mettre l’appli à jour. Sur un ordinateur (Chrome ou Edge), la mise à jour est automatique.'} Les fichiers restent sur ton appareil : rien n’est envoyé sur internet.</p>
     ${card('hab', 'Ton fichier : nom, prénom, rôle, postes en I / L / U et dates d’échéance.')}
-    ${card('plan', 'Ton fichier : nom, prénom, type (Congé, RTT, Arrêt, Formation…), du, au.')}`;
+    ${card('plan', 'Ton planning annuel : un onglet par mois, une ligne par personne, et un code par jour (CA, RTT, ABS, For).')}`;
 }
 
 function linkBanner() {
@@ -1241,7 +1241,78 @@ function importPlanning(wb) {
     state.absImport = abs;
     return `Planning importé : ${n} absence${n > 1 ? 's' : ''}.`;
   }
-  return null;
+  return importPlanningGrid(wb);
+}
+
+// Planning annuel « en grille » : un onglet par mois, une ligne par personne, un code par jour (CA, RTT, ABS, For…).
+const GRID_CODES = { ca: 'Congé annuel', conge: 'Congé annuel', rtt: 'RTT', abs: 'Absence', arret: 'Arrêt', for: 'Formation', formation: 'Formation', am: 'Arrêt' };
+function importPlanningGrid(wb) {
+  const abs = {};
+  let found = false;
+  let days = 0;
+  const seen = new Set();
+  for (const name of wb.SheetNames) {
+    const rows = sheetRows(wb.Sheets[name]);
+    let h = -1;
+    let cName = -1;
+    for (let r = 0; r < Math.min(rows.length, 40) && h < 0; r++) {
+      const i = (rows[r] || []).findIndex((v) => norm(cellText(v)) === 'nom prenom' || norm(cellText(v)) === 'nom et prenom');
+      if (i >= 0) [h, cName] = [r, i];
+    }
+    if (h < 0) continue;
+    // La ligne des dates : celle qui contient le plus de vraies dates sous le titre.
+    let dRow = -1;
+    let best = 0;
+    for (let r = h; r < Math.min(h + 5, rows.length); r++) {
+      const n = (rows[r] || []).filter(isDate).length;
+      if (n > best) [best, dRow] = [n, r];
+    }
+    if (dRow < 0 || best < 7) continue;
+    found = true;
+    const dates = (rows[dRow] || []).map((v) => (isDate(v) ? toIso(v) : ''));
+    const cPoste = (rows[h] || []).findIndex((v) => norm(cellText(v)) === 'poste');
+    // Étiquettes d'équipe (« EQ A ») placées à droite des blocs.
+    const teamCells = [];
+    rows.forEach((r, i) => (r || []).forEach((v, j) => j > cName + 1 && !dates[j] && /^(eq|equipe)\s*\S+$/.test(norm(cellText(v))) && teamCells.push([i, cellText(v)])));
+    let block = [];
+    const flush = () => {
+      const label = teamCells.find(([i]) => block.includes(i))?.[1];
+      if (label) block.forEach((i) => (rows[i].__team = label));
+      block = [];
+    };
+    for (let r = dRow + 1; r < rows.length; r++) {
+      const row = rows[r] || [];
+      const full = cellText(row[cName]);
+      if (!full) {
+        flush();
+        continue;
+      }
+      block.push(r);
+    }
+    flush();
+    for (let r = dRow + 1; r < rows.length; r++) {
+      const row = rows[r] || [];
+      const full = cellText(row[cName]);
+      if (!full) continue;
+      // « NOM Prénom » : les mots en majuscules sont le nom.
+      const words = full.split(' ');
+      const nomW = words.filter((w) => w === w.toUpperCase() && /[A-Z]/.test(w));
+      const preW = words.filter((w) => !nomW.includes(w));
+      const p = findOrCreatePerson(nomW.join(' ') || words[0], preW.join(' ') || words.slice(1).join(' '));
+      if (cPoste >= 0 && cellText(row[cPoste])) p.post = cellText(row[cPoste]);
+      if (row.__team) p.team = row.__team;
+      seen.add(p.id);
+      dates.forEach((d, j) => {
+        const code = cellText(row[j]);
+        if (!d || !code) return;
+        (abs[d] = abs[d] || {})[p.id] = { type: GRID_CODES[norm(code)] || code };
+        days++;
+      });
+    }
+  }
+  if (!found) return null;
+  state.absImport = abs;
+  return `Planning importé : ${seen.size} personnes, ${days} jour${days > 1 ? 's' : ''} d’absence.`;
 }
 
 // Relecture automatique : à l'ouverture, au retour sur l'appli et toutes les 30 secondes.
