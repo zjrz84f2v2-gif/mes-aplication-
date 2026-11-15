@@ -497,6 +497,11 @@ function bind() {
     document.getElementById('people-list').innerHTML = peopleCards();
   });
   document.getElementById('import-file')?.addEventListener('change', importBackup);
+  document.getElementById('plan-year')?.addEventListener('change', (e) => {
+    state.planYear = Number(e.target.value) || new Date().getFullYear();
+    save();
+    if (state.links.plan) refreshLinks(true);
+  });
   app.querySelectorAll('[data-pick-excel]').forEach((el) =>
     el.addEventListener('change', async () => {
       const f = el.files[0];
@@ -959,7 +964,9 @@ function linksHtml() {
   };
   return `<p class="hint" style="margin:-4px 0 12px">${canLink ? 'Sur cet ordinateur, l’appli relit tes fichiers toute seule dès que tu les enregistres dans Excel.' : 'Sur ce téléphone, choisis le fichier à chaque fois que tu veux mettre l’appli à jour. Sur un ordinateur (Chrome ou Edge), la mise à jour est automatique.'} Les fichiers restent sur ton appareil : rien n’est envoyé sur internet.</p>
     ${card('hab', 'Ton fichier : nom, prénom, rôle, postes en I / L / U et dates d’échéance.')}
-    ${card('plan', 'Ton planning annuel : un onglet par mois, une ligne par personne, et un code par jour (CA, RTT, ABS, For).')}`;
+    ${card('plan', 'Ton planning annuel : un onglet par mois, une ligne par personne, et un code par jour (CA, RTT, ABS, For).')}
+    <div class="ech-edit" style="margin-top:10px"><label class="grow" for="plan-year">Année du planning (si le fichier n’écrit que les numéros des jours)</label>
+      <input id="plan-year" type="number" inputmode="numeric" min="2020" max="2100" value="${Number(state.planYear) || new Date().getFullYear()}" style="width:96px"></div>`;
 }
 
 function linkBanner() {
@@ -1149,12 +1156,21 @@ function importHabilitations(wb) {
       const title = titleOf(c);
       if (!title) continue;
       if (vals.some(isDate)) {
+        const every = everyOf(c);
+        const years = every === 'par an' || every === 'tous les ans' ? 1 : Number((every.match(/\d+/) || [0])[0]);
+        // « Date dernier recyclage », « date de réalisation »… : c'est la date du dernier passage, pas l'échéance.
+        const headTxt = [h - 2, h - 1, h].filter((r) => r >= 0).map((r) => norm(cellText(rows[r]?.[c]))).join(' ');
+        const addYears = /dernier|realisation|initial|effectue|passage/.test(headTxt) ? years : 0;
         let ec = state.echeances.find((x) => norm(x.name) === norm(title));
-        if (!ec) state.echeances.push((ec = { id: uid('e'), name: title, every: everyOf(c) }));
+        if (!ec) state.echeances.push((ec = { id: uid('e'), name: title, every }));
         data.forEach((r) => {
           const p = findOrCreatePerson(cellText(r[cNom]), cellText(r[cPre]));
           p.dates = p.dates || {};
-          const d = toIso(r[c]);
+          let d = toIso(r[c]);
+          if (d && addYears) {
+            const x = parseIso(d);
+            d = iso(new Date(x.getFullYear() + addYears, x.getMonth(), x.getDate()));
+          }
           if (d) {
             p.dates[ec.id] = d;
             nDates++;
@@ -1220,6 +1236,29 @@ function importPlanning(wb) {
   return importPlanningGrid(wb);
 }
 
+const MONTH_NAMES = ['janvier', 'fevrier', 'mars', 'avril', 'mai', 'juin', 'juillet', 'aout', 'septembre', 'octobre', 'novembre', 'decembre'];
+// Jours écrits 1, 2, 3… : le mois vient du nom de l'onglet (« Janvier », « Juillet et Août »), l'année du réglage.
+function numberedDays(rows, h, sheetName) {
+  const months = MONTH_NAMES.map((m, i) => [norm(sheetName).indexOf(m), i]).filter(([at]) => at >= 0).sort((a, b) => a[0] - b[0]).map(([, i]) => i);
+  if (!months.length) return null;
+  const year = Number(state.planYear) || new Date().getFullYear();
+  for (let r = h; r < Math.min(h + 5, rows.length); r++) {
+    const row = rows[r] || [];
+    const nums = row.map((v) => (typeof v === 'number' && Number.isInteger(v) && v >= 1 && v <= 31 ? v : null));
+    if (nums.filter((n) => n).length < 20) continue;
+    let mi = 0;
+    let prev = 0;
+    return [nums.map((n) => {
+      if (!n) return '';
+      if (n < prev && mi < months.length - 1) mi++;
+      prev = n;
+      const d = new Date(year, months[mi], n);
+      return d.getMonth() === months[mi] ? iso(d) : '';
+    }), r];
+  }
+  return null;
+}
+
 // Planning annuel « en grille » : un onglet par mois, une ligne par personne, un code par jour (CA, RTT, ABS, For…).
 const GRID_CODES = { ca: 'Congé annuel', conge: 'Congé annuel', rtt: 'RTT', abs: 'Absence', arret: 'Arrêt', for: 'Formation', formation: 'Formation', am: 'Arrêt' };
 function importPlanningGrid(wb) {
@@ -1243,9 +1282,13 @@ function importPlanningGrid(wb) {
       const n = (rows[r] || []).filter(isDate).length;
       if (n > best) [best, dRow] = [n, r];
     }
-    if (dRow < 0 || best < 7) continue;
+    let dates = dRow >= 0 && best >= 7 ? (rows[dRow] || []).map((v) => (isDate(v) ? toIso(v) : '')) : null;
+    if (!dates) {
+      const nd = numberedDays(rows, h, name);
+      if (nd) [dates, dRow] = nd;
+    }
+    if (!dates) continue;
     found = true;
-    const dates = (rows[dRow] || []).map((v) => (isDate(v) ? toIso(v) : ''));
     const cPoste = (rows[h] || []).findIndex((v) => norm(cellText(v)) === 'poste');
     // Étiquettes d'équipe (« EQ A ») placées à droite des blocs.
     const teamCells = [];
@@ -1280,7 +1323,7 @@ function importPlanningGrid(wb) {
       seen.add(p.id);
       dates.forEach((d, j) => {
         const code = cellText(row[j]);
-        if (!d || !code) return;
+        if (!d || !code || /^(eq|equipe)\s*\S+$/.test(norm(code))) return;
         (abs[d] = abs[d] || {})[p.id] = { type: GRID_CODES[norm(code)] || code };
         days++;
       });
