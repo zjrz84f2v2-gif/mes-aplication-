@@ -105,6 +105,7 @@ button.card { text-align: left; width: 100%; padding: 14px; display: flex; gap: 
 .team-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
 .team-head h3 { margin: 0; font-size: 19px; font-weight: 800; }
 .team-head small { margin-left: auto; color: var(--ink-2); font-weight: 700; font-size: 14px; }
+@media (max-width: 520px) { .team-head small { margin-left: 0; flex-basis: 100%; } }
 .team-boss { display: flex; gap: 8px; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px dashed var(--line); }
 .team-boss .pick { flex: 0 1 140px; }
 .pick-post { font-size: 12px; color: var(--ink-2); font-weight: 600; margin-top: -4px; }
@@ -115,7 +116,7 @@ button.card { text-align: left; width: 100%; padding: 14px; display: flex; gap: 
 .replace-row { display: flex; gap: 10px; align-items: flex-start; }
 .replace-poste { width: 120px; flex: 0 0 auto; font-weight: 700; font-size: 15px; padding-top: 6px; overflow-wrap: anywhere; display: flex; gap: 6px; align-items: flex-start; }
 .cands { display: flex; flex-wrap: wrap; gap: 6px; flex: 1; min-width: 0; }
-.cand { display: inline-flex; align-items: center; gap: 6px; background: var(--bg); border-radius: 999px; padding: 3px 10px 3px 3px; font-weight: 700; font-size: 14px; border: 0; }
+.cand { text-align: left; display: inline-flex; align-items: center; gap: 6px; background: var(--bg); border-radius: 999px; padding: 3px 10px 3px 3px; font-weight: 700; font-size: 14px; border: 0; }
 .cand .lvl { width: 24px; height: 24px; border-radius: 999px; }
 .cand .lvl svg { width: 15px; height: 15px; }
 .nobody { color: var(--danger); font-weight: 800; font-size: 14px; padding-top: 6px; }
@@ -214,7 +215,7 @@ button.card { text-align: left; width: 100%; padding: 14px; display: flex; gap: 
 .finder-results button:hover, .finder-results button:focus-visible { background: var(--bg); }
 .finder-results .grow { flex: 1; min-width: 0; }
 .finder-results small { display: block; color: var(--ink-2); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-@media (min-width: 900px) { .finder { top: 70px; padding-top: 4px; } }
+@media (min-width: 900px) { .finder { top: 0; padding-top: 72px; margin-top: -72px; background: var(--bg); box-shadow: 0 1px 0 var(--line); } }
 .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(96px + env(safe-area-inset-bottom)); background: var(--ink); color: #fff; padding: 12px 18px; border-radius: 999px; font-weight: 700; z-index: 30; max-width: calc(100% - 32px); text-align: center; box-shadow: 0 10px 30px -10px rgba(0, 0, 0, .45); }
 
 .btn, .chip, .pick, button.card, .seg button, .tabs button, .icon-btn, .close, .cand { transition: transform .14s cubic-bezier(.2, .8, .2, 1), background-color .15s ease-out, opacity .12s ease-out; }
@@ -418,6 +419,8 @@ const presenceBadge = (day, p) => {
 const ABS_COLORS = { conge: '#3F8F1F', 'conge annuel': '#3F8F1F', rtt: '#7C3AED', arret: '#C2321F', absence: '#0A84C6', formation: '#B4581E', autre: '#4B5563' };
 const absColor = (type) => ABS_COLORS[norm(type).replace(/s$/, '')] || ABS_COLORS[Object.keys(ABS_COLORS).find((k) => norm(type).startsWith(norm(k)))] || '#4B5563';
 const absBadge = (info) => (info ? `<span class="abs-type" style="background:${absColor(info.type)}">${esc(info.type)}</span>` : '');
+const ABS_SHORT = { 'conge annuel': 'CA', conge: 'CA', rtt: 'RTT', absence: 'ABS', arret: 'Arrêt', formation: 'For' };
+const absShort = (info) => (info ? `<span class="abs-type" style="background:${absColor(info.type)}" title="${esc(info.type)}">${esc(ABS_SHORT[norm(info.type)] || info.type)}</span>` : '');
 const norm = (t) => String(t ?? '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
 
 // Qui peut tenir ce poste (en dehors de certaines personnes), les plus habiles d'abord.
@@ -426,14 +429,14 @@ function candidates(posteId, exclude, day = ui.day) {
   return state.people
     .filter((p) => !exclude.has(p.id) && p.skills?.[posteId] && level(p.skills[posteId]) && level(p.skills[posteId]).replace !== false)
     .filter((p) => !shifts || working(day, p.id))
-    .sort((a, b) => rank(b.skills[posteId]) - rank(a.skills[posteId]) || byName(a, b));
+    .sort((a, b) => rank(b.skills[posteId]) - rank(a.skills[posteId]) || shiftRank(a, day) - shiftRank(b, day) || byName(a, b));
 }
 
 // ---------- Recherche d'une personne (sur chaque page) ----------
 
 function finderHtml() {
   if (!state.people.some((p) => !p.planOnly)) return '';
-  return `<div class="finder" role="search"><div class="search-wrap">${icons.search}<input class="search" id="finder" type="search" placeholder="Rechercher une personne (nom, prénom, VISA, poste)" autocomplete="off" aria-label="Rechercher une personne" aria-controls="finder-results"></div><div class="finder-results" id="finder-results" hidden></div></div>`;
+  return `<div class="finder" role="search"><div class="search-wrap">${icons.search}<input class="search" id="finder" type="search" placeholder="Rechercher une personne" autocomplete="off" aria-label="Rechercher une personne" aria-controls="finder-results"></div><div class="finder-results" id="finder-results" hidden></div></div>`;
 }
 
 function finderMatches(q) {
@@ -524,6 +527,14 @@ function teamsOf(people) {
   }
   return [...map.entries()].sort((a, b) => (a[0] === 'Sans équipe') - (b[0] === 'Sans équipe') || a[0].localeCompare(b[0], 'fr'));
 }
+// Ordre des quarts : matin, après-midi, nuit, journée ; puis sans quart ; les absents à la fin.
+const SHIFT_ORDER = ['Quart matin', 'Quart après-midi', 'Quart nuit', 'Quart de jour'];
+function shiftRank(p, day) {
+  if (absInfo(day, p.id)) return 9;
+  const i = SHIFT_ORDER.indexOf(shiftOf(day, p.id));
+  return i >= 0 ? i : working(day, p.id) ? 4 : 5;
+}
+
 // Le manageur (ou le chef) en haut, puis les chefs de ligne, puis les autres.
 function bossRank(p) {
   const r = norm(role(p.role)?.name);
@@ -556,10 +567,14 @@ function renderToday() {
   const absent = absentOn(day);
   const people = state.people.filter(shown);
   const tile = (p) =>
-    `<button class="pick" data-absent="${p.id}" aria-pressed="${absent.has(p.id)}">${avHtml(p)}<span>${esc(p.name)}</span>${p.post ? `<small class="pick-post">${esc(p.post)}</small>` : ''}${absBadge(absInfo(day, p.id)) || (shiftOf(day, p.id) ? `<span class="abs-type" style="background:var(--ok)">${esc(shortShift(shiftOf(day, p.id)))}</span>` : '')}${isDpp(p, day) ? '<span class="abs-type" style="background:#7C3AED" title="Bâtiment AI">DPP</span>' : ''}</button>`;
+    `<button class="pick" data-absent="${p.id}" aria-pressed="${absent.has(p.id)}">${avHtml(p)}<span>${esc(p.name)}</span>${p.post ? `<small class="pick-post">${esc(p.post)}</small>` : ''}${absShort(absInfo(day, p.id)) || (shiftOf(day, p.id) ? `<span class="abs-type" style="background:var(--ok)">${esc(shortShift(shiftOf(day, p.id)))}</span>` : '')}${isDpp(p, day) ? '<span class="abs-type" style="background:#7C3AED" title="Bâtiment AI">DPP</span>' : ''}</button>`;
   html += `<div class="section-title">Les équipes ce jour-là<small>${absent.size ? absent.size + ' absent' + (absent.size > 1 ? 's' : '') : ''}</small></div><div class="teams">`;
-  for (const [team, members] of teamsOf(people)) {
-    const sorted = members.slice().sort((a, b) => bossRank(a) - bossRank(b) || byName(a, b));
+  const teamOrder = (members) => {
+    const i = SHIFT_ORDER.indexOf(teamShift(members, day));
+    return i >= 0 ? i : 9;
+  };
+  for (const [team, members] of teamsOf(people).sort((a, b) => teamOrder(a[1]) - teamOrder(b[1]))) {
+    const sorted = members.slice().sort((a, b) => shiftRank(a, day) - shiftRank(b, day) || bossRank(a) - bossRank(b) || byName(a, b));
     const bosses = sorted.filter((p) => bossRank(p) === 0);
     const others = sorted.filter((p) => bossRank(p) !== 0);
     const nAbs = members.filter((p) => absent.has(p.id)).length;
@@ -578,7 +593,7 @@ function renderToday() {
   // Postes que plus personne de présent ne sait tenir.
   const uncovered = state.postes.filter((po) => state.people.some((p) => absent.has(p.id) && p.skills?.[po.id]) && !candidates(po.id, absent).length);
   html += `<div class="summary">${uncovered.length ? `<span class="badge red">${uncovered.length} poste${uncovered.length > 1 ? 's' : ''} sans remplaçant : ${esc(uncovered.map((p) => p.name).join(', '))}</span>` : '<span class="badge green">Tous les postes ont un remplaçant possible</span>'}</div>
-    <div class="section-title">Les absents et qui peut les remplacer dans leur équipe</div><div class="grid">`;
+    <div class="section-title">Les absents et qui peut les remplacer dans leur équipe</div><div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(min(100%,400px),1fr))">`;
   for (const id of absent) {
     const p = person(id);
     if (!p) continue;
@@ -640,7 +655,10 @@ function renderTeam() {
 
 function peopleCards() {
   const q = ui.query.trim().toLowerCase();
-  const all = state.people.filter((p) => (ui.roleFilter === 'all' || p.role === ui.roleFilter) && (!q || p.name.toLowerCase().includes(q))).sort(byName);
+  const today = iso(new Date());
+  const all = state.people
+    .filter((p) => (ui.roleFilter === 'all' || p.role === ui.roleFilter) && (!q || p.name.toLowerCase().includes(q)))
+    .sort((a, b) => shiftRank(a, today) - shiftRank(b, today) || byName(a, b));
   const list = all.filter((p) => !p.planOnly);
   const planOnly = all.filter((p) => p.planOnly && p.ambiguous);
   if (!all.length) return `<p class="hint">Personne ne correspond.</p>`;
@@ -653,7 +671,7 @@ function peopleCards() {
     .map((p) => {
       const skills = Object.keys(p.skills || {}).filter((k) => poste(k) && level(p.skills[k]));
       return `<button class="card" data-person="${p.id}">${avHtml(p)}<div class="grow"><div class="card-title">${esc(p.name)}</div>
-        <div class="card-meta">${esc(role(p.role)?.name || 'Sans rôle')}${p.team ? ' · ' + esc(p.team) : ''}${p.post ? ' · ' + esc(p.post) : ''} · ${skills.length} poste${skills.length > 1 ? 's' : ''}</div>
+        <div class="card-meta">${esc(role(p.role)?.name || 'Sans rôle')}${p.team ? ' · ' + esc(p.team) : ''}${p.post && norm(p.post) !== norm(role(p.role)?.name) ? ' · ' + esc(p.post) : ''} · ${skills.length} poste${skills.length > 1 ? 's' : ''}</div>
         ${skills.length ? `<div class="lvls-row">${skills.sort((a, b) => rank(p.skills[b]) - rank(p.skills[a]) || poste(a).name.localeCompare(poste(b).name, 'fr')).map((k) => `<span class="pchip">${lvlHtml(p.skills[k])}<span>${esc(poste(k).name)}</span></span>`).join('')}</div>` : ''}
       </div>${icons.chevron}</button>`;
     })
@@ -1135,7 +1153,7 @@ function echStatus(d) {
   const left = (parseIso(d) - parseIso(iso(new Date()))) / DAY;
   return left < 0 ? 'red' : left <= 60 ? 'orange' : 'green';
 }
-const fmtDate = (d) => parseIso(d).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+const fmtDate = (d) => parseIso(d).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' });
 function echDate(d) {
   if (!d) return '<span class="ech-date none">—</span>';
   const st = echStatus(d);
@@ -1185,7 +1203,7 @@ document.addEventListener('click', (e) => {
 
 const canLink = 'showOpenFilePicker' in window;
 // À changer quand la façon de lire les fichiers change : les fichiers raccordés sont alors relus.
-const READER_VERSION = '2026-11-15e';
+const READER_VERSION = '2026-11-15f';
 const handles = {};
 let linkNeedsTap = false;
 
