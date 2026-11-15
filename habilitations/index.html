@@ -119,6 +119,20 @@ button.card { text-align: left; width: 100%; padding: 14px; display: flex; gap: 
 .cand { text-align: left; display: inline-flex; align-items: center; gap: 6px; background: var(--bg); border-radius: 999px; padding: 3px 10px 3px 3px; font-weight: 700; font-size: 14px; border: 0; }
 .cand .lvl { width: 24px; height: 24px; border-radius: 999px; }
 .cand .lvl svg { width: 15px; height: 15px; }
+/* « Qui peut remplacer » dans la fiche d'une personne. */
+.rp-block { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 12px; }
+.rp-block + .rp-block { margin-top: 10px; }
+.rp-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.rp-head b { font-size: 16px; }
+.rp-head small { margin-left: auto; color: var(--ink-2); font-weight: 600; font-size: 13px; display: inline-flex; align-items: center; gap: 6px; }
+.rp-head small .lvl-tag { font-size: 13px; padding: 2px 8px 2px 2px; }
+.rp-group + .rp-group { margin-top: 10px; }
+.rp-title { display: block; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; color: var(--ink-3); margin-bottom: 6px; }
+.rp-title.same { color: var(--accent); }
+.rp-none { color: var(--ink-2); font-size: 14px; }
+.cand small { color: var(--ink-2); font-size: 12px; font-weight: 700; }
+.cand.same { background: var(--accent-soft); box-shadow: inset 0 0 0 1.5px var(--accent); color: #123E9C; }
+.legend-same { display: inline-block; width: 12px; height: 12px; border-radius: 4px; background: var(--accent-soft); box-shadow: inset 0 0 0 1.5px var(--accent); vertical-align: -1px; }
 .nobody { color: var(--danger); font-weight: 800; font-size: 14px; padding-top: 6px; }
 
 /* Fiche (feuille qui monte du bas, panneau centré sur ordinateur). */
@@ -931,13 +945,38 @@ function openPerson(id) {
   const known = state.postes.filter((po) => p.skills[po.id] && level(p.skills[po.id]));
   const others = state.postes.filter((po) => !known.includes(po));
   let replaceHtml = '';
-  if (known.length) {
-    replaceHtml = `<span class="label">Qui peut remplacer ${esc(p.name)} ?</span><div class="card" style="padding:12px"><div class="replace" style="margin:0;border:0;padding:0">${known
-      .map((po) => {
-        const c = candidates(po.id, absent, iso(new Date()));
-        return `<div class="replace-row"><div class="replace-poste">${lvlHtml(p.skills[po.id])}<span style="padding-top:3px">${esc(po.name)}</span></div>${c.length ? `<div class="cands">${c.slice(0, 6).map((x) => `<button class="cand" data-go-person="${x.id}">${lvlHtml(x.skills[po.id])}${esc(x.name)}</button>`).join('')}</div>` : '<div class="nobody">Personne</div>'}</div>`;
-      })
-      .join('')}</div></div><p class="hint">Sans compter les absents du jour.</p>`;
+  const today = iso(new Date());
+  const dpp = isDpp(p, today);
+  // Une puce de remplaçant : niveau, nom, quart ; mise en avant si même équipe.
+  const chip = (x, lv) =>
+    `<button class="cand${p.team && x.team === p.team ? ' same' : ''}" data-go-person="${x.id}">${lvlHtml(lv)}<span>${esc(x.name)}</span>${shiftOf(today, x.id) ? `<small>${esc(shortShift(shiftOf(today, x.id)))}</small>` : ''}${p.team && x.team !== p.team && x.team ? `<small>${esc(x.team)}</small>` : ''}</button>`;
+  // Deux groupes : son équipe d'abord (mise en avant), puis les autres équipes.
+  const groups = (list, lvOf) => {
+    if (!list.length) return `<div class="nobody">${dpp ? 'Personne d’habilité au DPP de disponible' : 'Personne de disponible'}</div>`;
+    const mine = p.team ? list.filter((x) => x.team === p.team) : list;
+    const others = p.team ? list.filter((x) => x.team !== p.team) : [];
+    let h = '';
+    if (p.team) h += `<div class="rp-group"><span class="rp-title same">Dans son équipe · ${esc(p.team)}</span>${mine.length ? `<div class="cands">${mine.map((x) => chip(x, lvOf(x))).join('')}</div>` : '<span class="rp-none">Personne dans son équipe</span>'}</div>`;
+    if (others.length || !p.team)
+      h += `<div class="rp-group">${p.team ? '<span class="rp-title">Autres équipes</span>' : ''}<div class="cands">${(p.team ? others : mine).slice(0, 5).map((x) => chip(x, lvOf(x))).join('')}${(p.team ? others : mine).length > 5 ? `<span class="badge grey">+${(p.team ? others : mine).length - 5}</span>` : ''}</div></div>`;
+    return h;
+  };
+  if (known.length || dpp) {
+    const blocks = [];
+    if (dpp) {
+      const pool = state.people
+        .filter((x) => shown(x) && !x.planOnly && !absent.has(x.id) && dppLevel(x) && (!dayHasShifts(today) || working(today, x.id)))
+        .sort((a, b) => rank(dppLevel(b)) - rank(dppLevel(a)) || shiftRank(a, today) - shiftRank(b, today) || byName(a, b));
+      blocks.push(`<div class="rp-block"><div class="rp-head"><span class="abs-type" style="background:#7C3AED">DPP</span><b>Bâtiment AI</b><small>seulement les habilités au DPP</small></div>${groups(pool, dppLevel)}</div>`);
+    }
+    for (const po of known) {
+      const c = candidates(po.id, absent, today).filter((x) => !dpp || dppLevel(x));
+      blocks.push(`<div class="rp-block"><div class="rp-head"><b>${esc(po.name)}</b><small>${esc(p.name.split(' ')[0])} : ${levelTag(p.skills[po.id])}</small></div>${groups(c, (x) => x.skills[po.id])}</div>`);
+    }
+    replaceHtml = `<span class="label">Qui peut remplacer ${esc(p.name)} ?</span>
+      ${p.team ? `<p class="hint" style="margin:-4px 0 10px"><span class="legend-same"></span> En bleu : les personnes de son équipe (${esc(p.team)}).</p>` : ''}
+      ${blocks.join('')}
+      <p class="hint">Sans compter les absents du jour${dayHasShifts(today) ? ', et seulement ceux qui travaillent aujourd’hui' : ''}.</p>`;
   }
   const back = showSheet(`<div class="sheet-head">${avHtml(p, 'big')}<div style="min-width:0"><h2>${esc(p.name)}</h2><p>${esc(role(p.role)?.name || 'Sans rôle')}${p.team ? ' · ' + esc(p.team) : ''} · ${known.length} poste${known.length > 1 ? 's' : ''}</p><p style="margin-top:6px">Aujourd’hui : ${presenceBadge(iso(new Date()), p)}</p></div>${closeBtn}</div>
     ${p.post ? `<p class="hint">Poste habituel : <b>${esc(p.post)}</b></p>` : ''}
