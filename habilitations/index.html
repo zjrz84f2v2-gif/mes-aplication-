@@ -604,6 +604,7 @@ function renderPostes() {
 // Réglages : rôles et niveaux modifiables (pour ajouter ce qui manque), et sauvegarde.
 function renderSettings() {
   return `<h1 class="page">Réglages</h1><p class="sub">L’appli est en lecture seule : tout se change dans les fichiers Excel, pour éviter les erreurs.</p>
+    <p class="hint">Version de l’appli : ${READER_VERSION}</p>
     <div class="section-title">Fichiers Excel raccordés</div>
     ${linksHtml()}
     ${wordsHtml()}
@@ -1102,6 +1103,8 @@ document.addEventListener('click', (e) => {
 // dès qu'il est enregistré. Ailleurs (iPhone), on choisit le fichier à chaque mise à jour.
 
 const canLink = 'showOpenFilePicker' in window;
+// À changer quand la façon de lire les fichiers change : les fichiers raccordés sont alors relus.
+const READER_VERSION = '2026-11-15c';
 const handles = {};
 let linkNeedsTap = false;
 
@@ -1144,8 +1147,13 @@ function linksHtml() {
 function linkBanner() {
   const unknown = (state.levelWords || []).filter((w) => !(state.levelMap?.[norm(w.text)] || w.lv)).length;
   if (unknown) return `<div class="banner" style="background:var(--danger-soft);color:var(--danger)">${unknown} façon${unknown > 1 ? 's' : ''} d’écrire un niveau à expliquer à l’appli.<button class="btn" data-tab-go="reglages">Choisir</button></div>`;
-  if (!linkNeedsTap) return '';
-  return `<div class="banner">Tes fichiers Excel ont peut-être changé.<button class="btn" data-action="refresh-links">Mettre à jour</button></div>`;
+  const kinds = Object.keys(state.links || {});
+  if (!kinds.length) return '';
+  const last = Math.max(...kinds.map((k) => state.links[k].at || 0));
+  const when = last ? new Date(last).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
+  const old = kinds.some((k) => state.links[k].reader !== READER_VERSION);
+  if (linkNeedsTap || old) return `<div class="banner">${old ? 'L’appli a été améliorée : relis tes fichiers Excel.' : 'Tes fichiers Excel ont peut-être changé.'}<button class="btn" data-action="refresh-links">Actualiser</button></div>`;
+  return `<div class="banner" style="background:var(--card);color:var(--ink-2);border:1px solid var(--line)">Fichiers lus le ${when}.<button class="btn ghost" data-action="refresh-links">${canLink ? 'Actualiser' : 'Comment actualiser ?'}</button></div>`;
 }
 
 async function linkFile(kind) {
@@ -1177,7 +1185,14 @@ async function unlinkFile(kind) {
 
 // Relit les fichiers raccordés s'ils ont changé depuis la dernière lecture.
 async function refreshLinks(fromTap) {
-  if (!canLink) return;
+  if (!canLink) {
+    if (fromTap) {
+      ui.tab = 'reglages';
+      render();
+      toast('Sur téléphone, choisis à nouveau tes fichiers Excel ici pour les relire.');
+    }
+    return;
+  }
   let needTap = false;
   for (const kind of ['hab', 'plan']) {
     if (!state.links[kind]) continue;
@@ -1192,11 +1207,12 @@ async function refreshLinks(fromTap) {
         continue;
       }
       const f = await h.getFile();
-      if (fromTap || f.lastModified !== state.links[kind].modified) await importExcel(f, kind, fromTap);
+      if (fromTap || f.lastModified !== state.links[kind].modified || state.links[kind].reader !== READER_VERSION) await importExcel(f, kind, fromTap);
     } catch (e) {
       if (fromTap) toast(`Impossible de relire « ${state.links[kind].name} ». Raccorde-le à nouveau dans Réglages.`);
     }
   }
+  if (fromTap && !needTap) toast('Fichiers relus.');
   if (needTap !== linkNeedsTap) {
     linkNeedsTap = needTap;
     if (!document.querySelector('.sheet-back')) render();
@@ -1236,7 +1252,7 @@ async function importExcel(file, kind, verbose) {
   lastFiles[kind] = file;
   const report = kind === 'plan' ? importPlanning(wb) : importHabilitations(wb);
   if (!report) return toast(kind === 'plan' ? 'Je ne trouve pas les colonnes Nom, Prénom, Type, Du, Au dans ce fichier.' : 'Je ne trouve pas les colonnes Nom et Prénom dans ce fichier.');
-  state.links[kind] = { name: file.name, at: Date.now(), modified: file.lastModified };
+  state.links[kind] = { name: file.name, at: Date.now(), modified: file.lastModified, reader: READER_VERSION };
   save();
   render();
   if (verbose) toast(report);
