@@ -462,9 +462,21 @@ function candidates(posteId, exclude, day = ui.day) {
 
 // ---------- Recherche d'une personne (sur chaque page) ----------
 
+// Postes : on filtre les postes. Échéances : on montre celles d'une personne. Ailleurs : on cherche une personne.
+const FINDER_MODE = { postes: ['posteQuery', 'Rechercher un poste'], echeances: ['echQuery', 'Échéances d’une personne (nom, prénom…)'] };
 function finderHtml() {
   if (!state.people.some((p) => !p.planOnly)) return '';
-  return `<div class="finder" role="search"><div class="search-wrap">${icons.search}<input class="search" id="finder" type="search" placeholder="Rechercher une personne" autocomplete="off" aria-label="Rechercher une personne" aria-controls="finder-results"></div><div class="finder-results" id="finder-results" hidden></div></div>`;
+  const mode = FINDER_MODE[ui.tab];
+  const label = mode ? mode[1] : 'Rechercher une personne';
+  return `<div class="finder" role="search"><div class="search-wrap">${icons.search}<input class="search" id="finder" type="search" placeholder="${label}" value="${esc(mode ? ui[mode[0]] || '' : '')}" autocomplete="off" aria-label="${label}"${mode ? ' aria-controls="page"' : ' aria-controls="finder-results"'}></div><div class="finder-results" id="finder-results" hidden></div></div>`;
+}
+
+// Redessine la page sous la barre de recherche, sans toucher au champ (le clavier reste ouvert).
+function renderPage() {
+  const page = document.getElementById('page');
+  if (!page) return render();
+  page.innerHTML = SCREENS[ui.tab]();
+  bind();
 }
 
 function finderMatches(q) {
@@ -505,10 +517,24 @@ function showFinder(input) {
 }
 
 document.addEventListener('input', (e) => {
-  if (e.target.id === 'finder') showFinder(e.target);
+  if (e.target.id !== 'finder') return;
+  const mode = FINDER_MODE[ui.tab];
+  if (mode) {
+    ui[mode[0]] = e.target.value;
+    return renderPage();
+  }
+  showFinder(e.target);
 });
 document.addEventListener('keydown', (e) => {
   if (e.target.id !== 'finder') return;
+  if (FINDER_MODE[ui.tab]) {
+    if (e.key === 'Escape') {
+      e.target.value = '';
+      ui[FINDER_MODE[ui.tab][0]] = '';
+      renderPage();
+    }
+    return;
+  }
   if (e.key === 'Escape') {
     e.target.value = '';
     showFinder(e.target);
@@ -529,10 +555,17 @@ document.addEventListener('click', (e) => {
 
 const app = document.getElementById('app');
 
+const SCREENS = {
+  jour: () => renderToday(),
+  equipe: () => renderTeam(),
+  postes: () => renderPostes(),
+  echeances: () => renderEcheances(),
+  reglages: () => renderSettings(),
+};
+
 function render() {
   document.querySelectorAll('.tabs button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === ui.tab)));
-  const screens = { jour: renderToday, equipe: renderTeam, postes: renderPostes, echeances: renderEcheances, reglages: renderSettings };
-  app.innerHTML = finderHtml() + screens[ui.tab]();
+  app.innerHTML = finderHtml() + `<div id="page">${SCREENS[ui.tab]()}</div>`;
   bind();
 }
 
@@ -704,7 +737,10 @@ function renderPostes() {
 `;
   if (!state.postes.length) return html + `<div style="margin-top:14px">${firstSteps()}</div>`;
   const absent = absentOn(iso(new Date()));
-  html += `<div class="grid" style="margin-top:14px">${state.postes
+  const words = norm(ui.posteQuery).split(' ').filter(Boolean);
+  const list = state.postes.filter((po) => words.every((w) => norm(po.name).includes(w)));
+  if (words.length) html += `<p class="hint">${list.length ? `${list.length} poste${list.length > 1 ? 's' : ''} pour « ${esc(ui.posteQuery.trim())} »` : `Aucun poste ne s’appelle « ${esc(ui.posteQuery.trim())} ».`}</p>`;
+  html += `<div class="grid" style="margin-top:14px">${list
     .map((po) => {
       const who = state.people.filter((p) => p.skills?.[po.id] && level(p.skills[po.id])).sort((a, b) => rank(b.skills[po.id]) - rank(a.skills[po.id]));
       const counts = state.levels.map((lv) => [lv, who.filter((p) => p.skills[po.id] === lv.id).length]).filter(([, n]) => n);
@@ -1226,10 +1262,30 @@ function echDate(d) {
   return `<span class="ech-date ${st}">${label}</span>`;
 }
 
+// Toutes les échéances des personnes qui correspondent à la recherche, de la plus urgente à la plus lointaine.
+function echeancesOf(q) {
+  const people = finderMatches(q);
+  if (!people.length) return `<p class="hint" style="margin-top:14px">Personne ne s’appelle « ${esc(q.trim())} ».</p>`;
+  return people
+    .map((p) => {
+      const rows = state.echeances.map((ec) => ({ ec, d: p.dates?.[ec.id] || '' })).sort((a, b) => (a.d || '9999').localeCompare(b.d || '9999'));
+      const withDate = rows.filter((x) => x.d);
+      const red = withDate.filter((x) => echStatus(x.d) === 'red').length;
+      const orange = withDate.filter((x) => echStatus(x.d) === 'orange').length;
+      return `<section class="card" style="padding:14px;margin-top:14px">
+        <button class="absent-head" data-person="${p.id}" style="background:none;border:0;padding:0;width:100%;text-align:left">${avHtml(p)}<span class="grow"><span class="card-title" style="display:block">${esc(p.name)}</span><span class="card-meta">${esc([role(p.role)?.name, p.team].filter(Boolean).join(' · '))}</span></span>${icons.chevron}</button>
+        <div class="lvls-row" style="margin:10px 0">${red ? `<span class="badge red">${red} expirée${red > 1 ? 's' : ''}</span>` : ''}${orange ? `<span class="badge" style="background:#FDF0DC;color:var(--warn)">${orange} bientôt</span>` : ''}${!red && !orange && withDate.length ? '<span class="badge green">Tout est à jour</span>' : ''}${!withDate.length ? '<span class="badge grey">Aucune échéance dans le fichier</span>' : ''}</div>
+        ${rows.map((x) => `<div class="ech-edit"><span class="grow">${esc(x.ec.name)}${x.ec.every ? `<small style="display:block;color:var(--ink-3);font-weight:600;font-size:13px">${esc(x.ec.every)}</small>` : ''}</span>${echDate(x.d)}</div>`).join('')}
+      </section>`;
+    })
+    .join('');
+}
+
 function renderEcheances() {
   let html = `<h1 class="page">Échéances</h1><p class="sub">Les habilitations à date : rouge = expirée, orange = à renouveler dans les 60 jours.</p>`;
   if (!state.echeances.length)
     return html + `<div class="empty" style="margin-top:18px"><b>Pas encore d’échéances</b>Raccorde ton fichier Excel d’habilitations dans « Réglages » : les dates (microbio, ZEC, BPF, CACES…) arrivent ici.<br><button class="btn" data-tab-go="reglages">Raccorder mon fichier</button></div>`;
+  if (norm(ui.echQuery)) return html + echeancesOf(ui.echQuery);
   const all = [];
   state.people.forEach((p) => state.echeances.forEach((ec) => p.dates?.[ec.id] && all.push({ p, ec, d: p.dates[ec.id], st: echStatus(p.dates[ec.id]) })));
   all.sort((a, b) => a.d.localeCompare(b.d));
@@ -1267,7 +1323,7 @@ document.addEventListener('click', (e) => {
 
 const canLink = 'showOpenFilePicker' in window;
 // À changer quand la façon de lire les fichiers change : les fichiers raccordés sont alors relus.
-const READER_VERSION = '2026-11-15j';
+const READER_VERSION = '2026-11-15k';
 const handles = {};
 let linkNeedsTap = false;
 
