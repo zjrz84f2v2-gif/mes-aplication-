@@ -128,6 +128,35 @@ input, textarea { caret-color: var(--accent); }
 .day-add { align-self: stretch; min-height: 44px; border: 0; background: none; text-align: left; color: var(--ink-3); font-size: 15px; padding: 0 0 0 40px; border-radius: 10px; }
 .day-list .ev + .day-add { min-height: 36px; }
 
+/* Onglet Travail : un emploi du temps par personne, en couleurs. */
+.legend { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 10px; }
+.tag { display: inline-flex; align-items: center; min-height: 26px; padding: 0 10px; border-radius: 999px; font-size: 13px; font-weight: 800; background: var(--c); color: var(--i); }
+.work-sum { margin: 0 0 10px; display: flex; flex-direction: column; gap: 2px; }
+.work-sum p { margin: 0; font-size: 14px; color: var(--ink-2); }
+.work-sum b { color: var(--ink); }
+.work { background: var(--card); border-radius: var(--radius); box-shadow: 0 10px 30px -22px rgba(30, 28, 24, .4); overflow: clip; }
+.work-row { display: grid; grid-template-columns: 62px repeat(var(--cols), minmax(0, 1fr)); gap: 6px; padding: 4px 8px 4px 0; align-items: center; border-top: 1px solid var(--line); }
+.work-row.wk { border-top: 2px solid rgba(30, 28, 24, .2); }
+.work-names { position: sticky; top: 0; z-index: 2; background: var(--card); border-top: 0; padding-top: 10px; padding-bottom: 8px; box-shadow: 0 1px 0 var(--line); }
+.work-names span { display: flex; align-items: center; justify-content: center; gap: 6px; min-width: 0; font-weight: 800; font-size: 15px; }
+.work-names span em { font-style: normal; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.work-names i { width: 10px; height: 10px; border-radius: 50%; flex: 0 0 auto; }
+.wday { padding-left: 12px; display: flex; align-items: baseline; gap: 5px; }
+.wday b { font: 800 19px/1 var(--display); font-variant-numeric: tabular-nums; min-width: 1.3em; }
+.wday span { font-size: 12px; font-weight: 700; color: var(--ink-2); text-transform: capitalize; }
+.work-row.weekend .wday span { color: var(--accent); }
+.work-row.is-today { background: rgba(255, 224, 102, .28); }
+.work-row.is-today .wday b { background: linear-gradient(transparent 45%, var(--highlight) 45%, var(--highlight) 95%, transparent 95%); }
+.work-row.is-past .wday b { color: var(--ink-3); }
+.work-row.is-past .wcell { opacity: .55; }
+.wcell { min-height: 40px; min-width: 0; border-radius: 10px; border: 0; padding: 0 4px; background: var(--c); color: var(--i); font-weight: 800; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wcell.empty { background: transparent; border: 1.5px dashed rgba(30, 28, 24, .14); color: var(--ink-3); font-weight: 600; font-size: 18px; }
+.today-work { display: flex; flex-wrap: wrap; gap: 6px; margin: 2px 0 8px; }
+.codes { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.code-btn { min-height: 58px; border-radius: 14px; border: 0; background: var(--c); color: var(--i); font-weight: 800; font-size: 17px; }
+.code-btn[aria-pressed="true"] { box-shadow: 0 0 0 3px var(--paper), 0 0 0 6px var(--ink); }
+.who-pick { display: flex; gap: 8px; flex-wrap: wrap; }
+
 /* Gros bouton du bas. */
 .footer { position: fixed; left: 0; right: 0; bottom: 0; padding: 12px max(18px, env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom)) max(18px, env(safe-area-inset-left)); background: linear-gradient(rgba(236, 238, 244, 0), var(--paper) 30%); z-index: 5; }
 .footer .btn { max-width: 604px; margin: 0 auto; display: flex; }
@@ -183,8 +212,8 @@ textarea.field { min-height: 90px; resize: vertical; font-size: 17px; }
 .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(96px + env(safe-area-inset-bottom)); background: var(--ink); color: var(--paper); padding: 12px 18px; font-weight: 700; z-index: 30; max-width: calc(100% - 32px); text-align: center; border-radius: 999px; box-shadow: 0 10px 30px -10px rgba(0, 0, 0, .5); }
 
 /* Retour visuel immédiat quand on touche. */
-.btn, .chip, .nav, .check, .ev-body, .day-add, .icon-btn, .close, .small-btn { transition: transform .14s cubic-bezier(.2, .8, .2, 1), opacity .12s ease-out, background-color .14s ease-out; }
-.btn:active, .chip:active, .nav:active, .check:active, .icon-btn:active, .small-btn:active { transform: scale(.96); }
+.btn, .chip, .nav, .check, .ev-body, .day-add, .icon-btn, .close, .small-btn, .wcell, .code-btn { transition: transform .14s cubic-bezier(.2, .8, .2, 1), opacity .12s ease-out, background-color .14s ease-out; }
+.btn:active, .chip:active, .nav:active, .check:active, .icon-btn:active, .small-btn:active, .wcell:active, .code-btn:active { transform: scale(.96); }
 .ev-body:active, .day-add:active, .close:active { opacity: .55; }
 /* L'arrivée de la feuille : elle monte vite puis freine. */
 .sheet { animation: rise .32s cubic-bezier(.16, 1, .3, 1); }
@@ -299,6 +328,20 @@ function firebaseBackend() {
       ),
     saveEvent: (p, ev) => fs.setDoc(fs.doc(db, 'plannings', p, 'events', ev.id), ev, { merge: true }),
     removeEvent: (p, id) => fs.deleteDoc(fs.doc(db, 'plannings', p, 'events', id)),
+    // Emploi du temps travail : un document par personne et par jour (plannings/{p}/work/{membre}_{date}).
+    watchWork: (p, since, cb, err) =>
+      fs.onSnapshot(
+        fs.query(fs.collection(db, 'plannings', p, 'work'), fs.where('date', '>=', since)),
+        { includeMetadataChanges: true },
+        (qs) => cb(qs.docs.map((d) => ({ ...d.data(), id: d.id })), qs.metadata),
+        err,
+      ),
+    saveWork(p, list, removeIds) {
+      const b = fs.writeBatch(db);
+      list.forEach((w) => b.set(fs.doc(db, 'plannings', p, 'work', w.id), w));
+      (removeIds || []).forEach((id) => b.delete(fs.doc(db, 'plannings', p, 'work', id)));
+      return b.commit();
+    },
   };
 }
 
@@ -348,6 +391,19 @@ function demoBackend() {
       delete d[p].events[id];
       write(d);
     },
+    watchWork(p, since, cb) {
+      const f = () => cb(Object.values(read()[p]?.work || {}).filter((w) => w.date >= since), meta);
+      listeners.add(f);
+      setTimeout(f);
+      return () => listeners.delete(f);
+    },
+    async saveWork(p, list, removeIds) {
+      const d = read();
+      d[p].work = d[p].work || {};
+      list.forEach((w) => (d[p].work[w.id] = w));
+      (removeIds || []).forEach((id) => delete d[p].work[id]);
+      write(d);
+    },
   };
 }
 
@@ -391,8 +447,34 @@ function dayLabel(s) {
 
 let plan = null; // { name, members: { id: { name, color } } }
 let events = [];
+let work = []; // { id: membre_date, member, date, code, by, updatedAt }
+
+// Les couleurs du travail : vert le matin, orange l'après-midi, violet la nuit.
+const WORK = {
+  M: { one: 'matin', pl: 'matins', label: 'Matin', short: 'Matin', c: '#2E7D4F', i: '#fff' },
+  AM: { one: 'aprèm', pl: 'aprèm', label: 'Après-midi', short: 'Aprèm', c: '#C2570C', i: '#fff' },
+  N: { one: 'nuit', pl: 'nuits', label: 'Nuit', short: 'Nuit', c: '#6B3FBF', i: '#fff' },
+  J: { one: 'journée', pl: 'journées', label: 'Journée', short: 'Journée', c: '#1F6F8B', i: '#fff' },
+  ECOLE: { one: 'jour d’école', pl: 'jours d’école', label: 'École', short: 'École', c: '#2F5BD3', i: '#fff' },
+  RTT: { one: 'RTT', pl: 'RTT', label: 'RTT', short: 'RTT', c: '#FFE066', i: '#1E1C18' },
+  CP: { one: 'congé payé', pl: 'congés payés', label: 'Congé payé', short: 'CP', c: '#CDEFF1', i: '#0E5560' },
+  MAL: { one: 'jour de maladie', pl: 'jours de maladie', label: 'Arrêt maladie', short: 'Maladie', c: '#B23A26', i: '#fff' },
+};
+const workId = (m, day) => `${m}_${day}`;
+const workOn = (m, day) => work.find((w) => w.member === m && w.date === day);
+const tagHtml = (code, text) => (WORK[code] ? `<span class="tag" style="--c:${WORK[code].c};--i:${WORK[code].i}">${esc(text ?? WORK[code].label)}</span>` : '');
+// Moi d'abord, puis les autres.
+const memberIds = () => Object.keys(plan?.members || {}).sort((a, b) => (b === local.memberId) - (a === local.memberId));
+
+function workLine(day) {
+  const tags = memberIds()
+    .map((m) => [m, workOn(m, day)])
+    .filter(([, w]) => w && WORK[w.code])
+    .map(([m, w]) => tagHtml(w.code, `${member(m).name} · ${WORK[w.code].short}`));
+  return tags.length ? `<div class="today-work" aria-label="Travail">${tags.join('')}</div>` : '';
+}
 let synced = true;
-let ui = { weekStart: startOfWeek(new Date()), month: firstOfMonth(new Date()), selected: iso(new Date()), view: local.view === 'month' ? 'month' : 'week', screen: 'loading', error: '' };
+let ui = { weekStart: startOfWeek(new Date()), month: firstOfMonth(new Date()), selected: iso(new Date()), view: ['week', 'month', 'work'].includes(local.view) ? local.view : 'week', screen: 'loading', error: '' };
 const app = document.getElementById('app');
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -430,7 +512,9 @@ function render() {
   if (ui.screen === 'main') {
     const f = document.createElement('div');
     f.className = 'footer';
-    f.innerHTML = `<button class="btn" data-add="${todayIso()}">${icons.plus} Ajouter</button>`;
+    f.innerHTML = ui.view === 'work'
+      ? `<button class="btn" data-work="${esc(local.memberId)}|${todayIso()}">${icons.plus} Ajouter mon travail</button>`
+      : `<button class="btn" data-add="${todayIso()}">${icons.plus} Ajouter</button>`;
     document.body.appendChild(f);
   }
   bind();
@@ -534,15 +618,17 @@ function renderMain() {
   html += `<section class="today" aria-label="Aujourd’hui">
       <h2 class="today-date"><mark>${esc(capital(fmt(today, { weekday: 'long' })))}</mark> ${esc(fmt(today, { day: 'numeric', month: 'long' }))}</h2>
       <p class="today-sub">${todays.length ? (left ? `${left} chose${left > 1 ? 's' : ''} à faire aujourd’hui` : 'Tout est fait pour aujourd’hui, bravo !') : 'Rien de prévu aujourd’hui.'}</p>
+      ${workLine(t)}
       ${todays.map(evHtml).join('')}
-      <div class="tomorrow"><h3>Demain</h3>${eventsOn(tomorrow).map(evHtml).join('') || '<p class="nothing">Rien de prévu pour l’instant.</p>'}</div>
+      <div class="tomorrow"><h3>Demain</h3>${workLine(tomorrow)}${eventsOn(tomorrow).map(evHtml).join('') || '<p class="nothing">Rien de prévu pour l’instant.</p>'}</div>
     </section>`;
 
   html += `<div class="switch" role="group" aria-label="Affichage">
       <button data-view="week" aria-pressed="${ui.view === 'week'}">Semaine</button>
       <button data-view="month" aria-pressed="${ui.view === 'month'}">Mois</button>
+      <button data-view="work" aria-pressed="${ui.view === 'work'}">Travail</button>
     </div>`;
-  return html + (ui.view === 'month' ? monthHtml(today) : weekHtml(today));
+  return html + (ui.view === 'work' ? workHtml(today) : ui.view === 'month' ? monthHtml(today) : weekHtml(today));
 }
 
 function weekHtml(today) {
@@ -607,6 +693,60 @@ function monthHtml(today) {
       ${list.map(evHtml).join('') || '<p class="nothing">Rien de prévu ce jour-là.</p>'}
       <button class="day-add" data-add="${sel}">+ Ajouter ce jour-là</button>
     </section>`;
+  return html;
+}
+
+// L'emploi du temps travail du mois : une colonne par personne.
+function workHtml(today) {
+  const t = iso(today);
+  const m0 = ui.month;
+  const isThisMonth = iso(m0) === iso(firstOfMonth(today));
+  const ids = memberIds();
+  const last = new Date(m0.getFullYear(), m0.getMonth() + 1, 0).getDate();
+  let html = `<div class="week-head">
+      <h2>${esc(capital(fmt(m0, { month: 'long', year: 'numeric' })))}</h2>
+      ${isThisMonth ? '' : '<button class="back-now" data-action="this-week">Aujourd’hui</button>'}
+      <button class="nav" data-month="-1" aria-label="Mois précédent">${icons.left}</button>
+      <button class="nav" data-month="1" aria-label="Mois suivant">${icons.right}</button>
+    </div>
+    <div class="legend">${['M', 'AM', 'N'].map((c) => tagHtml(c)).join('')}</div>`;
+  // Le compte du mois pour chacun.
+  const sums = ids
+    .map((m) => {
+      const n = {};
+      for (let d = 1; d <= last; d++) {
+        const w = workOn(m, iso(new Date(m0.getFullYear(), m0.getMonth(), d)));
+        if (w && WORK[w.code]) n[w.code] = (n[w.code] || 0) + 1;
+      }
+      const parts = Object.keys(WORK).filter((c) => n[c]).map((c) => `${n[c]} ${n[c] > 1 ? WORK[c].pl : WORK[c].one}`);
+      return parts.length ? `<p><b>${esc(member(m).name)}</b> : ${esc(parts.join(' · '))}</p>` : '';
+    })
+    .join('');
+  if (sums) html += `<div class="work-sum">${sums}</div>`;
+  html += `<div class="work" style="--cols:${ids.length}">
+      <div class="work-row work-names"><span></span>${ids.map((m) => `<span><i style="background:${esc(member(m).color)}"></i><em>${esc(member(m).name)}</em></span>`).join('')}</div>`;
+  for (let day = 1; day <= last; day++) {
+    const d = new Date(m0.getFullYear(), m0.getMonth(), day);
+    const ds = iso(d);
+    const wd = d.getDay();
+    const cls = `${wd === 1 && day > 1 ? ' wk' : ''}${wd === 0 || wd === 6 ? ' weekend' : ''}${ds === t ? ' is-today' : ''}${ds < t ? ' is-past' : ''}`;
+    const long = fmt(d, { weekday: 'long', day: 'numeric', month: 'long' });
+    html += `<div class="work-row${cls}">
+        <div class="wday"><b>${day}</b><span>${esc(fmt(d, { weekday: 'short' }).replace('.', ''))}</span></div>
+        ${ids
+          .map((m) => {
+            const w = workOn(m, ds);
+            const k = w && WORK[w.code];
+            const label = `${member(m).name}, ${long} : ${k ? k.label : 'rien'}. Modifier`;
+            return k
+              ? `<button class="wcell" style="--c:${k.c};--i:${k.i}" data-work="${esc(m)}|${ds}" aria-label="${esc(label)}">${esc(k.short)}</button>`
+              : `<button class="wcell empty" data-work="${esc(m)}|${ds}" aria-label="${esc(label)}">+</button>`;
+          })
+          .join('')}
+      </div>`;
+  }
+  html += `</div>
+    <p class="hint">Touche une case pour mettre ou changer le travail de ce jour-là. Chacun remplit sa colonne.</p>`;
   return html;
 }
 
@@ -686,6 +826,11 @@ document.addEventListener('click', (e) => {
   if (done) return toggleDone(done.dataset.done);
   const open = e.target.closest('[data-open]');
   if (open) return openDetail(open.dataset.open);
+  const wk = e.target.closest('[data-work]');
+  if (wk) {
+    const [m, day] = wk.dataset.work.split('|');
+    return openWork(m, day);
+  }
   const view = e.target.closest('[data-view]');
   if (view) {
     ui.view = local.view = view.dataset.view;
@@ -866,6 +1011,55 @@ function openDetail(id) {
   });
 }
 
+// Mettre, changer ou effacer le travail d'une personne, sur un jour ou plusieurs.
+function openWork(m, day) {
+  if (!plan?.members?.[m]) m = local.memberId;
+  const ids = memberIds();
+  const cur = workOn(m, day);
+  let who = m;
+  const back = showSheet(`<div class="sheet-head"><h3>Travail</h3>${closeBtn}</div>
+    <p class="detail-meta">${esc(capital(fmt(parseIso(day), { weekday: 'long', day: 'numeric', month: 'long' })))}</p>
+    ${ids.length > 1 ? `<span class="label">Pour qui ?</span><div class="who-pick">${ids.map((id) => `<button type="button" class="chip" data-who="${esc(id)}" aria-pressed="${id === who}">${esc(member(id).name)}</button>`).join('')}</div>` : ''}
+    <label class="label" for="work-end">Jusqu’au <span style="font-weight:500;color:var(--ink-2)">(plusieurs jours d’un coup)</span></label>
+    <input type="date" class="field" id="work-end" value="${day}" min="${day}" style="max-width:220px">
+    <span class="label">Touche ce que c’est</span>
+    <div class="codes">${Object.entries(WORK).map(([c, k]) => `<button type="button" class="code-btn" style="--c:${k.c};--i:${k.i}" data-code="${c}" aria-pressed="${cur?.code === c}">${esc(k.label)}</button>`).join('')}</div>
+    <div class="actions"><button class="btn danger" data-clear>Effacer (repos)</button></div>`);
+  const end = back.querySelector('#work-end');
+  const days = () => {
+    const out = [];
+    const last = end.value && end.value > day ? end.value : day;
+    for (let d = parseIso(day); iso(d) <= last && out.length < 120; d = addDays(d, 1)) out.push(iso(d));
+    return out;
+  };
+  const apply = (code) => {
+    const list = days();
+    const now = Date.now();
+    const docs = code ? list.map((ds) => ({ id: workId(who, ds), member: who, date: ds, code, by: local.memberId, updatedAt: now })) : [];
+    const removeIds = code ? [] : list.map((ds) => workId(who, ds));
+    const touched = new Set(list.map((ds) => workId(who, ds)));
+    work = work.filter((w) => !touched.has(w.id)).concat(docs);
+    backend.saveWork(local.planId, docs, removeIds).catch((err) => toast(explain(err)));
+    closeSheet();
+    render();
+    const n = list.length > 1 ? ` (${list.length} jours)` : '';
+    toast(code ? `${WORK[code].label}${n} : c’est noté !` : `Effacé${n}.`);
+  };
+  back.addEventListener('click', (e) => {
+    const w = e.target.closest('[data-who]');
+    if (w) {
+      who = w.dataset.who;
+      back.querySelectorAll('[data-who]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.who === who)));
+      const c = workOn(who, day)?.code;
+      back.querySelectorAll('[data-code]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.code === c)));
+      return;
+    }
+    const c = e.target.closest('[data-code]');
+    if (c) return apply(c.dataset.code);
+    if (e.target.closest('[data-clear]')) apply(null);
+  });
+}
+
 // ---------- Agenda (rappel du téléphone) ----------
 
 const icsDate = (s) => s.replace(/-/g, '');
@@ -987,6 +1181,17 @@ async function start() {
       (list, meta) => {
         events = list;
         synced = !meta.hasPendingWrites && !meta.fromCache;
+        if (ui.screen === 'main' && !document.querySelector('.sheet-back')) render();
+      },
+      (err) => toast(explain(err)),
+    ),
+  );
+  unsub.push(
+    backend.watchWork(
+      local.planId,
+      iso(addDays(new Date(), -120)),
+      (list) => {
+        work = list;
         if (ui.screen === 'main' && !document.querySelector('.sheet-back')) render();
       },
       (err) => toast(explain(err)),
