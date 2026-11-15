@@ -114,7 +114,8 @@ button.card { text-align: left; width: 100%; padding: 14px; display: flex; gap: 
 .mrow-text b, .mrow-text small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mrow-text b { font-size: 15px; }
 .mrow-text small { font-size: 12px; color: var(--ink-2); font-weight: 600; }
-.mrow-tags { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; max-width: 110px; }
+.mrow-tags { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; max-width: 46%; min-width: 0; }
+.mrow-tags .abs-type { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mrow.is-absent { background: var(--danger-soft); border-color: rgba(194, 50, 31, .35); }
 .mrow.is-absent b { color: var(--danger); }
 .pick-post { font-size: 12px; color: var(--ink-2); font-weight: 600; margin-top: -4px; }
@@ -428,7 +429,7 @@ function dppLevel(p) {
 // Est-ce que la personne est là ce jour-là ?
 function presence(day, p) {
   const a = absInfo(day, p.id);
-  if (a) return { here: false, text: 'Absent · ' + a.type, color: absColor(a.type) };
+  if (a) return { here: false, text: 'Absent · ' + absText(a), color: absColor(a.type) };
   const sh = shiftOf(day, p.id);
   if (sh) return { here: true, text: 'Là · ' + sh + (isDpp(p, day) ? ' · DPP (bât. AI)' : ''), color: 'var(--ok)' };
   if (state.locs?.[day]?.[p.id] === 'DPP') return { here: true, text: 'Là · DPP (bât. AI)', color: 'var(--ok)' };
@@ -444,7 +445,9 @@ const ABS_COLORS = { conge: '#3F8F1F', 'conge annuel': '#3F8F1F', rtt: '#7C3AED'
 const absColor = (type) => ABS_COLORS[norm(type).replace(/s$/, '')] || ABS_COLORS[Object.keys(ABS_COLORS).find((k) => norm(type).startsWith(norm(k)))] || '#4B5563';
 const absBadge = (info) => (info ? `<span class="abs-type" style="background:${absColor(info.type)}">${esc(info.type)}</span>` : '');
 const ABS_SHORT = { 'conge annuel': 'CA', conge: 'CA', rtt: 'RTT', absence: 'ABS', arret: 'Arrêt', formation: 'For' };
-const absShort = (info) => (info ? `<span class="abs-type" style="background:${absColor(info.type)}" title="${esc(info.type)}">${esc(ABS_SHORT[norm(info.type)] || info.type)}</span>` : '');
+const absShort = (info) => (info ? `<span class="abs-type" style="background:${absColor(info.type)}" title="${esc(absText(info))}">${esc(info.raw || ABS_SHORT[norm(info.type)] || info.type)}</span>` : '');
+// « RTT », « CA (Congé annuel) », « Visite médicale »… : le texte de l'Excel d'abord.
+const absText = (info) => (info.raw && norm(info.raw) !== norm(info.type) ? `${info.raw} (${info.type})` : info.raw || info.type);
 const norm = (t) => String(t ?? '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
 
 // Qui peut tenir ce poste (en dehors de certaines personnes), les plus habiles d'abord.
@@ -635,7 +638,7 @@ function renderToday() {
           : '<div class="nobody">Personne d’habilité au DPP de disponible</div>'
       }</div>`;
     }
-    html += `<div class="card absent-card"><div class="absent-head">${avHtml(p, 'absent')}<div class="grow"><div class="card-title">${esc(p.name)}</div><div class="card-meta">${esc(p.post || role(p.role)?.name || '')} · ${absInfo(day, p.id) ? esc(absInfo(day, p.id).type) + (absInfo(day, p.id).note ? ' (' + esc(absInfo(day, p.id).note) + ')' : '') : 'absent'}</div></div></div>
+    html += `<div class="card absent-card"><div class="absent-head">${avHtml(p, 'absent')}<div class="grow"><div class="card-title">${esc(p.name)}</div><div class="card-meta">${esc(p.post || role(p.role)?.name || '')} · ${absInfo(day, p.id) ? esc(absText(absInfo(day, p.id))) + (absInfo(day, p.id).note ? ' (' + esc(absInfo(day, p.id).note) + ')' : '') : 'absent'}</div></div></div>
       <div class="replace">${dppRow}${
         skills.length
           ? skills
@@ -1268,7 +1271,7 @@ document.addEventListener('click', (e) => {
 
 const canLink = 'showOpenFilePicker' in window;
 // À changer quand la façon de lire les fichiers change : les fichiers raccordés sont alors relus.
-const READER_VERSION = '2026-11-15g';
+const READER_VERSION = '2026-11-15h';
 const handles = {};
 let linkNeedsTap = false;
 
@@ -1303,7 +1306,7 @@ function linksHtml() {
   };
   return `<p class="hint" style="margin:-4px 0 12px">${canLink ? 'Sur cet ordinateur, l’appli relit tes fichiers toute seule dès que tu les enregistres dans Excel.' : 'Sur ce téléphone, choisis le fichier à chaque fois que tu veux mettre l’appli à jour. Sur un ordinateur (Chrome ou Edge), la mise à jour est automatique.'} Les fichiers restent sur ton appareil : rien n’est envoyé sur internet.</p>
     ${card('hab', 'Ton fichier : nom, prénom, rôle, postes en I / L / U et dates d’échéance.')}
-    ${card('plan', 'Ton planning annuel : un onglet par mois, une ligne par personne, et un code par jour : CA, RTT, ABS, For pour les absences, QM, QAM, QN, QJ pour les quarts, DPP pour le bâtiment AI.')}
+    ${card('plan', 'Ton planning annuel : un onglet par mois, une ligne par personne, et un code par jour : CA, RTT, ABS, For pour les absences, QM, QAM, QN, QJ pour les quarts, DPP pour le bâtiment AI (QMDPP = quart matin au DPP).')}
     <div class="ech-edit" style="margin-top:10px"><label class="grow" for="plan-year">Année du planning (si le fichier n’écrit que les numéros des jours)</label>
       <input id="plan-year" type="number" inputmode="numeric" min="2020" max="2100" value="${Number(state.planYear) || new Date().getFullYear()}" style="width:96px"></div>`;
 }
@@ -1721,7 +1724,7 @@ function importPlanning(wb) {
       if (!from) continue;
       const p = findOrCreatePerson(cellText(r[cNom]), cellText(r[cPre]), true);
       if (!p) continue;
-      const info = { type: cellText(r[cType]) || 'Absent' };
+      const info = { type: cellText(r[cType]) || 'Absent', raw: cellText(r[cType]) };
       if (cNote >= 0 && cellText(r[cNote])) info.note = cellText(r[cNote]);
       const shift = SHIFT_CODES[norm(info.type)];
       for (let d = parseIso(from), i = 0; d <= parseIso(to) && i < 400; d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1), i++) {
@@ -1833,13 +1836,13 @@ function importPlanningGrid(wb) {
       dates.forEach((d, j) => {
         const code = cellText(row[j]);
         if (!d || !code || /^(eq|equipe)\s*\S+$/.test(norm(code))) return;
-        // « DPP », « QM DPP »… : au bâtiment AI ce jour-là, avec le quart s'il est écrit.
-        const tokens = norm(code).split(' ');
-        if (tokens.includes('dpp')) {
+        // « DPP », « QMDPP », « QM DPP », « DPP-QAM »… : au bâtiment AI ce jour-là, avec le quart s'il est écrit.
+        const dppCode = norm(code).replace(/ /g, '').match(/^(qam|qm|qn|qj)?dpp(qam|qm|qn|qj)?$/);
+        if (dppCode) {
           (locs[d] = locs[d] || {})[p.id] = 'DPP';
-          const rest = tokens.filter((t) => t !== 'dpp').join(' ');
-          if (SHIFT_CODES[rest]) {
-            (shifts[d] = shifts[d] || {})[p.id] = SHIFT_CODES[rest];
+          const sh = SHIFT_CODES[dppCode[1] || dppCode[2] || ''];
+          if (sh) {
+            (shifts[d] = shifts[d] || {})[p.id] = sh;
             nShifts++;
           }
           return;
@@ -1850,7 +1853,7 @@ function importPlanningGrid(wb) {
           nShifts++;
           return;
         }
-        (abs[d] = abs[d] || {})[p.id] = { type: GRID_CODES[norm(code)] || code };
+        (abs[d] = abs[d] || {})[p.id] = { type: GRID_CODES[norm(code)] || code, raw: code };
         days++;
       });
     }
