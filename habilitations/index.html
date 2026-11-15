@@ -478,11 +478,33 @@ function renderSettings() {
   return `<h1 class="page">Réglages</h1><p class="sub">L’appli est en lecture seule : tout se change dans les fichiers Excel, pour éviter les erreurs.</p>
     <div class="section-title">Fichiers Excel raccordés</div>
     ${linksHtml()}
+    ${wordsHtml()}
     <div class="section-title">Niveaux</div>
     ${state.levels.map((lv) => `<div class="skill"><span class="skill-name">${esc(lv.desc)}</span>${levelTag(lv.id)}</div>`).join('')}
     <div class="section-title">Rôles</div>
     <div class="row-wrap">${state.roles.map((r) => `<span class="chip" style="cursor:default"><span class="lvl" style="width:12px;height:12px;border-radius:4px;background:${r.color}"></span>${esc(r.name)}</span>`).join('')}</div>
     <p class="hint">Un rôle qui n’est pas dans la liste est ajouté tout seul s’il est écrit dans la colonne « Rôle » du fichier Excel.</p>`;
+}
+
+// Les mots trouvés dans le fichier d'habilitations, et le niveau que l'appli leur donne.
+function wordsHtml() {
+  const words = state.levelWords || [];
+  if (!words.length) return '';
+  const unknown = words.filter((w) => !(state.levelMap?.[norm(w.text)] || w.lv)).length;
+  const opts = (cur) =>
+    `<option value="" ${cur ? '' : 'selected'} disabled>À choisir</option>` +
+    state.levels.map((lv) => `<option value="${lv.id}" ${cur === lv.id ? 'selected' : ''}>${esc(lv.letter)}</option>`).join('') +
+    `<option value="none" ${cur === 'none' ? 'selected' : ''}>Pas habilité</option>`;
+  return `<div class="section-title">Comment l’appli lit tes niveaux${unknown ? `<span class="badge red">${unknown} à choisir</span>` : ''}</div>
+    <p class="hint" style="margin:-4px 0 10px">Les mots trouvés dans ton fichier d’habilitations. Change le niveau si l’appli s’est trompée.</p>
+    ${words
+      .map((w) => {
+        const t = norm(w.text);
+        const cur = state.levelMap?.[t] || w.lv || '';
+        return `<div class="ech-edit"${cur ? '' : ' style="border-color:var(--danger)"'}><span class="grow">« ${esc(w.text)} » <small style="color:var(--ink-3);font-weight:600">${w.n} case${w.n > 1 ? 's' : ''}</small></span>
+          <select class="date-input" style="height:42px" data-word="${esc(t)}" aria-label="Niveau pour ${esc(w.text)}">${opts(cur)}</select></div>`;
+      })
+      .join('')}`;
 }
 
 // ---------- Interactions ----------
@@ -497,6 +519,16 @@ function bind() {
     document.getElementById('people-list').innerHTML = peopleCards();
   });
   document.getElementById('import-file')?.addEventListener('change', importBackup);
+  app.querySelectorAll('[data-word]').forEach((el) =>
+    el.addEventListener('change', async () => {
+      state.levelMap = { ...(state.levelMap || {}), [el.dataset.word]: el.value };
+      save();
+      if (lastFiles.hab) await importExcel(lastFiles.hab, 'hab', false);
+      else if (state.links.hab) await refreshLinks(true);
+      else render();
+      toast('C’est noté : l’appli s’en souviendra.');
+    }),
+  );
   document.getElementById('plan-year')?.addEventListener('change', (e) => {
     state.planYear = Number(e.target.value) || new Date().getFullYear();
     save();
@@ -970,6 +1002,8 @@ function linksHtml() {
 }
 
 function linkBanner() {
+  const unknown = (state.levelWords || []).filter((w) => !(state.levelMap?.[norm(w.text)] || w.lv)).length;
+  if (unknown) return `<div class="banner" style="background:var(--danger-soft);color:var(--danger)">${unknown} façon${unknown > 1 ? 's' : ''} d’écrire un niveau à expliquer à l’appli.<button class="btn" data-tab-go="reglages">Choisir</button></div>`;
   if (!linkNeedsTap) return '';
   return `<div class="banner">Tes fichiers Excel ont peut-être changé.<button class="btn" data-action="refresh-links">Mettre à jour</button></div>`;
 }
@@ -1026,6 +1060,7 @@ async function refreshLinks(fromTap) {
   }
 }
 
+const lastFiles = {};
 let xlsxWait;
 function loadXlsx() {
   if (window.XLSX) return Promise.resolve();
@@ -1055,6 +1090,7 @@ async function importExcel(file, kind, verbose) {
   } catch (e) {
     return toast('Ce fichier n’est pas un fichier Excel lisible.');
   }
+  lastFiles[kind] = file;
   const report = kind === 'plan' ? importPlanning(wb) : importHabilitations(wb);
   if (!report) return toast(kind === 'plan' ? 'Je ne trouve pas les colonnes Nom, Prénom, Type, Du, Au dans ce fichier.' : 'Je ne trouve pas les colonnes Nom et Prénom dans ce fichier.');
   state.links[kind] = { name: file.name, at: Date.now(), modified: file.lastModified };
@@ -1097,14 +1133,47 @@ function findOrCreatePerson(nom, prenom) {
   return p;
 }
 
-const LEVEL_WORDS = { utilisateur: 'L', 'a initier': 'I', initier: 'I', formateur: 'U', tuteur: 'U' };
-function levelFromCell(v) {
-  const t = norm(cellText(v));
-  if (!t) return null;
+// Les différentes façons d'écrire un niveau dans les fichiers. « none » = pas habilité.
+const LEVEL_WORDS = {
+  I: ['i', 'initie', 'initiee', 'a initier', 'initier', 'initiation', 'en formation', 'formation en cours', 'a former', 'en cours', 'debutant', 'debutante', 'apprenti', 'apprentie', 'novice', 'decouverte', 'base', 'connaissance de base', 'notions', 'accompagne', 'sous tutelle', 'niveau 1', 'niv 1', 'n1', '1'],
+  L: ['l', 'utilisateur', 'utilisatrice', 'utilisateurs', 'habilite', 'habilitee', 'autonome', 'maitrise', 'maitrisee', 'operationnel', 'operationnelle', 'confirme', 'confirmee', 'forme', 'formee', 'valide', 'validee', 'qualifie', 'qualifiee', 'oui', 'ok', 'x', 'niveau 2', 'niv 2', 'n2', '2'],
+  U: ['u', 'formateur', 'formatrice', 'tuteur', 'tutrice', 'expert', 'experte', 'referent', 'referente', 'reference', 'pilote', 'sait former', 'transmet', 'niveau 3', 'niv 3', 'n3', '3'],
+  none: ['non', 'no', 'na', 'n a', 'nc', 'aucun', 'aucune', 'pas habilite', 'pas forme', 'retire', 'retiree', 'suspendu', 'suspendue', '0', 'niveau 0', 'n0'],
+};
+const WORD_LEVEL = Object.fromEntries(Object.entries(LEVEL_WORDS).flatMap(([lv, words]) => words.map((w) => [w, lv])));
+let seenWords = {};
+
+// Le niveau d'une case : d'abord tes choix (Réglages), puis la lettre, puis les mots connus.
+function wordLevel(t) {
+  const mine = state.levelMap?.[t];
+  if (mine) return mine;
   const lv = state.levels.find((l) => norm(l.letter) === t);
   if (lv) return lv.id;
-  const w = LEVEL_WORDS[t];
-  return w && level(w) ? w : undefined;
+  if (WORD_LEVEL[t]) return WORD_LEVEL[t];
+  // « Utilisateur depuis 2023 », « Formateur (VA/VP) »… : on regarde le début.
+  const start = Object.keys(WORD_LEVEL)
+    .filter((w) => w.length > 2 && t.startsWith(w + ' '))
+    .sort((a, b) => b.length - a.length)[0];
+  return start ? WORD_LEVEL[start] : '';
+}
+
+function levelFromCell(v, track) {
+  const t = norm(cellText(v));
+  if (!t) return null;
+  const lv = wordLevel(t);
+  if (track) seenWords[t] = seenWords[t] || { text: cellText(v), n: 0, lv };
+  if (track) seenWords[t].n++;
+  if (lv === 'none') return null;
+  return lv && level(lv) ? lv : undefined;
+}
+
+// Une colonne de postes : des mots courts répétés (pas des dates, ni des adresses, ni des phrases).
+function looksLikeLevels(vals) {
+  const t = vals.map((v) => cellText(v)).filter(Boolean);
+  if (!t.length) return false;
+  if (t.some((x) => levelFromCell(x) !== undefined && levelFromCell(x) !== null)) return true;
+  const distinct = new Set(t.map(norm));
+  return distinct.size <= 6 && t.every((x) => x.length <= 25 && !/@|https?:/.test(x));
 }
 
 const META = ['nom', 'prenom', 'visa', 'equipe', 'animateur', 'role', 'fonction', 'type', 'statut', 'matricule', 'mail', 'email'];
@@ -1115,6 +1184,7 @@ function importHabilitations(wb) {
   let nSkills = 0;
   let nDates = 0;
   let found = false;
+  seenWords = {};
   for (const name of wb.SheetNames) {
     const rows = sheetRows(wb.Sheets[name]);
     const h = findHeader(rows);
@@ -1176,17 +1246,17 @@ function importHabilitations(wb) {
             nDates++;
           } else delete p.dates[ec.id];
         });
-      } else if (vals.some((v) => levelFromCell(v))) {
+      } else if (looksLikeLevels(vals)) {
         let po = state.postes.find((x) => norm(x.name) === norm(title));
         if (!po) state.postes.push((po = { id: uid('po'), name: title, training: '' }));
         data.forEach((r) => {
           const p = findOrCreatePerson(cellText(r[cNom]), cellText(r[cPre]));
           p.skills = p.skills || {};
-          const lv = levelFromCell(r[c]);
+          const lv = levelFromCell(r[c], true);
           if (lv) {
             p.skills[po.id] = lv;
             nSkills++;
-          } else if (lv === null) delete p.skills[po.id];
+          } else delete p.skills[po.id];
         });
       }
     }
@@ -1203,6 +1273,9 @@ function importHabilitations(wb) {
     nPeople = Math.max(nPeople, data.length);
   }
   if (!found) return null;
+  state.levelWords = Object.values(seenWords).sort((a, b) => b.n - a.n);
+  const unknown = state.levelWords.filter((w) => !w.lv).length;
+  if (unknown) return `Importé, mais ${unknown} façon${unknown > 1 ? 's' : ''} d’écrire un niveau ${unknown > 1 ? 'sont inconnues' : 'est inconnue'} : choisis leur sens dans Réglages.`;
   return `Importé : ${nPeople} personne${nPeople > 1 ? 's' : ''}, ${nSkills} habilitation${nSkills > 1 ? 's' : ''} de poste, ${nDates} date${nDates > 1 ? 's' : ''} d’échéance.`;
 }
 
