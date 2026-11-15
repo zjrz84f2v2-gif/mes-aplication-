@@ -354,7 +354,10 @@ function avHtml(p, cls = '') {
   return `<span class="av ${cls}" style="background:${r?.color || '#4B5563'}" aria-hidden="true">${esc(initials(p.name))}</span>`;
 }
 
-const absentOn = (day) => new Set(Object.keys(state.absImport?.[day] || {}));
+// Les noms du planning qui ne correspondent à personne du fichier d'habilitations ne sont pas affichés
+// (sauf les homonymes, signalés pour qu'on ajoute l'initiale du prénom).
+const shown = (p) => p && !(p.planOnly && !p.ambiguous);
+const absentOn = (day) => new Set(Object.keys(state.absImport?.[day] || {}).filter((id) => shown(person(id))));
 const absInfo = (day, id) => state.absImport?.[day]?.[id] || null;
 const ABS_COLORS = { conge: '#3F8F1F', 'conge annuel': '#3F8F1F', rtt: '#7C3AED', arret: '#C2321F', absence: '#0A84C6', formation: '#B4581E', autre: '#4B5563' };
 const absColor = (type) => ABS_COLORS[norm(type).replace(/s$/, '')] || ABS_COLORS[Object.keys(ABS_COLORS).find((k) => norm(type).startsWith(norm(k)))] || '#4B5563';
@@ -400,7 +403,7 @@ function renderToday() {
   if (steps) return html + `<div style="margin-top:18px">${steps}</div>`;
 
   const absent = absentOn(day);
-  const people = state.people.slice().sort(byName);
+  const people = state.people.filter(shown).sort(byName);
   html += `<div class="section-title">L’équipe ce jour-là<small>${absent.size ? absent.size + ' absent' + (absent.size > 1 ? 's' : '') : ''}</small></div>
     <div class="people-pick">${people
       .map((p) => `<button class="pick" data-absent="${p.id}" aria-pressed="${absent.has(p.id)}">${avHtml(p)}<span>${esc(p.name)}</span>${absBadge(absInfo(day, p.id))}</button>`)
@@ -444,7 +447,8 @@ function renderToday() {
 const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 
 function renderTeam() {
-  let html = `<h1 class="page">Équipe</h1><p class="sub">${state.people.length} personne${state.people.length > 1 ? 's' : ''}</p>`;
+  const nb = state.people.filter((p) => !p.planOnly).length;
+  let html = `<h1 class="page">Équipe</h1><p class="sub">${nb} personne${nb > 1 ? 's' : ''}</p>`;
   const steps = firstSteps();
   if (steps && !state.people.length) return html + `<div style="margin-top:18px">${steps}</div>`;
   html += `<div class="search-wrap">${icons.search}<input class="search" id="q" type="search" placeholder="Chercher une personne" value="${esc(ui.query)}" autocomplete="off" aria-label="Chercher une personne"></div>
@@ -460,11 +464,11 @@ function peopleCards() {
   const q = ui.query.trim().toLowerCase();
   const all = state.people.filter((p) => (ui.roleFilter === 'all' || p.role === ui.roleFilter) && (!q || p.name.toLowerCase().includes(q))).sort(byName);
   const list = all.filter((p) => !p.planOnly);
-  const planOnly = all.filter((p) => p.planOnly);
+  const planOnly = all.filter((p) => p.planOnly && p.ambiguous);
   if (!all.length) return `<p class="hint">Personne ne correspond.</p>`;
   const others = planOnly.length
-    ? `<div style="grid-column:1/-1"><div class="section-title">Seulement dans le planning<small>${planOnly.length}</small></div>
-        <p class="hint" style="margin:-4px 0 8px">Ces personnes sont dans ton planning mais pas dans le fichier d’habilitations (ou leur nom est écrit autrement). L’appli ne connaît donc pas leurs postes.</p>
+    ? `<div style="grid-column:1/-1"><div class="section-title">À vérifier dans le planning<small>${planOnly.length}</small></div>
+        <p class="hint" style="margin:-4px 0 8px">Plusieurs personnes portent ce nom dans le fichier d’habilitations : ajoute l’initiale du prénom dans le planning (ex. « MARTIN E. »).</p>
         <div class="lvls-row">${planOnly.map((p) => `<span class="pchip"${p.ambiguous ? ' style="background:var(--danger-soft);color:var(--danger)" title="Plusieurs personnes portent ce nom"' : ''}>${esc(p.name)}${p.ambiguous ? ' (' + p.ambiguous.length + ' possibles)' : ''}${p.post ? ' · ' + esc(p.post) : ''}</span>`).join('')}</div></div>`
     : '';
   return others + list
@@ -1547,8 +1551,8 @@ function importPlanningGrid(wb) {
   if (!found) return null;
   state.absImport = abs;
   mergePlanOnly();
-  const unknown = state.people.filter((p) => p.planOnly).length;
-  if (unknown) return `Planning importé. ${unknown} nom${unknown > 1 ? 's' : ''} du planning ${unknown > 1 ? 'ne sont' : 'n’est'} pas dans le fichier d’habilitations : voir Équipe.`;
+  const unknown = state.people.filter((p) => p.planOnly && p.ambiguous).length;
+  if (unknown) return `Planning importé. ${unknown} nom${unknown > 1 ? 's' : ''} à vérifier (homonymes) : voir Équipe.`;
   return `Planning importé : ${seen.size} personnes, ${days} jour${days > 1 ? 's' : ''} d’absence.`;
 }
 
