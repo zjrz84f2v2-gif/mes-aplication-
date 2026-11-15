@@ -1354,7 +1354,7 @@ document.addEventListener('click', (e) => {
 
 const canLink = 'showOpenFilePicker' in window;
 // À changer quand la façon de lire les fichiers change : les fichiers raccordés sont alors relus.
-const READER_VERSION = '2026-11-15m';
+const READER_VERSION = '2026-11-15n';
 const handles = {};
 let linkNeedsTap = false;
 
@@ -1531,6 +1531,36 @@ function findHeader(rows, also = []) {
 }
 
 const personKey = (prenom, nom) => norm(`${prenom} ${nom}`);
+// Le rôle de chacun : ce qui est écrit (colonne Rôle/Fonction/Statut, ou le poste du planning),
+// sinon le manageur se reconnaît à son VISA (code d'équipe = VISA), et par défaut c'est un opérateur.
+const ROLE_RULES = [
+  ['Manageur', /\bmanag|chef d equipe|\bchef\b(?! de ligne)|responsable|superviseur|\bencadr/],
+  ['Alternant', /altern|apprenti|stagiaire|contrat pro|\binterim/],
+  ['Technicien', /techni|\btech\b|maintenance|methode|qualite/],
+  ['Opérateur', /operat|conduct|\bposte\b|controle|\bpilote\b/],
+];
+function roleFromText(t) {
+  const n = norm(t);
+  if (!n) return '';
+  return (ROLE_RULES.find(([, re]) => re.test(n)) || [''])[0];
+}
+function applyRoles() {
+  const roleId = (name) => {
+    let ro = state.roles.find((x) => norm(x.name) === norm(name));
+    if (!ro) state.roles.push((ro = { id: uid('r'), name, color: ROLE_COLORS[state.roles.length % ROLE_COLORS.length] }));
+    return ro.id;
+  };
+  for (const p of state.people) {
+    const name =
+      roleFromText(p.roleText) ||
+      (p.roleText ? p.roleText : '') ||
+      roleFromText(p.post) ||
+      (p.team && visaCode(p) && visaCode(p) === norm(p.team) ? 'Manageur' : '') ||
+      'Opérateur';
+    p.role = roleId(name);
+  }
+}
+
 function mergePlanOnly() {
   for (const p of state.people.filter((x) => x.planOnly)) {
     const hits = p.preN
@@ -1551,6 +1581,7 @@ function mergePlanOnly() {
     if (p.team && !to.team) to.team = p.team;
     state.people = state.people.filter((x) => x !== p);
   }
+  applyRoles();
 }
 
 // Une vraie personne : pas une ligne de total (« 37 NOMBRE OPÉRATEURS »), ni un titre.
@@ -1695,7 +1726,7 @@ function importHabilitations(wb) {
     const col = (k) => head.findIndex((x) => x === k || x.startsWith(k));
     const cNom = col('nom');
     const cPre = col('prenom');
-    const cRole = head.findIndex((x) => x === 'role' || x === 'fonction');
+    const cRole = head.findIndex((x) => ['role', 'fonction', 'statut', 'metier', 'emploi', 'categorie', 'qualification', 'contrat'].includes(x));
     const cTeam = col('equipe');
     const cVisa = col('visa');
     const cAnim = col('animateur');
@@ -1774,10 +1805,7 @@ function importHabilitations(wb) {
       if (cVisa >= 0 && cellText(r[cVisa])) p.visa = cellText(r[cVisa]);
       if (cAnim >= 0 && cellText(r[cAnim])) p.anim = cellText(r[cAnim]);
       if (cRole >= 0 && cellText(r[cRole])) {
-        const rn = cellText(r[cRole]);
-        let ro = state.roles.find((x) => norm(x.name) === norm(rn));
-        if (!ro) state.roles.push((ro = { id: uid('r'), name: rn, color: ROLE_COLORS[state.roles.length % ROLE_COLORS.length] }));
-        p.role = ro.id;
+        p.roleText = cellText(r[cRole]);
       }
     });
     nPeople = Math.max(nPeople, data.length);
