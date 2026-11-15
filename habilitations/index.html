@@ -52,6 +52,8 @@ h1.page { font-size: 30px; line-height: 1.1; font-weight: 800; letter-spacing: -
 .lvl { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 8px; flex: 0 0 auto; }
 .lvl svg { width: 18px; height: 18px; }
 .lvl.letter { font-weight: 900; font-size: 14px; color: #fff; }
+.lvl-tag { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px 4px 4px; border-radius: 12px; font-size: 16px; flex: 0 0 auto; }
+.lvl-tag .lvl { background: transparent !important; }
 .lvl-chip { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; font-size: 14px; }
 .pchip { display: inline-flex; align-items: center; gap: 6px; background: var(--bg); border-radius: 10px; padding: 3px 10px 3px 3px; font-weight: 700; font-size: 14px; max-width: 100%; }
 .pchip .lvl { width: 24px; height: 24px; border-radius: 7px; }
@@ -334,7 +336,7 @@ function avHtml(p, cls = '') {
   return `<span class="av ${cls}" style="background:${r?.color || '#4B5563'}" aria-hidden="true">${esc(initials(p.name))}</span>`;
 }
 
-const absentOn = (day) => new Set([...(state.absences[day] || []), ...Object.keys(state.absImport?.[day] || {})]);
+const absentOn = (day) => new Set(Object.keys(state.absImport?.[day] || {}));
 const absInfo = (day, id) => state.absImport?.[day]?.[id] || null;
 const ABS_COLORS = { conge: '#3F8F1F', 'conge annuel': '#3F8F1F', rtt: '#7C3AED', arret: '#C2321F', absence: '#0A84C6', formation: '#B4581E', autre: '#4B5563' };
 const absColor = (type) => ABS_COLORS[norm(type).replace(/s$/, '')] || ABS_COLORS[Object.keys(ABS_COLORS).find((k) => norm(type).startsWith(norm(k)))] || '#4B5563';
@@ -361,9 +363,9 @@ function render() {
 
 function firstSteps() {
   if (!state.postes.length)
-    return `<div class="empty"><b>L’appli est vide sur cet appareil</b>Charge tes fichiers Excel (Réglages › Fichiers Excel raccordés), ou essaie d’abord avec l’exemple : 29 personnes inventées, leurs habilitations et le planning de l’année.<br><button class="btn" data-action="demo">Charger l’exemple</button><br><button class="btn ghost" data-tab-go="reglages" style="margin-top:8px">Raccorder mes fichiers Excel</button><br><button class="btn ghost" data-action="add-poste" style="margin-top:8px">${icons.plus} Ajouter un poste à la main</button></div>`;
+    return `<div class="empty"><b>L’appli est vide sur cet appareil</b>Charge tes fichiers Excel (Réglages › Fichiers Excel raccordés), ou essaie d’abord avec l’exemple : 29 personnes inventées, leurs habilitations et le planning de l’année.<br><button class="btn" data-action="demo">Charger l’exemple</button><br><button class="btn ghost" data-tab-go="reglages" style="margin-top:8px">Raccorder mes fichiers Excel</button></div>`;
   if (!state.people.length)
-    return `<div class="empty"><b>Ajoute ton équipe</b>Une fiche par personne, avec son rôle et ses habilitations.<br><button class="btn" data-action="add-person">${icons.plus} Ajouter une personne</button></div>`;
+    return `<div class="empty"><b>Pas encore d’équipe</b>L’équipe vient de ton fichier Excel d’habilitations.<br><button class="btn" data-tab-go="reglages">Raccorder mon fichier</button></div>`;
   return '';
 }
 
@@ -373,7 +375,7 @@ function renderToday() {
   const d = parseIso(day);
   const isToday = day === iso(new Date());
   let html = `<h1 class="page">${isToday ? 'Aujourd’hui' : esc(cap(d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })))}</h1>
-    <p class="sub">Touche les personnes absentes : l’appli te dit qui peut les remplacer.</p>
+    <p class="sub">Les absents du jour viennent de ton planning Excel. L’appli te dit qui peut les remplacer.</p>
     <div class="date-row"><input type="date" class="date-input" id="day" value="${day}" aria-label="Choisir le jour">${isToday ? '' : '<button class="btn ghost small" data-action="today">Revenir à aujourd’hui</button>'}</div>
     ${linkBanner()}`;
   const steps = firstSteps();
@@ -381,12 +383,12 @@ function renderToday() {
 
   const absent = absentOn(day);
   const people = state.people.slice().sort(byName);
-  html += `<div class="section-title">Qui est absent ?<small>${absent.size ? absent.size + ' absent' + (absent.size > 1 ? 's' : '') : ''}</small></div>
+  html += `<div class="section-title">L’équipe ce jour-là<small>${absent.size ? absent.size + ' absent' + (absent.size > 1 ? 's' : '') : ''}</small></div>
     <div class="people-pick">${people
       .map((p) => `<button class="pick" data-absent="${p.id}" aria-pressed="${absent.has(p.id)}">${avHtml(p)}<span>${esc(p.name)}</span>${absBadge(absInfo(day, p.id))}</button>`)
       .join('')}</div>`;
 
-  if (!absent.size) return html + `<p class="hint" style="margin-top:14px">Personne n’est noté absent ce jour-là.</p>`;
+  if (!absent.size) return html + `<p class="hint" style="margin-top:14px">${state.links.plan || Object.keys(state.absImport || {}).length ? 'Personne n’est absent ce jour-là dans le planning.' : 'Aucun planning raccordé : va dans Réglages pour choisir ton planning Excel.'}</p>`;
 
   // Postes que plus personne de présent ne sait tenir.
   const uncovered = state.postes.filter((po) => state.people.some((p) => absent.has(p.id) && p.skills?.[po.id]) && !candidates(po.id, absent).length);
@@ -428,7 +430,6 @@ function renderTeam() {
       <button class="chip" data-role-filter="all" aria-pressed="${ui.roleFilter === 'all'}">Tous</button>
       ${state.roles.map((r) => `<button class="chip" data-role-filter="${r.id}" aria-pressed="${ui.roleFilter === r.id}"><span class="lvl" style="width:12px;height:12px;border-radius:4px;background:${r.color}"></span>${esc(r.name)}</button>`).join('')}
     </div>
-    <div class="actions" style="margin-top:14px"><button class="btn" data-action="add-person">${icons.plus} Ajouter une personne</button></div>
     <div class="grid" style="margin-top:14px" id="people-list">${peopleCards()}</div>`;
   return html;
 }
@@ -452,7 +453,7 @@ function peopleCards() {
 
 function renderPostes() {
   let html = `<h1 class="page">Postes</h1><p class="sub">Les habilitations de l’atelier, et qui sait tenir chaque poste.</p>
-    <div class="actions" style="margin-top:14px"><button class="btn" data-action="add-poste">${icons.plus} Ajouter un poste</button></div>`;
+`;
   if (!state.postes.length) return html + `<div style="margin-top:14px">${firstSteps()}</div>`;
   const absent = absentOn(iso(new Date()));
   html += `<div class="grid" style="margin-top:14px">${state.postes
@@ -474,41 +475,14 @@ function renderPostes() {
 
 // Réglages : rôles et niveaux modifiables (pour ajouter ce qui manque), et sauvegarde.
 function renderSettings() {
-  return `<h1 class="page">Réglages</h1><p class="sub">Tes fichiers Excel, et les rôles et niveaux à ajouter ou renommer.</p>
+  return `<h1 class="page">Réglages</h1><p class="sub">L’appli est en lecture seule : tout se change dans les fichiers Excel, pour éviter les erreurs.</p>
     <div class="section-title">Fichiers Excel raccordés</div>
     ${linksHtml()}
-    <div class="section-title">Rôles</div>
-    ${state.roles
-      .map(
-        (r, i) => `<div class="set-row"><span class="lvl" style="width:18px;height:18px;border-radius:6px;background:${r.color}"></span>
-        <input value="${esc(r.name)}" data-rename-role="${r.id}" aria-label="Nom du rôle ${i + 1}">
-        <button class="icon-btn" data-up-role="${r.id}" aria-label="Monter ${esc(r.name)}" ${i ? '' : 'disabled'}>${icons.up}</button>
-        <button class="icon-btn" data-del-role="${r.id}" aria-label="Supprimer ${esc(r.name)}">${icons.trash}</button></div>`,
-      )
-      .join('')}
-    <div class="actions" style="margin-top:10px"><button class="btn ghost" data-action="add-role">${icons.plus} Ajouter un rôle</button></div>
-
     <div class="section-title">Niveaux</div>
-    <p class="hint" style="margin:-4px 0 10px">Du plus bas au plus haut : l’appli propose d’abord les remplaçants du niveau le plus haut.</p>
-    ${state.levels
-      .map(
-        (lv, i) => `<div class="level-edit"><div class="top">${lvlHtml(lv.id)}
-          <input class="letter" value="${esc(lv.letter)}" maxlength="3" data-level-letter="${lv.id}" aria-label="Lettre du niveau">
-          <span class="grow"></span>
-          <button class="icon-btn" data-up-level="${lv.id}" aria-label="Monter le niveau ${esc(lv.letter)}" ${i ? '' : 'disabled'}>${icons.up}</button>
-          <button class="icon-btn" data-del-level="${lv.id}" aria-label="Supprimer le niveau ${esc(lv.letter)}">${icons.trash}</button></div>
-          <textarea data-level-desc="${lv.id}" aria-label="Description du niveau ${esc(lv.letter)}">${esc(lv.desc)}</textarea></div>`,
-      )
-      .join('')}
-    <div class="actions" style="margin-top:10px"><button class="btn ghost" data-action="add-level">${icons.plus} Ajouter un niveau</button></div>
-
-    <div class="section-title">Sauvegarde</div>
-    <p class="hint" style="margin:-4px 0 12px">Tout est gardé sur cet appareil. Pour passer du téléphone à l’ordinateur (ou l’inverse), sauvegarde dans un fichier puis récupère-le sur l’autre appareil.</p>
-    <div class="actions" style="margin-top:0">
-      <button class="btn" data-action="export">Sauvegarder dans un fichier</button>
-      <button class="btn ghost" data-action="import">Récupérer une sauvegarde</button>
-      <input type="file" id="import-file" accept="application/json,.json" hidden>
-    </div>`;
+    ${state.levels.map((lv) => `<div class="skill"><span class="skill-name">${esc(lv.desc)}</span>${levelTag(lv.id)}</div>`).join('')}
+    <div class="section-title">Rôles</div>
+    <div class="row-wrap">${state.roles.map((r) => `<span class="chip" style="cursor:default"><span class="lvl" style="width:12px;height:12px;border-radius:4px;background:${r.color}"></span>${esc(r.name)}</span>`).join('')}</div>
+    <p class="hint">Un rôle qui n’est pas dans la liste est ajouté tout seul s’il est écrit dans la colonne « Rôle » du fichier Excel.</p>`;
 }
 
 // ---------- Interactions ----------
@@ -562,10 +536,8 @@ document.addEventListener('click', (e) => {
     return window.scrollTo(0, 0);
   }
   const ab = e.target.closest('[data-absent]');
-  if (ab && absInfo(ui.day, ab.dataset.absent) && !(state.absences[ui.day] || []).includes(ab.dataset.absent)) {
-    return toast('Cette absence vient du planning Excel : change-la dans le fichier.');
-  }
-  if (ab) {
+  if (ab) return openPerson(ab.dataset.absent);
+  if (false) {
     const list = new Set(state.absences[ui.day] || []);
     list.has(ab.dataset.absent) ? list.delete(ab.dataset.absent) : list.add(ab.dataset.absent);
     if (list.size) state.absences[ui.day] = [...list];
@@ -655,6 +627,13 @@ function closeSheet() {
 
 const closeBtn = `<button class="close" aria-label="Fermer">${icons.close}</button>`;
 
+// Le niveau affiché en grand dans les fiches (lecture seule).
+function levelTag(id) {
+  const lv = level(id);
+  if (!lv) return '';
+  return `<span class="lvl-tag" style="color:${lv.color};background:${lv.color}14" title="${esc(lv.desc)}">${lvlHtml(id)}<b>${esc(lv.letter)}</b></span>`;
+}
+
 // Sélecteur de niveau : —, I, L, U (et les niveaux ajoutés).
 function segHtml(current, attr) {
   return `<div class="seg" role="group" aria-label="Niveau">
@@ -684,20 +663,17 @@ function openPerson(id) {
       .join('')}</div></div><p class="hint">Sans compter les absents du jour.</p>`;
   }
   const back = showSheet(`<div class="sheet-head">${avHtml(p, 'big')}<div style="min-width:0"><h2>${esc(p.name)}</h2><p>${esc(role(p.role)?.name || 'Sans rôle')}${p.team ? ' · ' + esc(p.team) : ''} · ${known.length} poste${known.length > 1 ? 's' : ''}</p></div>${closeBtn}</div>
-    <span class="label">Rôle</span>
-    <div class="row-wrap">${state.roles.map((r) => `<button class="chip" data-set-role="${r.id}" aria-pressed="${p.role === r.id}">${esc(r.name)}</button>`).join('')}</div>
+    ${p.post ? `<p class="hint">Poste habituel : <b>${esc(p.post)}</b></p>` : ''}
     <span class="label">Habilitations</span>
-    ${known.length ? known.map((po) => skillRow(p, po)).join('') : '<p class="hint" style="margin:0">Aucune pour l’instant. Ajoute-en ci-dessous.</p>'}
-    ${others.length ? `<span class="label">Ajouter une habilitation</span><div class="row-wrap">${others.map((po) => `<button class="chip" data-add-skill="${po.id}">${icons.plus.replace('<svg', '<svg style="width:16px;height:16px"')} ${esc(po.name)}</button>`).join('')}</div>` : ''}
-    ${state.postes.length ? '' : '<p class="hint">Crée d’abord des postes dans l’onglet « Postes ».</p>'}
+    ${known.length ? known.map((po) => skillRow(p, po)).join('') : '<p class="hint" style="margin:0">Aucune habilitation de poste dans le fichier.</p>'}
     ${state.echeances.length ? `<span class="label">Habilitations à date</span>${state.echeances
       .map((ec) => {
         const d = p.dates?.[ec.id] || '';
-        return `<div class="ech-edit"><span class="grow">${esc(ec.name)}</span>${echDate(d)}<input type="date" value="${esc(d)}" data-ech="${ec.id}" aria-label="Échéance ${esc(ec.name)}"></div>`;
+        return `<div class="ech-edit"><span class="grow">${esc(ec.name)}</span>${echDate(d)}</div>`;
       })
-      .join('')}${state.links.hab ? '<p class="hint">Ces dates viennent de ton fichier Excel : la prochaine mise à jour du fichier les remplace.</p>' : ''}` : ''}
+      .join('')}` : ''}
     ${replaceHtml}
-    <div class="actions"><button class="btn ghost" data-edit>Modifier le nom</button><button class="btn danger" data-del>Retirer de l’équipe</button></div>`);
+    <p class="hint" style="margin-top:18px">Pour changer quelque chose, modifie le fichier Excel : l’appli se met à jour toute seule.</p>`);
   back.querySelectorAll('[data-ech]').forEach((el) =>
     el.addEventListener('change', () => {
       p.dates = p.dates || {};
@@ -747,7 +723,7 @@ function openPerson(id) {
 }
 
 function skillRow(p, po) {
-  return `<div class="skill"><div class="skill-name">${esc(po.name)}${po.training ? `<small>Formation : ${esc(po.training)}</small>` : ''}</div>${segHtml(p.skills[po.id], 'skill').replace(/data-skill="([^"]*)"/g, `data-skill="${po.id}|$1"`)}</div>`;
+  return `<div class="skill"><div class="skill-name">${esc(po.name)}${po.training ? `<small>Formation : ${esc(po.training)}</small>` : ''}</div>${levelTag(p.skills[po.id])}</div>`;
 }
 
 function openPersonEditor(id) {
@@ -789,9 +765,8 @@ function openPoste(id) {
   const rest = state.people.filter((p) => !who.includes(p)).sort(byName);
   const back = showSheet(`<div class="sheet-head"><div style="min-width:0"><h2>${esc(po.name)}</h2><p>${po.training ? 'Temps de formation : ' + esc(po.training) + ' · ' : ''}${who.length} habilité${who.length > 1 ? 's' : ''}</p></div>${closeBtn}</div>
     <span class="label">Qui est habilité</span>
-    ${who.length ? who.map((p) => `<div class="skill"><span class="skill-name" style="display:flex;align-items:center;gap:10px">${avHtml(p, 'small')}<span style="min-width:0">${esc(p.name)}<small>${esc(role(p.role)?.name || '')}</small></span></span>${segHtml(p.skills[po.id], 'pskill').replace(/data-pskill="([^"]*)"/g, `data-pskill="${p.id}|$1"`)}</div>`).join('') : '<p class="hint" style="margin:0">Personne pour l’instant.</p>'}
-    ${rest.length ? `<span class="label">Habiliter quelqu’un</span><div class="row-wrap">${rest.map((p) => `<button class="chip" data-habilite="${p.id}">${icons.plus.replace('<svg', '<svg style="width:16px;height:16px"')} ${esc(p.name)}</button>`).join('')}</div>` : ''}
-    <div class="actions"><button class="btn ghost" data-edit>Modifier le poste</button><button class="btn danger" data-del>Supprimer le poste</button></div>`);
+    ${who.length ? who.map((p) => `<div class="skill"><span class="skill-name" style="display:flex;align-items:center;gap:10px">${avHtml(p, 'small')}<span style="min-width:0">${esc(p.name)}<small>${esc(role(p.role)?.name || '')}</small></span></span>${levelTag(p.skills[po.id])}</div>`).join('') : '<p class="hint" style="margin:0">Personne n’est habilité dans le fichier.</p>'}
+    <p class="hint" style="margin-top:18px">Pour changer quelque chose, modifie le fichier Excel : l’appli se met à jour toute seule.</p>`);
   let confirmDel = false;
   back.addEventListener('click', (e) => {
     let el;
