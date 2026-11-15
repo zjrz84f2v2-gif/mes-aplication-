@@ -51,7 +51,7 @@ h1.page { font-size: 30px; line-height: 1.1; font-weight: 800; letter-spacing: -
 /* Les niveaux I, L, U. */
 .lvl { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 8px; flex: 0 0 auto; }
 .lvl svg { width: 18px; height: 18px; }
-.lvl.letter { font-weight: 900; font-size: 14px; color: #fff; }
+.lvl.letter { font-weight: 900; font-size: 11px; color: #fff; letter-spacing: -.02em; }
 .lvl-tag { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px 4px 4px; border-radius: 12px; font-size: 16px; flex: 0 0 auto; }
 .lvl-tag .lvl { background: transparent !important; }
 .lvl-chip { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; font-size: 14px; }
@@ -224,6 +224,12 @@ const STORE_KEY = 'habilitations-v1';
 const ROLE_COLORS = ['#1D5BD8', '#B45309', '#0F766E', '#7C3AED', '#BE185D', '#4B5563', '#0369A1', '#A16207'];
 const LEVEL_COLORS = ['#D97706', '#1D5BD8', '#17803D', '#7C3AED', '#BE185D', '#0F766E'];
 
+// Sous I : pas encore opérationnels, donc jamais proposés comme remplaçants.
+const LOW_LEVELS = [
+  { id: 'AI', letter: 'AI', name: 'À initier', shape: 'letter', color: '#6B7280', desc: 'Pas encore formé : la formation est à prévoir.', replace: false },
+  { id: 'EF', letter: 'EF', name: 'En formation', shape: 'letter', color: '#0E7490', desc: 'En cours de formation sur le poste.', replace: false },
+];
+
 function defaultState() {
   return {
     version: 1,
@@ -235,9 +241,10 @@ function defaultState() {
     ],
     // Du plus bas au plus haut : l'ordre sert à proposer les meilleurs remplaçants d'abord.
     levels: [
-      { id: 'I', letter: 'I', shape: 'I', color: '#D97706', desc: 'Connaissance de base. Opérationnel, mais peut avoir besoin d’aide.' },
-      { id: 'L', letter: 'L', shape: 'L', color: '#1D5BD8', desc: 'Poste maîtrisé.' },
-      { id: 'U', letter: 'U', shape: 'U', color: '#17803D', desc: 'Poste maîtrisé, et sait former et transmettre.' },
+      ...LOW_LEVELS,
+      { id: 'I', letter: 'I', label: 'Initié', shape: 'I', color: '#D97706', desc: 'Initié : connaissance de base. Opérationnel, mais peut avoir besoin d’aide.' },
+      { id: 'L', letter: 'L', label: 'Utilisateur', shape: 'L', color: '#1D5BD8', desc: 'Utilisateur : poste maîtrisé.' },
+      { id: 'U', letter: 'U', label: 'Formateur', shape: 'U', color: '#17803D', desc: 'Formateur : poste maîtrisé, et sait former et transmettre.' },
     ],
     postes: [],
     people: [],
@@ -253,7 +260,18 @@ function defaultState() {
 function load() {
   try {
     const raw = localStorage.getItem(STORE_KEY);
-    if (raw) return { ...defaultState(), ...JSON.parse(raw) };
+    if (raw) {
+      const data = { ...defaultState(), ...JSON.parse(raw) };
+      // Anciennes versions : on ajoute « À initier » et « En formation » sous I.
+      const missing = LOW_LEVELS.filter((l) => !data.levels.some((x) => x.id === l.id));
+      if (missing.length) data.levels = [...missing, ...data.levels];
+      const fresh = defaultState().levels;
+      data.levels.forEach((l) => {
+        const d = fresh.find((x) => x.id === l.id && x.label);
+        if (d && !l.label) Object.assign(l, { label: d.label, desc: d.desc });
+      });
+      return data;
+    }
   } catch (e) {}
   return defaultState();
 }
@@ -346,7 +364,7 @@ const norm = (t) => String(t ?? '').toLowerCase().normalize('NFD').replace(/[\u0
 // Qui peut tenir ce poste (en dehors de certaines personnes), les plus habiles d'abord.
 function candidates(posteId, exclude) {
   return state.people
-    .filter((p) => !exclude.has(p.id) && p.skills?.[posteId] && level(p.skills[posteId]))
+    .filter((p) => !exclude.has(p.id) && p.skills?.[posteId] && level(p.skills[posteId]) && level(p.skills[posteId]).replace !== false)
     .sort((a, b) => rank(b.skills[posteId]) - rank(a.skills[posteId]) || byName(a, b));
 }
 
@@ -493,7 +511,7 @@ function wordsHtml() {
   const unknown = words.filter((w) => !(state.levelMap?.[norm(w.text)] || w.lv)).length;
   const opts = (cur) =>
     `<option value="" ${cur ? '' : 'selected'} disabled>À choisir</option>` +
-    state.levels.map((lv) => `<option value="${lv.id}" ${cur === lv.id ? 'selected' : ''}>${esc(lv.letter)}</option>`).join('') +
+    state.levels.slice().reverse().map((lv) => `<option value="${lv.id}" ${cur === lv.id ? 'selected' : ''}>${esc(lv.name || (lv.label ? lv.letter + ' – ' + lv.label : lv.letter))}</option>`).join('') +
     `<option value="none" ${cur === 'none' ? 'selected' : ''}>Pas habilité</option>`;
   return `<div class="section-title">Comment l’appli lit tes niveaux${unknown ? `<span class="badge red">${unknown} à choisir</span>` : ''}</div>
     <p class="hint" style="margin:-4px 0 10px">Les mots trouvés dans ton fichier d’habilitations. Change le niveau si l’appli s’est trompée.</p>
@@ -668,7 +686,8 @@ const closeBtn = `<button class="close" aria-label="Fermer">${icons.close}</butt
 function levelTag(id) {
   const lv = level(id);
   if (!lv) return '';
-  return `<span class="lvl-tag" style="color:${lv.color};background:${lv.color}14" title="${esc(lv.desc)}">${lvlHtml(id)}<b>${esc(lv.letter)}</b></span>`;
+  if (lv.name) return `<span class="lvl-tag" style="color:${lv.color};background:${lv.color}14;padding-left:12px" title="${esc(lv.desc)}"><b>${esc(lv.name)}</b></span>`;
+  return `<span class="lvl-tag" style="color:${lv.color};background:${lv.color}14" title="${esc(lv.desc)}">${lvlHtml(id)}<b>${esc(lv.label || lv.letter)}</b></span>`;
 }
 
 // Sélecteur de niveau : —, I, L, U (et les niveaux ajoutés).
@@ -1135,7 +1154,9 @@ function findOrCreatePerson(nom, prenom) {
 
 // Les différentes façons d'écrire un niveau dans les fichiers. « none » = pas habilité.
 const LEVEL_WORDS = {
-  I: ['i', 'initie', 'initiee', 'a initier', 'initier', 'initiation', 'en formation', 'formation en cours', 'a former', 'en cours', 'debutant', 'debutante', 'apprenti', 'apprentie', 'novice', 'decouverte', 'base', 'connaissance de base', 'notions', 'accompagne', 'sous tutelle', 'niveau 1', 'niv 1', 'n1', '1'],
+  AI: ['ai', 'a initier', 'initier', 'a former', 'pas initie', 'non initie', 'pas encore forme', 'formation a prevoir'],
+  EF: ['ef', 'en formation', 'formation en cours', 'en cours de formation', 'en cours', 'initiation', 'apprentissage'],
+  I: ['i', 'initie', 'initiee', 'debutant', 'debutante', 'novice', 'decouverte', 'base', 'connaissance de base', 'notions', 'accompagne', 'sous tutelle', 'niveau 1', 'niv 1', 'n1', '1'],
   L: ['l', 'utilisateur', 'utilisatrice', 'utilisateurs', 'habilite', 'habilitee', 'autonome', 'maitrise', 'maitrisee', 'operationnel', 'operationnelle', 'confirme', 'confirmee', 'forme', 'formee', 'valide', 'validee', 'qualifie', 'qualifiee', 'oui', 'ok', 'x', 'niveau 2', 'niv 2', 'n2', '2'],
   U: ['u', 'formateur', 'formatrice', 'tuteur', 'tutrice', 'expert', 'experte', 'referent', 'referente', 'reference', 'pilote', 'sait former', 'transmet', 'niveau 3', 'niv 3', 'n3', '3'],
   none: ['non', 'no', 'na', 'n a', 'nc', 'aucun', 'aucune', 'pas habilite', 'pas forme', 'retire', 'retiree', 'suspendu', 'suspendue', '0', 'niveau 0', 'n0'],
