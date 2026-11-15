@@ -585,7 +585,7 @@ function renderToday() {
   const d = parseIso(day);
   const isToday = day === iso(new Date());
   let html = `<h1 class="page">${isToday ? 'Aujourd’hui' : esc(cap(d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })))}</h1>
-    <p class="sub">Les absents du jour viennent de ton planning Excel. L’appli te dit qui peut les remplacer.</p>
+    <p class="sub">Les absents du jour viennent de ton planning Excel. Touche une personne pour voir qui peut la remplacer.</p>
     <div class="date-row"><input type="date" class="date-input" id="day" value="${day}" aria-label="Choisir le jour">${isToday ? '' : '<button class="btn ghost small" data-action="today">Revenir à aujourd’hui</button>'}</div>
     ${linkBanner()}`;
   const steps = firstSteps();
@@ -618,51 +618,10 @@ function renderToday() {
 
   if (!absent.size) return html + `<p class="hint" style="margin-top:14px">${state.links.plan || Object.keys(state.absImport || {}).length ? 'Personne n’est absent ce jour-là dans le planning.' : 'Aucun planning raccordé : va dans Réglages pour choisir ton planning Excel.'}</p>`;
 
-  // Postes que plus personne de présent ne sait tenir.
+  // Postes que plus personne de présent ne sait tenir (le détail est dans la fiche de chaque absent).
   const uncovered = state.postes.filter((po) => state.people.some((p) => absent.has(p.id) && p.skills?.[po.id]) && !candidates(po.id, absent).length);
-  html += `<div class="summary">${uncovered.length ? `<span class="badge red">${uncovered.length} poste${uncovered.length > 1 ? 's' : ''} sans remplaçant : ${esc(uncovered.map((p) => p.name).join(', '))}</span>` : '<span class="badge green">Tous les postes ont un remplaçant possible</span>'}</div>
-    <div class="section-title">Les absents et qui peut les remplacer dans leur équipe</div><div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(min(100%,400px),1fr))">`;
-  for (const id of absent) {
-    const p = person(id);
-    if (!p) continue;
-    const skills = Object.keys(p.skills || {}).filter((k) => poste(k) && level(p.skills[k]));
-    const dpp = isDpp(p, day);
-    let dppRow = '';
-    if (dpp) {
-      const pool = state.people
-        .filter((x) => shown(x) && !x.planOnly && !absent.has(x.id) && x.id !== p.id && dppLevel(x) && (!dayHasShifts(day) || working(day, x.id)))
-        .sort((a, b) => (b.team === p.team) - (a.team === p.team) || rank(dppLevel(b)) - rank(dppLevel(a)) || byName(a, b));
-      dppRow = `<div class="replace-row"><div class="replace-poste"><span class="abs-type" style="background:#7C3AED">DPP</span><span style="padding-top:3px">Bâtiment AI</span></div>${
-        pool.length
-          ? `<div class="cands">${pool.slice(0, 4).map((x) => `<button class="cand" data-person="${x.id}">${lvlHtml(dppLevel(x))}${esc(x.name)}${x.team && x.team !== p.team ? ` <small style="color:var(--ink-2)">${esc(x.team)}</small>` : ''}${shiftOf(day, x.id) ? ` <small style="color:var(--ink-2)">${esc(shortShift(shiftOf(day, x.id)))}</small>` : ''}</button>`).join('')}${pool.length > 4 ? `<span class="badge grey">+${pool.length - 4}</span>` : ''}</div>`
-          : '<div class="nobody">Personne d’habilité au DPP de disponible</div>'
-      }</div>`;
-    }
-    html += `<div class="card absent-card"><div class="absent-head">${avHtml(p, 'absent')}<div class="grow"><div class="card-title">${esc(p.name)}</div><div class="card-meta">${esc(p.post || role(p.role)?.name || '')} · ${absInfo(day, p.id) ? esc(absText(absInfo(day, p.id))) + (absInfo(day, p.id).note ? ' (' + esc(absInfo(day, p.id).note) + ')' : '') : 'absent'}</div></div></div>
-      <div class="replace">${dppRow}${
-        skills.length
-          ? skills
-              .map((k) => poste(k))
-              .sort(byName)
-              .map((po) => {
-                const all = candidates(po.id, absent).filter((x) => !dpp || dppLevel(x));
-                const mine = p.team ? all.filter((x) => x.team === p.team) : all;
-                const c = mine.length ? mine : all;
-                return `<div class="replace-row"><div class="replace-poste">${lvlHtml(p.skills[po.id])}<span style="padding-top:3px">${esc(po.name)}</span></div>${
-                  c.length
-                    ? `<div class="cands">${p.team && !mine.length ? `<span class="badge grey">Personne dans ${esc(p.team)} · autre équipe :</span>` : ''}${c.slice(0, 3).map((x) => `<button class="cand" data-person="${x.id}">${lvlHtml(x.skills[po.id])}${esc(x.name)}${shiftOf(day, x.id) ? ` <small style="color:var(--ink-2)">${esc(shortShift(shiftOf(day, x.id)))}</small>` : ''}</button>`).join('')}${c.length > 3 ? `<button class="badge grey" data-poste="${po.id}" style="border:0">+${c.length - 3} autres</button>` : ''}</div>`
-                    : `<div class="nobody">${dpp ? 'Personne d’habilité au DPP sur ce poste' : 'Personne de disponible'}</div>`
-                }</div>`;
-              })
-              .join('')
-          : `<p class="hint" style="margin:0;color:var(--danger)">${
-              p.ambiguous
-                ? `Plusieurs personnes s’appellent ${esc(p.name)} dans le fichier d’habilitations (${esc(p.ambiguous.join(', '))}). Ajoute l’initiale du prénom dans le planning (ex. « ${esc(p.name)} M. ») pour que je sache laquelle.`
-                : `Je ne trouve pas ${esc(p.name)} dans le fichier d’habilitations, donc je ne peux pas proposer de remplaçant. Vérifie que le nom est écrit pareil dans les deux fichiers.`
-            }</p>`
-      }</div></div>`;
-  }
-  return html + `</div>`;
+  if (uncovered.length) html += `<div class="summary"><span class="badge red">${uncovered.length} poste${uncovered.length > 1 ? 's' : ''} sans remplaçant : ${esc(uncovered.map((p) => p.name).join(', '))}</span></div>`;
+  return html;
 }
 
 const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -954,12 +913,14 @@ function openPerson(id) {
   const p = person(id);
   if (!p) return;
   p.skills = p.skills || {};
-  const absent = absentOn(iso(new Date()));
+  const day = ui.day || iso(new Date());
+  const dayName = day === iso(new Date()) ? 'Aujourd’hui' : cap(parseIso(day).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }));
+  const absent = absentOn(day);
   absent.add(p.id);
   const known = state.postes.filter((po) => p.skills[po.id] && level(p.skills[po.id]));
   const others = state.postes.filter((po) => !known.includes(po));
   let replaceHtml = '';
-  const today = iso(new Date());
+  const today = day;
   const dpp = isDpp(p, today);
   // Une puce de remplaçant : niveau, nom, quart ; mise en avant si même équipe.
   const chip = (x, lv) =>
@@ -991,9 +952,9 @@ function openPerson(id) {
       ${p.team ? `<p class="hint" style="margin:-4px 0 10px"><span class="legend-same"></span> En bleu : les personnes de son équipe (${esc(p.team)}).</p>` : ''}
       ${blocks.length > 2 ? `<div class="search-wrap" style="margin:0 0 10px">${icons.search}<input class="search" id="rp-find" type="search" placeholder="Chercher un poste" autocomplete="off" aria-label="Chercher un poste parmi ceux de ${esc(p.name)}"></div><p class="hint" id="rp-none" hidden style="margin:0 0 10px">Aucun de ses postes ne correspond.</p>` : ''}
       <div id="rp-list">${blocks.join('')}</div>
-      <p class="hint">Sans compter les absents du jour${dayHasShifts(today) ? ', et seulement ceux qui travaillent aujourd’hui' : ''}.</p>`;
+      <p class="hint">Sans compter les absents du jour${dayHasShifts(today) ? ', et seulement ceux qui travaillent ce jour-là' : ''}.</p>`;
   }
-  const back = showSheet(`<div class="sheet-head">${avHtml(p, 'big')}<div style="min-width:0"><h2>${esc(p.name)}</h2><p>${esc(role(p.role)?.name || 'Sans rôle')}${p.team ? ' · ' + esc(p.team) : ''} · ${known.length} poste${known.length > 1 ? 's' : ''}</p><p style="margin-top:6px">Aujourd’hui : ${presenceBadge(iso(new Date()), p)}</p></div>${closeBtn}</div>
+  const back = showSheet(`<div class="sheet-head">${avHtml(p, 'big')}<div style="min-width:0"><h2>${esc(p.name)}</h2><p>${esc(role(p.role)?.name || 'Sans rôle')}${p.team ? ' · ' + esc(p.team) : ''} · ${known.length} poste${known.length > 1 ? 's' : ''}</p><p style="margin-top:6px">${esc(dayName)} : ${presenceBadge(day, p)}</p></div>${closeBtn}</div>
     ${p.post ? `<p class="hint">Poste habituel : <b>${esc(p.post)}</b></p>` : ''}
     ${replaceHtml ? '<button class="btn ghost small" data-go-replace style="margin-top:12px">Voir qui peut le remplacer ↓</button>' : ''}
     <span class="label">Habilitations</span>
@@ -1271,7 +1232,7 @@ document.addEventListener('click', (e) => {
 
 const canLink = 'showOpenFilePicker' in window;
 // À changer quand la façon de lire les fichiers change : les fichiers raccordés sont alors relus.
-const READER_VERSION = '2026-11-15h';
+const READER_VERSION = '2026-11-15i';
 const handles = {};
 let linkNeedsTap = false;
 
