@@ -230,6 +230,8 @@ button.card { text-align: left; width: 100%; padding: 14px; display: flex; gap: 
 .ech-date.orange { background: #FDF0DC; color: var(--warn); }
 .ech-date.green { background: var(--ok-soft); color: var(--ok); }
 .ech-date.none { background: var(--bg); color: var(--ink-3); }
+.ech-wrap { display: inline-flex; flex-direction: column; align-items: flex-end; gap: 2px; flex: 0 0 auto; }
+.ech-got { font-size: 12px; font-weight: 600; color: var(--ink-3); white-space: nowrap; }
 .ech-edit { display: flex; align-items: center; gap: 10px; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 8px 8px 8px 14px; }
 .ech-edit + .ech-edit { margin-top: 8px; }
 .ech-edit .grow { flex: 1; min-width: 0; font-weight: 700; }
@@ -1064,7 +1066,7 @@ function openPerson(id) {
     ${state.echeances.length ? `<span class="label">Habilitations à date</span>${state.echeances
       .map((ec) => {
         const d = p.dates?.[ec.id] || '';
-        return `<div class="ech-edit"><span class="grow">${esc(ec.name)}</span>${echDate(d)}</div>`;
+        return `<div class="ech-edit"><span class="grow">${esc(ec.name)}</span>${echDate(d, p.got?.[ec.id])}</div>`;
       })
       .join('')}` : ''}
     ${replaceHtml}
@@ -1282,15 +1284,17 @@ const DAY = 864e5;
 function echStatus(d) {
   if (!d) return 'none';
   const left = (parseIso(d) - parseIso(iso(new Date()))) / DAY;
-  return left < 0 ? 'red' : left <= 60 ? 'orange' : 'green';
+  return left <= 90 ? 'red' : left <= 182 ? 'orange' : 'green';
 }
 const fmtDate = (d) => parseIso(d).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' });
-function echDate(d) {
-  if (!d) return '<span class="ech-date none">—</span>';
+// d = date où il faut la repasser ; got = date où elle a été obtenue (celle écrite dans l'Excel).
+function echDate(d, got) {
+  const obt = got ? `<small class="ech-got">obtenue le ${fmtDate(got)}</small>` : '';
+  if (!d) return `<span class="ech-wrap"><span class="ech-date none">${got ? 'Pas de durée' : '—'}</span>${obt}</span>`;
   const st = echStatus(d);
   const left = Math.round((parseIso(d) - parseIso(iso(new Date()))) / DAY);
-  const label = st === 'red' ? `Expiré · ${fmtDate(d)}` : st === 'orange' ? `Dans ${left} j · ${fmtDate(d)}` : fmtDate(d);
-  return `<span class="ech-date ${st}">${label}</span>`;
+  const label = left < 0 ? `Expirée · ${fmtDate(d)}` : st === 'green' ? `Jusqu’au ${fmtDate(d)}` : `Dans ${left} j · ${fmtDate(d)}`;
+  return `<span class="ech-wrap"><span class="ech-date ${st}">${label}</span>${obt}</span>`;
 }
 
 // Toutes les échéances des personnes qui correspondent à la recherche, de la plus urgente à la plus lointaine.
@@ -1299,21 +1303,21 @@ function echeancesOf(q) {
   if (!people.length) return `<p class="hint" style="margin-top:14px">Personne ne s’appelle « ${esc(q.trim())} ».</p>`;
   return people
     .map((p) => {
-      const rows = state.echeances.map((ec) => ({ ec, d: p.dates?.[ec.id] || '' })).sort((a, b) => (a.d || '9999').localeCompare(b.d || '9999'));
+      const rows = state.echeances.map((ec) => ({ ec, d: p.dates?.[ec.id] || '', got: p.got?.[ec.id] || '' })).sort((a, b) => (a.d || '9999').localeCompare(b.d || '9999'));
       const withDate = rows.filter((x) => x.d);
       const red = withDate.filter((x) => echStatus(x.d) === 'red').length;
       const orange = withDate.filter((x) => echStatus(x.d) === 'orange').length;
       return `<section class="card" style="padding:14px;margin-top:14px">
         <button class="absent-head" data-person="${p.id}" style="background:none;border:0;padding:0;width:100%;text-align:left">${avHtml(p)}<span class="grow"><span class="card-title" style="display:block">${esc(p.name)}</span><span class="card-meta">${esc([role(p.role)?.name, p.team].filter(Boolean).join(' · '))}</span></span>${icons.chevron}</button>
-        <div class="lvls-row" style="margin:10px 0">${red ? `<span class="badge red">${red} expirée${red > 1 ? 's' : ''}</span>` : ''}${orange ? `<span class="badge" style="background:#FDF0DC;color:var(--warn)">${orange} bientôt</span>` : ''}${!red && !orange && withDate.length ? '<span class="badge green">Tout est à jour</span>' : ''}${!withDate.length ? '<span class="badge grey">Aucune échéance dans le fichier</span>' : ''}</div>
-        ${rows.map((x) => `<div class="ech-edit"><span class="grow">${esc(x.ec.name)}${x.ec.every ? `<small style="display:block;color:var(--ink-3);font-weight:600;font-size:13px">${esc(x.ec.every)}</small>` : ''}</span>${echDate(x.d)}</div>`).join('')}
+        <div class="lvls-row" style="margin:10px 0">${red ? `<span class="badge red">${red} à repasser vite</span>` : ''}${orange ? `<span class="badge" style="background:#FDF0DC;color:var(--warn)">${orange} dans moins de 6 mois</span>` : ''}${!red && !orange && withDate.length ? '<span class="badge green">Tout est à jour</span>' : ''}${!withDate.length ? '<span class="badge grey">Aucune échéance dans le fichier</span>' : ''}</div>
+        ${rows.map((x) => `<div class="ech-edit"><span class="grow">${esc(x.ec.name)}${x.ec.every ? `<small style="display:block;color:var(--ink-3);font-weight:600;font-size:13px">${esc(x.ec.every)}</small>` : ''}</span>${echDate(x.d, x.got)}</div>`).join('')}
       </section>`;
     })
     .join('');
 }
 
 function renderEcheances() {
-  let html = `<h1 class="page">Échéances</h1><p class="sub">Les habilitations à date : rouge = expirée, orange = à renouveler dans les 60 jours.</p>`;
+  let html = `<h1 class="page">Échéances</h1><p class="sub">Date de l’Excel = date d’obtention ; on y ajoute la durée écrite au-dessus (ex. 3 ans) pour savoir quand la repasser. Rouge = à repasser dans moins de 3 mois (ou expirée), orange = dans moins de 6 mois, vert = à jour.</p>`;
   if (!state.echeances.length)
     return html + `<div class="empty" style="margin-top:18px"><b>Pas encore d’échéances</b>Raccorde ton fichier Excel d’habilitations dans « Réglages » : les dates (microbio, ZEC, BPF, CACES…) arrivent ici.<br><button class="btn" data-tab-go="reglages">Raccorder mon fichier</button></div>`;
   if (norm(ui.echQuery)) return html + echeancesOf(ui.echQuery);
@@ -1323,10 +1327,10 @@ function renderEcheances() {
   const red = all.filter((x) => x.st === 'red');
   const orange = all.filter((x) => x.st === 'orange');
   const green = all.filter((x) => x.st === 'green');
-  const row = (x) => `<button class="ech-row" data-person="${x.p.id}" style="width:100%;text-align:left">${avHtml(x.p, 'small')}<span class="grow"><span class="card-title" style="font-size:16px;display:block">${esc(x.p.name)}</span><span class="card-meta">${esc(x.ec.name)}</span></span>${echDate(x.d)}</button>`;
-  html += `<div class="summary"><span class="badge red">${red.length} expirée${red.length > 1 ? 's' : ''}</span><span class="badge" style="background:#FDF0DC;color:var(--warn)">${orange.length} bientôt</span><span class="badge green">${green.length} valide${green.length > 1 ? 's' : ''}</span></div>`;
-  if (red.length) html += `<div class="section-title">Expirées</div>${red.map(row).join('')}`;
-  if (orange.length) html += `<div class="section-title">À renouveler bientôt</div>${orange.map(row).join('')}`;
+  const row = (x) => `<button class="ech-row" data-person="${x.p.id}" style="width:100%;text-align:left">${avHtml(x.p, 'small')}<span class="grow"><span class="card-title" style="font-size:16px;display:block">${esc(x.p.name)}</span><span class="card-meta">${esc(x.ec.name)}</span></span>${echDate(x.d, x.p.got?.[x.ec.id])}</button>`;
+  html += `<div class="summary"><span class="badge red">${red.length} à repasser vite</span><span class="badge" style="background:#FDF0DC;color:var(--warn)">${orange.length} dans moins de 6 mois</span><span class="badge green">${green.length} valide${green.length > 1 ? 's' : ''}</span></div>`;
+  if (red.length) html += `<div class="section-title">À repasser vite (moins de 3 mois)</div>${red.map(row).join('')}`;
+  if (orange.length) html += `<div class="section-title">À repasser dans moins de 6 mois</div>${orange.map(row).join('')}`;
   if (!red.length && !orange.length) html += `<p class="hint" style="margin-top:14px">Tout est à jour.</p>`;
   html += `<div class="section-title">Par habilitation</div><div class="grid">${state.echeances
     .map((ec) => {
@@ -1334,7 +1338,7 @@ function renderEcheances() {
       const r = list.filter((x) => x.st === 'red').length;
       const o = list.filter((x) => x.st === 'orange').length;
       return `<div class="card" style="padding:14px"><div class="card-title">${esc(ec.name)}</div><div class="card-meta">${list.length} personne${list.length > 1 ? 's' : ''}${ec.every ? ' · ' + esc(ec.every) : ''}</div>
-        <div class="lvls-row">${r ? `<span class="badge red">${r} expirée${r > 1 ? 's' : ''}</span>` : ''}${o ? `<span class="badge" style="background:#FDF0DC;color:var(--warn)">${o} bientôt</span>` : ''}${!r && !o && list.length ? '<span class="badge green">À jour</span>' : ''}</div></div>`;
+        <div class="lvls-row">${r ? `<span class="badge red">${r} à repasser vite</span>` : ''}${o ? `<span class="badge" style="background:#FDF0DC;color:var(--warn)">${o} dans moins de 6 mois</span>` : ''}${!r && !o && list.length ? '<span class="badge green">À jour</span>' : ''}</div></div>`;
     })
     .join('')}</div>`;
   return html;
@@ -1354,7 +1358,7 @@ document.addEventListener('click', (e) => {
 
 const canLink = 'showOpenFilePicker' in window;
 // À changer quand la façon de lire les fichiers change : les fichiers raccordés sont alors relus.
-const READER_VERSION = '2026-11-15o';
+const READER_VERSION = '2026-11-16a';
 const handles = {};
 let linkNeedsTap = false;
 
@@ -1744,8 +1748,17 @@ function importHabilitations(wb) {
     const everyOf = (c) => {
       for (let r = h; r >= 0; r--) {
         const t = cellText(rows[r]?.[c]);
-        const m = norm(t).match(/(1 fois tous les \d+ ans?|1 fois par an|tous les \d+ ans?|tous les ans)/);
+        const n = norm(t);
+        const m = n.match(/(1 fois tous les \d+ ans?|1 fois par an|tous les \d+ ans?|tous les ans)/);
         if (m) return m[1].replace(/^1 fois /, '').replace(/^tous les 1 an$/, 'tous les ans');
+        // Juste la durée écrite au-dessus : « 3 ans », « valable 5 ans », « 6 mois », « annuel ».
+        if (n.length <= 30) {
+          const y = n.match(/(?:^|\s|\()(\d+)\s*(ans?|annees?)\b/);
+          if (y) return Number(y[1]) === 1 ? 'tous les ans' : `tous les ${y[1]} ans`;
+          const mo = n.match(/(?:^|\s|\()(\d+)\s*mois\b/);
+          if (mo) return `tous les ${mo[1]} mois`;
+          if (/^(annuel(le)?|par an)$/.test(n)) return 'tous les ans';
+        }
       }
       return '';
     };
@@ -1761,24 +1774,27 @@ function importHabilitations(wb) {
       const trainedOn = vals.some(isDate) && !every && !/echeance/.test(colTxt);
       if (trainedOn && /date/.test(colTxt)) continue; // date d'une colonne voisine (« date formation ou réhabilitation »)
       if (vals.some(isDate) && !trainedOn) {
-        const years = every === 'par an' || every === 'tous les ans' ? 1 : Number((every.match(/\d+/) || [0])[0]);
-        // « Date dernier recyclage », « date de réalisation »… : c'est la date du dernier passage, pas l'échéance.
-        const headTxt = [h - 2, h - 1, h].filter((r) => r >= 0).map((r) => norm(cellText(rows[r]?.[c]))).join(' ');
-        const addYears = /dernier|realisation|initial|effectue|passage/.test(headTxt) ? years : 0;
+        // La date écrite est celle où l'habilitation a été OBTENUE ; elle est valable la durée écrite au-dessus.
+        const months = /mois/.test(every) ? Number((every.match(/\d+/) || [0])[0]) : (every === 'par an' || every === 'tous les ans' ? 1 : Number((every.match(/\d+/) || [0])[0])) * 12;
         let ec = state.echeances.find((x) => norm(x.name) === norm(title));
         if (!ec) state.echeances.push((ec = { id: uid('e'), name: title, every }));
+        if (every) ec.every = every;
         data.forEach((r) => {
           const p = findOrCreatePerson(cellText(r[cNom]), cellText(r[cPre]));
           p.dates = p.dates || {};
-          let d = toIso(r[c]);
-          if (d && addYears) {
-            const x = parseIso(d);
-            d = iso(new Date(x.getFullYear() + addYears, x.getMonth(), x.getDate()));
-          }
-          if (d) {
-            p.dates[ec.id] = d;
+          p.got = p.got || {};
+          const got = toIso(r[c]);
+          let d = '';
+          if (got && months) {
+            const x = parseIso(got);
+            d = iso(new Date(x.getFullYear(), x.getMonth() + months, x.getDate()));
+          } else if (got && /echeance|expir|fin de validite/.test(colTxt)) d = got; // colonne qui donne déjà la date limite
+          if (got) {
+            p.got[ec.id] = got;
             nDates++;
-          } else delete p.dates[ec.id];
+          } else delete p.got[ec.id];
+          if (d) p.dates[ec.id] = d;
+          else delete p.dates[ec.id];
         });
       } else if (trainedOn || looksLikeLevels(vals)) {
         let po = state.postes.find((x) => norm(x.name) === norm(title));
