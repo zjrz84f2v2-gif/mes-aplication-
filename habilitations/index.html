@@ -1292,8 +1292,9 @@ function echStatus(d) {
 const fmtDate = (d) => parseIso(d).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' });
 // d = date où il faut la repasser ; got = date où elle a été obtenue (celle écrite dans l'Excel).
 function echDate(d, got) {
+  if (d && !got) return '<span class="ech-wrap"><span class="ech-date none">À relire</span><small class="ech-got">relis ton fichier Excel</small></span>';
   const obt = got ? `<small class="ech-got">obtenue le ${fmtDate(got)}</small>` : '';
-  if (!d) return `<span class="ech-wrap"><span class="ech-date none">${got ? 'Pas de durée' : '—'}</span>${obt}</span>`;
+  if (!d) return `<span class="ech-wrap"><span class="ech-date none">${got ? 'Durée introuvable' : '—'}</span>${obt}</span>`;
   const st = echStatus(d);
   const left = Math.round((parseIso(d) - parseIso(iso(new Date()))) / DAY);
   const label = left < 0 ? `Expirée · ${fmtDate(d)}` : st === 'green' ? `Jusqu’au ${fmtDate(d)}` : `Dans ${left} j · ${fmtDate(d)}`;
@@ -1307,7 +1308,7 @@ function echeancesOf(q) {
   return people
     .map((p) => {
       const rows = state.echeances.map((ec) => ({ ec, d: p.dates?.[ec.id] || '', got: p.got?.[ec.id] || '' })).sort((a, b) => (a.d || '9999').localeCompare(b.d || '9999'));
-      const withDate = rows.filter((x) => x.d);
+      const withDate = rows.filter((x) => x.d && x.got);
       const red = withDate.filter((x) => echStatus(x.d) === 'red').length;
       const orange = withDate.filter((x) => echStatus(x.d) === 'orange').length;
       return `<section class="card" style="padding:14px;margin-top:14px">
@@ -1325,7 +1326,7 @@ function renderEcheances() {
     return html + `<div class="empty" style="margin-top:18px"><b>Pas encore d’échéances</b>Raccorde ton fichier Excel d’habilitations dans « Réglages » : les dates (microbio, ZEC, BPF, CACES…) arrivent ici.<br><button class="btn" data-tab-go="reglages">Raccorder mon fichier</button></div>`;
   if (norm(ui.echQuery)) return html + echeancesOf(ui.echQuery);
   const all = [];
-  state.people.forEach((p) => state.echeances.forEach((ec) => p.dates?.[ec.id] && all.push({ p, ec, d: p.dates[ec.id], st: echStatus(p.dates[ec.id]) })));
+  state.people.forEach((p) => state.echeances.forEach((ec) => p.dates?.[ec.id] && p.got?.[ec.id] && all.push({ p, ec, d: p.dates[ec.id], st: echStatus(p.dates[ec.id]) })));
   all.sort((a, b) => a.d.localeCompare(b.d));
   const red = all.filter((x) => x.st === 'red');
   const orange = all.filter((x) => x.st === 'orange');
@@ -1361,7 +1362,7 @@ document.addEventListener('click', (e) => {
 
 const canLink = 'showOpenFilePicker' in window;
 // À changer quand la façon de lire les fichiers change : les fichiers raccordés sont alors relus.
-const READER_VERSION = '2026-11-16a';
+const READER_VERSION = '2026-11-16b';
 const handles = {};
 let linkNeedsTap = false;
 
@@ -1791,7 +1792,7 @@ function importHabilitations(wb) {
           if (got && months) {
             const x = parseIso(got);
             d = iso(new Date(x.getFullYear(), x.getMonth() + months, x.getDate()));
-          } else if (got && /echeance|expir|fin de validite/.test(colTxt)) d = got; // colonne qui donne déjà la date limite
+          } // Sans durée trouvée : on garde seulement la date d'obtention (jamais prise pour une date d'expiration).
           if (got) {
             p.got[ec.id] = got;
             nDates++;
