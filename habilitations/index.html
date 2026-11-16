@@ -245,7 +245,11 @@ button.card { text-align: left; width: 100%; padding: 14px; display: flex; gap: 
 .banner .btn { width: auto; min-height: 40px; font-size: 14px; margin-left: auto; }
 /* Recherche d'une personne, en haut de chaque page. */
 .finder { position: sticky; top: 0; z-index: 8; padding: calc(10px + env(safe-area-inset-top)) 0 6px; margin-top: calc(-1 * env(safe-area-inset-top)); background: linear-gradient(var(--bg) 80%, rgba(241, 244, 248, 0)); }
-.finder .search-wrap { margin-top: 0; }
+.finder .search-wrap { margin-top: 0; flex: 1; min-width: 0; }
+.finder { display: flex; align-items: center; gap: 8px; }
+.reload-btn { flex: 0 0 auto; width: 52px; height: 52px; border-radius: 16px; border: 1px solid var(--line); background: var(--card); color: var(--ink); display: flex; align-items: center; justify-content: center; padding: 0; }
+.reload-btn svg { width: 24px; height: 24px; }
+.reload-btn:active { transform: scale(.94); }
 .finder-results { position: absolute; left: 0; right: 0; top: 100%; background: var(--card); border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 16px 40px -12px rgba(22, 32, 44, .35); max-height: 60vh; overflow-y: auto; padding: 6px; }
 .finder-results button { width: 100%; display: flex; align-items: center; gap: 10px; padding: 8px; border: 0; background: none; border-radius: 12px; text-align: left; min-height: 52px; }
 .finder-results button:hover, .finder-results button:focus-visible { background: var(--bg); }
@@ -481,7 +485,7 @@ function finderHtml() {
   if (!state.people.some((p) => !p.planOnly)) return '';
   const mode = FINDER_MODE[ui.tab];
   const label = mode ? mode[1] : 'Rechercher une personne';
-  return `<div class="finder" role="search"><div class="search-wrap">${icons.search}<input class="search" id="finder" type="search" placeholder="${label}" value="${esc(mode ? ui[mode[0]] || '' : '')}" autocomplete="off" aria-label="${label}"${mode ? ' aria-controls="page"' : ' aria-controls="finder-results"'}></div><div class="finder-results" id="finder-results" hidden></div></div>`;
+  return `<div class="finder" role="search"><div class="search-wrap">${icons.search}<input class="search" id="finder" type="search" placeholder="${label}" value="${esc(mode ? ui[mode[0]] || '' : '')}" autocomplete="off" aria-label="${label}"${mode ? ' aria-controls="page"' : ' aria-controls="finder-results"'}></div><button class="reload-btn" data-action="reload-page" aria-label="Rafraîchir la page" title="Rafraîchir"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg></button><div class="finder-results" id="finder-results" hidden></div></div>`;
 }
 
 // Redessine la page sous la barre de recherche, sans toucher au champ (le clavier reste ouvert).
@@ -929,6 +933,7 @@ document.addEventListener('click', (e) => {
   else if (a === 'unlink-hab') unlinkFile('hab');
   else if (a === 'unlink-plan') unlinkFile('plan');
   else if (a === 'refresh-links') refreshLinks(true);
+  else if (a === 'reload-page') reloadPage();
   else if (a === 'demo') loadDemo();
   else if (a === 'no-team') openNoTeam();
   else if (a === 'wipe') {
@@ -1443,6 +1448,19 @@ async function unlinkFile(kind) {
 }
 
 // Relit les fichiers raccordés s'ils ont changé depuis la dernière lecture.
+// Bouton ↻ : relit les fichiers Excel (sur ordinateur), puis recharge la dernière version de l'appli.
+async function reloadPage() {
+  toast('Je rafraîchis…');
+  if (canLink && Object.keys(state.links || {}).length) {
+    try {
+      await refreshLinks(true);
+    } catch (e) {}
+  }
+  const u = new URL(location.href);
+  u.searchParams.set('r', Date.now());
+  location.replace(u.toString());
+}
+
 async function refreshLinks(fromTap) {
   if (!canLink) {
     if (fromTap) {
