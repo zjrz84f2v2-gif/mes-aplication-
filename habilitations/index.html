@@ -421,6 +421,9 @@ const shiftOf = (day, id) => state.shifts?.[day]?.[id] || '';
 const dayHasShifts = (day) => Object.keys(state.shifts?.[day] || {}).length > 0;
 // Travaille ce jour-là : un quart, ou « DPP » écrit dans le planning.
 const working = (day, id) => !!(shiftOf(day, id) || state.locs?.[day]?.[id]);
+// Couleur de chaque quart : vert le matin, orange l'après-midi, violet la nuit.
+const SHIFT_COLORS = { 'Quart matin': '#2E7D4F', 'Quart après-midi': '#C2570C', 'Quart nuit': '#6B3FBF', 'Quart de jour': '#1D4ED8' };
+const shiftColor = (label) => SHIFT_COLORS[label] || 'var(--ok)';
 const shortShift = (label) => (Object.entries(SHIFT_CODES).find(([, v]) => v === label)?.[0] || '').toUpperCase() || label;
 
 // DPP = l'endroit où travaille la personne : le bâtiment AI.
@@ -442,7 +445,7 @@ function presence(day, p) {
   const a = absInfo(day, p.id);
   if (a) return { here: false, text: 'Absent · ' + absText(a), color: absColor(a.type) };
   const sh = shiftOf(day, p.id);
-  if (sh) return { here: true, text: 'Là · ' + sh + (isDpp(p, day) ? ' · DPP (bât. AI)' : ''), color: 'var(--ok)' };
+  if (sh) return { here: true, text: 'Là · ' + sh + (isDpp(p, day) ? ' · DPP (bât. AI)' : ''), color: shiftColor(sh) };
   if (state.locs?.[day]?.[p.id] === 'DPP') return { here: true, text: 'Là · DPP (bât. AI)', color: 'var(--ok)' };
   if (dayHasShifts(day)) return { here: false, text: 'Pas de quart ce jour-là', color: '#6B7280' };
   if (state.links.plan || Object.keys(state.absImport || {}).length) return { here: true, text: 'Là', color: 'var(--ok)' };
@@ -452,7 +455,7 @@ const presenceBadge = (day, p) => {
   const pr = presence(day, p);
   return `<span class="abs-type" style="background:${pr.color}">${esc(pr.text)}</span>`;
 };
-const ABS_COLORS = { conge: '#3F8F1F', 'conge annuel': '#3F8F1F', rtt: '#7C3AED', arret: '#C2321F', absence: '#0A84C6', formation: '#B4581E', autre: '#4B5563' };
+const ABS_COLORS = { conge: '#0E7490', 'conge annuel': '#0E7490', rtt: '#BE185D', arret: '#C2321F', absence: '#0A84C6', formation: '#854D0E', autre: '#4B5563' };
 const absColor = (type) => ABS_COLORS[norm(type).replace(/s$/, '')] || ABS_COLORS[Object.keys(ABS_COLORS).find((k) => norm(type).startsWith(norm(k)))] || '#4B5563';
 const absBadge = (info) => (info ? `<span class="abs-type" style="background:${absColor(info.type)}">${esc(info.type)}</span>` : '');
 const ABS_SHORT = { 'conge annuel': 'CA', conge: 'CA', rtt: 'RTT', absence: 'ABS', arret: 'Arrêt', formation: 'For' };
@@ -638,7 +641,7 @@ function teamShift(members, day) {
 
 // Une ligne par personne : les noms longs sont coupés proprement au lieu de déformer les cases.
 function personRow(p, day, absent, attr = 'data-absent') {
-  return `<button class="mrow${absent.has(p.id) ? ' is-absent' : ''}" ${attr}="${p.id}" title="${esc(p.name)}${p.post ? ' · ' + esc(p.post) : ''}">${avHtml(p, 'small' + (absent.has(p.id) ? ' absent' : ''))}<span class="mrow-text"><b>${esc(p.name)}</b>${p.post || bossLabel(p) ? `<small>${esc([bossLabel(p), p.post].filter(Boolean).join(' · '))}</small>` : ''}</span><span class="mrow-tags">${absShort(absInfo(day, p.id)) || (shiftOf(day, p.id) ? `<span class="abs-type" style="background:var(--ok)">${esc(shortShift(shiftOf(day, p.id)))}</span>` : '')}${isDpp(p, day) ? '<span class="abs-type" style="background:#7C3AED" title="Bâtiment AI">DPP</span>' : ''}</span></button>`;
+  return `<button class="mrow${absent.has(p.id) ? ' is-absent' : ''}" ${attr}="${p.id}" title="${esc(p.name)}${p.post ? ' · ' + esc(p.post) : ''}">${avHtml(p, 'small' + (absent.has(p.id) ? ' absent' : ''))}<span class="mrow-text"><b>${esc(p.name)}</b>${p.post || bossLabel(p) ? `<small>${esc([bossLabel(p), p.post].filter(Boolean).join(' · '))}</small>` : ''}</span><span class="mrow-tags">${absShort(absInfo(day, p.id)) || (shiftOf(day, p.id) ? `<span class="abs-type" style="background:${shiftColor(shiftOf(day, p.id))}">${esc(shortShift(shiftOf(day, p.id)))}</span>` : '')}${isDpp(p, day) ? '<span class="abs-type" style="background:#374151" title="Bâtiment AI">DPP</span>' : ''}</span></button>`;
 }
 
 // Les personnes sans équipe : une liste à part, avec sa propre recherche.
@@ -695,7 +698,7 @@ function renderToday() {
     const sh = teamShift(members, day);
     const boss = members.find((p) => bossRank(p) === 0);
     html += `<section class="team-card card">
-        <div class="team-head"><h3>${esc(team)}${boss && norm(team) === visaCode(boss) ? ` <span style="font-weight:600;color:var(--ink-2);font-size:15px">· ${esc(boss.name)}</span>` : ''}</h3>${sh ? `<span class="abs-type" style="background:var(--ok)">${esc(sh)}</span>` : dayHasShifts(day) ? '<span class="abs-type" style="background:#6B7280">Pas de quart</span>' : ''}<small>${members.length - nAbs} présent${members.length - nAbs > 1 ? 's' : ''}${nAbs ? ` · ${nAbs} absent${nAbs > 1 ? 's' : ''}` : ''}${nDpp ? ` · ${nDpp} au DPP (bât. AI)` : ''}</small></div>
+        <div class="team-head"><h3>${esc(team)}${boss && norm(team) === visaCode(boss) ? ` <span style="font-weight:600;color:var(--ink-2);font-size:15px">· ${esc(boss.name)}</span>` : ''}</h3>${sh ? `<span class="abs-type" style="background:${shiftColor(sh)}">${esc(sh)}</span>` : dayHasShifts(day) ? '<span class="abs-type" style="background:#6B7280">Pas de quart</span>' : ''}<small>${members.length - nAbs} présent${members.length - nAbs > 1 ? 's' : ''}${nAbs ? ` · ${nAbs} absent${nAbs > 1 ? 's' : ''}` : ''}${nDpp ? ` · ${nDpp} au DPP (bât. AI)` : ''}</small></div>
         ${bosses.length ? `<div class="members team-boss">${bosses.map(tile).join('')}</div>` : ''}
         <div class="members">${others.map(tile).join('')}</div>
       </section>`;
@@ -1028,7 +1031,7 @@ function openPerson(id) {
   const dpp = isDpp(p, today);
   // Une puce de remplaçant : niveau, nom, quart ; mise en avant si même équipe.
   const chip = (x, lv) =>
-    `<button class="cand${p.team && x.team === p.team ? ' same' : ''}" data-go-person="${x.id}">${lvlHtml(lv)}<span>${esc(x.name)}</span>${shiftOf(today, x.id) ? `<small>${esc(shortShift(shiftOf(today, x.id)))}</small>` : ''}${p.team && x.team !== p.team && x.team ? `<small>${esc(x.team)}</small>` : ''}</button>`;
+    `<button class="cand${p.team && x.team === p.team ? ' same' : ''}" data-go-person="${x.id}">${lvlHtml(lv)}<span>${esc(x.name)}</span>${shiftOf(today, x.id) ? `<small style="color:${shiftColor(shiftOf(today, x.id))};font-weight:800">${esc(shortShift(shiftOf(today, x.id)))}</small>` : ''}${p.team && x.team !== p.team && x.team ? `<small>${esc(x.team)}</small>` : ''}</button>`;
   // Deux groupes : son équipe d'abord (mise en avant), puis les autres équipes.
   const groups = (list, lvOf) => {
     if (!list.length) return `<div class="nobody">${dpp ? 'Personne d’habilité au DPP de disponible' : 'Personne de disponible'}</div>`;
@@ -1046,7 +1049,7 @@ function openPerson(id) {
       const pool = state.people
         .filter((x) => shown(x) && !x.planOnly && !absent.has(x.id) && dppLevel(x) && (!dayHasShifts(today) || working(today, x.id)))
         .sort((a, b) => rank(dppLevel(b)) - rank(dppLevel(a)) || shiftRank(a, today) - shiftRank(b, today) || byName(a, b));
-      blocks.push(`<div class="rp-block" data-rp="dpp batiment ai"><div class="rp-head"><span class="abs-type" style="background:#7C3AED">DPP</span><b>Bâtiment AI</b><small>seulement les habilités au DPP</small></div>${groups(pool, dppLevel)}</div>`);
+      blocks.push(`<div class="rp-block" data-rp="dpp batiment ai"><div class="rp-head"><span class="abs-type" style="background:#374151">DPP</span><b>Bâtiment AI</b><small>seulement les habilités au DPP</small></div>${groups(pool, dppLevel)}</div>`);
     }
     for (const po of known) {
       const c = candidates(po.id, absent, today).filter((x) => !dpp || dppLevel(x));
