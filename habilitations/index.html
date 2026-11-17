@@ -1297,7 +1297,7 @@ function echStatus(d) {
 const fmtDate = (d) => parseIso(d).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' });
 // d = date où il faut la repasser ; got = date où elle a été obtenue (celle écrite dans l'Excel).
 function echDate(d, got) {
-  if (d && !got) return '<span class="ech-wrap"><span class="ech-date none">À relire</span><small class="ech-got">relis ton fichier Excel</small></span>';
+  if (d && !got) return '<span class="ech-wrap"><span class="ech-date none">À relire</span><small class="ech-got">choisis à nouveau ton Excel</small></span>';
   const obt = got ? `<small class="ech-got">obtenue le ${fmtDate(got)}</small>` : '';
   if (!d) return `<span class="ech-wrap"><span class="ech-date none">${got ? 'Durée introuvable' : '—'}</span>${obt}</span>`;
   const st = echStatus(d);
@@ -1367,7 +1367,7 @@ document.addEventListener('click', (e) => {
 
 const canLink = 'showOpenFilePicker' in window;
 // À changer quand la façon de lire les fichiers change : les fichiers raccordés sont alors relus.
-const READER_VERSION = '2026-11-16b';
+const READER_VERSION = '2026-11-17a';
 const handles = {};
 let linkNeedsTap = false;
 
@@ -1732,6 +1732,14 @@ function importHabilitations(wb) {
   let nDates = 0;
   let found = false;
   seenWords = {};
+  // Les dates viennent seulement de ce fichier : on repart de zéro (plus de restes d'une ancienne lecture).
+  const oldDates = state.people.map((p) => [p, p.dates, p.got]);
+  const oldEch = state.echeances;
+  state.echeances = [];
+  state.people.forEach((p) => {
+    p.dates = {};
+    p.got = {};
+  });
   for (const name of wb.SheetNames) {
     const rows = sheetRows(wb.Sheets[name]);
     const h = findHeader(rows);
@@ -1843,7 +1851,12 @@ function importHabilitations(wb) {
     });
     nPeople = Math.max(nPeople, data.length);
   }
-  if (!found) return null;
+  if (!found) {
+    // Pas un fichier d'habilitations : on remet tout comme avant.
+    state.echeances = oldEch;
+    oldDates.forEach(([p, d, g]) => Object.assign(p, { dates: d || {}, got: g || {} }));
+    return null;
+  }
   mergePlanOnly();
   state.levelWords = Object.values(seenWords).sort((a, b) => b.n - a.n);
   const unknown = state.levelWords.filter((w) => !w.lv).length;
