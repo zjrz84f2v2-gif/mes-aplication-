@@ -713,6 +713,12 @@ function renderToday() {
   const onShift = dayHasShifts(day) ? teams.filter(([, m]) => SHIFT_ORDER.slice(0, 3).includes(teamShift(m, day))) : teams;
   const rest = teams.filter((t) => !onShift.includes(t));
   html += `<div class="section-title">${dayHasShifts(day) ? 'Les équipes de quart' : 'Les équipes ce jour-là'}<small>${absent.size ? absent.size + ' absent' + (absent.size > 1 ? 's' : '') : ''}</small></div>`;
+  // Pas de quart ce jour-là : on dit pourquoi (planning pas encore lu, ou ce jour n'y est pas).
+  if (!dayHasShifts(day)) {
+    const sd = Object.keys(state.shifts || {}).filter((d) => Object.keys(state.shifts[d] || {}).length).sort();
+    const f = (d) => parseIso(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+    html += `<p class="hint" style="margin:-4px 0 12px">${sd.length ? `Aucun quart (QM, QAM, QN) noté ce jour-là dans ton planning. Le planning lu a des quarts du ${f(sd[0])} au ${f(sd[sd.length - 1])}.` : 'Aucun quart dans le planning lu : rechoisis ton fichier de planning dans Réglages pour voir les équipes de quart.'}</p>`;
+  }
   html += onShift.length ? `<div class="teams">${onShift.map(teamCard).join('')}</div>` : '<p class="hint">Aucune équipe en quart matin, après-midi ou nuit ce jour-là.</p>';
   if (rest.length) {
     const n = rest.reduce((k, [, m]) => k + m.length, 0);
