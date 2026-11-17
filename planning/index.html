@@ -260,6 +260,33 @@ textarea.field { min-height: 90px; resize: vertical; font-size: 17px; }
 /* L'arrivée de la feuille : elle monte vite puis freine. */
 .sheet { animation: rise .32s cubic-bezier(.16, 1, .3, 1); }
 @keyframes rise { from { transform: translateY(40px); opacity: .4; } }
+/* Planning de travail à imprimer / enregistrer en PDF. */
+.legend-row { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; }
+.legend-row .legend { margin: 0; flex: 1; }
+#print-area { display: none; }
+@media print {
+  @page { size: A4; margin: 12mm; }
+  body { background: #fff !important; padding: 0 !important; }
+  body.printing > *:not(#print-area) { display: none !important; }
+  body.printing #print-area { display: block; }
+  #print-area { font: 11px/1.3 var(--font); color: #1E1C18; }
+  #print-area * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .pr-person { break-before: page; }
+  .pr-person:first-child { break-before: auto; }
+  .pr-person h1 { font: 800 22px/1.1 var(--display); margin: 0 0 4px; }
+  .pr-person > p { margin: 0 0 10px; color: #5A554B; }
+  .pr-month { break-inside: avoid; margin: 0 0 14px; }
+  .pr-month h2 { font: 800 15px/1.2 var(--display); margin: 0 0 4px; text-transform: capitalize; }
+  .pr-month table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  .pr-month th { font-size: 10px; color: #5A554B; padding: 2px; text-transform: capitalize; }
+  .pr-month td { border: 1px solid #D9D6CF; height: 42px; vertical-align: top; padding: 2px 3px; }
+  .pr-month td.out { background: #F4F3F0; }
+  .pr-month td b { font-size: 10px; color: #5A554B; }
+  .pr-month td span { display: block; margin-top: 2px; border-radius: 4px; padding: 2px 3px; font-weight: 800; font-size: 10px; text-align: center; }
+  .pr-month td small { display: block; font-weight: 600; font-size: 9px; }
+  .pr-sum { font-size: 10px; color: #5A554B; margin-top: 3px; }
+}
+
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
 </style>
 </head>
@@ -815,7 +842,7 @@ function workHtml(today) {
       <button class="nav" data-month="-1" aria-label="Mois précédent">${icons.left}</button>
       <button class="nav" data-month="1" aria-label="Mois suivant">${icons.right}</button>
     </div>
-    <div class="legend">${['M', 'AM', 'N'].map((c) => tagHtml(c)).join('')}</div>`;
+    <div class="legend-row"><div class="legend">${['M', 'AM', 'N'].map((c) => tagHtml(c)).join('')}</div><button class="small-btn" data-action="work-export" style="margin:0">Télécharger</button></div>`;
   // Le compte du mois pour chacun.
   const sums = ids
     .map((m) => {
@@ -1299,6 +1326,7 @@ document.addEventListener('click', (e) => {
     render();
     window.scrollTo(0, 0);
   } else if (action === 'add-course') openCourse(null);
+  else if (action === 'work-export') openWorkExport();
   else if (action === 'add-stock') openStock(null);
   else if (action === 'clear-bought') {
     const ids = courses.filter((c) => c.bought).map((c) => c.id);
@@ -1349,6 +1377,118 @@ function closeSheet() {
 }
 
 const closeBtn = `<button class="close" aria-label="Fermer">${icons.close}</button>`;
+
+// ---------- Télécharger le planning de travail (tous les mois, pour chaque personne) ----------
+
+function workMonthsOf(m) {
+  const days = work.filter((w) => w.member === m && WORK[w.code]).map((w) => w.date).sort();
+  if (!days.length) return [];
+  const out = [];
+  for (let d = firstOfMonth(parseIso(days[0])); iso(d) <= days[days.length - 1]; d = new Date(d.getFullYear(), d.getMonth() + 1, 1)) out.push(d);
+  return out;
+}
+
+function openWorkExport() {
+  const ids = memberIds().filter((m) => workMonthsOf(m).length);
+  if (!ids.length) return toast('Personne n’a encore de travail noté.');
+  let who = ids.includes(local.memberId) ? local.memberId : ids[0];
+  const back = showSheet(`<div class="sheet-head"><h3>Télécharger le planning de travail</h3>${closeBtn}</div>
+    <p class="hint">Tous les mois, de la première à la dernière date notée.</p>
+    <span class="label">Pour qui ?</span>
+    <div class="who-pick">${ids.map((id) => `<button type="button" class="chip" data-who="${esc(id)}" aria-pressed="${id === who}">${esc(member(id).name)}</button>`).join('')}${ids.length > 1 ? `<button type="button" class="chip" data-who="*" aria-pressed="false">Tout le monde</button>` : ''}</div>
+    <div class="actions">
+      <button class="btn" data-pdf>Enregistrer en PDF (ou imprimer)</button>
+      <a class="btn ghost" data-ics href="#" target="_blank" rel="noopener">${icons.cal} Mettre dans mon agenda iPhone</a>
+    </div>
+    <p class="hint">PDF : dans la fenêtre qui s’ouvre, touche <b>Partager</b> (ou « Imprimer ») puis <b>Enregistrer dans Fichiers</b>. Agenda : touche <b>Tout ajouter</b>.</p>`);
+  const ics = back.querySelector('[data-ics]');
+  const sync = () => {
+    back.querySelectorAll('[data-who]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.who === who)));
+    ics.href = workIcsUrl(who === '*' ? ids : [who]);
+    ics.style.display = who === '*' ? 'none' : '';
+  };
+  sync();
+  back.addEventListener('click', (e) => {
+    const w = e.target.closest('[data-who]');
+    if (w) {
+      who = w.dataset.who;
+      return sync();
+    }
+    if (e.target.closest('[data-pdf]')) {
+      closeSheet();
+      printWork(who === '*' ? ids : [who]);
+    }
+  });
+}
+
+function workPrintHtml(ids) {
+  const names = ['lun', 'mar', 'mer', 'jeu', 'ven', 'sam', 'dim'];
+  let html = '';
+  for (const m of ids) {
+    const months = workMonthsOf(m);
+    html += `<section class="pr-person"><h1>Planning de travail – ${esc(member(m).name)}</h1><p>${esc(capital(fmt(months[0], { month: 'long', year: 'numeric' })))} à ${esc(fmt(months[months.length - 1], { month: 'long', year: 'numeric' }))} · imprimé le ${esc(fmt(new Date(), { day: 'numeric', month: 'long', year: 'numeric' }))}</p>`;
+    for (const m0 of months) {
+      const last = new Date(m0.getFullYear(), m0.getMonth() + 1, 0);
+      const n = {};
+      let rows = '';
+      for (let d = startOfWeek(m0); d <= last; d = addDays(d, 7)) {
+        rows += '<tr>';
+        for (let i = 0; i < 7; i++) {
+          const day = addDays(d, i);
+          if (day.getMonth() !== m0.getMonth()) {
+            rows += '<td class="out"></td>';
+            continue;
+          }
+          const w = workOn(m, iso(day));
+          const k = w && WORK[w.code];
+          if (k) n[w.code] = (n[w.code] || 0) + 1;
+          rows += `<td><b>${day.getDate()}</b>${k ? `<span style="background:${k.c};color:${k.i}">${esc(k.short)}${workHours(w) ? `<small>${esc(workHours(w))}</small>` : ''}</span>` : ''}</td>`;
+        }
+        rows += '</tr>';
+      }
+      const sum = Object.keys(WORK).filter((c) => n[c]).map((c) => `${n[c]} ${n[c] > 1 ? WORK[c].pl : WORK[c].one}`).join(' · ');
+      html += `<div class="pr-month"><h2>${esc(fmt(m0, { month: 'long', year: 'numeric' }))}</h2><table><thead><tr>${names.map((x) => `<th>${x}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table>${sum ? `<div class="pr-sum">${esc(sum)}</div>` : ''}</div>`;
+    }
+    html += '</section>';
+  }
+  return html;
+}
+
+function printWork(ids) {
+  let area = document.getElementById('print-area');
+  if (!area) {
+    area = document.createElement('div');
+    area.id = 'print-area';
+    document.body.appendChild(area);
+  }
+  area.innerHTML = workPrintHtml(ids);
+  document.body.classList.add('printing');
+  const done = () => document.body.classList.remove('printing');
+  addEventListener('afterprint', done, { once: true });
+  setTimeout(() => {
+    window.print();
+    setTimeout(done, 1000);
+  }, 50);
+}
+
+// Fichier agenda (.ics) : un rendez-vous par jour de travail, avec les horaires s'ils sont notés.
+function workIcsUrl(ids) {
+  const stamp = new Date().toISOString().replace(/[-:]/g, '').slice(0, 15) + 'Z';
+  const t = (day, hm) => `${day.replace(/-/g, '')}T${hm.replace(':', '')}00`;
+  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Notre planning//FR', 'CALSCALE:GREGORIAN', 'X-WR-CALNAME:Travail'];
+  for (const m of ids)
+    for (const w of work.filter((x) => x.member === m && WORK[x.code]).sort((a, b) => a.date.localeCompare(b.date))) {
+      const k = WORK[w.code];
+      lines.push('BEGIN:VEVENT', `UID:work-${w.id}@notre-planning`, `DTSTAMP:${stamp}`);
+      if (w.start && w.end) {
+        const endDay = w.end <= w.start ? iso(addDays(parseIso(w.date), 1)) : w.date;
+        lines.push(`DTSTART:${t(w.date, w.start)}`, `DTEND:${t(endDay, w.end)}`);
+      } else lines.push(`DTSTART;VALUE=DATE:${w.date.replace(/-/g, '')}`, `DTEND;VALUE=DATE:${iso(addDays(parseIso(w.date), 1)).replace(/-/g, '')}`);
+      lines.push(`SUMMARY:${icsText(`${k.label}${ids.length > 1 ? ' – ' + member(m).name : ''}`)}`, 'TRANSP:OPAQUE', 'END:VEVENT');
+    }
+  lines.push('END:VCALENDAR');
+  return 'data:text/calendar;charset=utf-8,' + encodeURIComponent(lines.join('\r\n'));
+}
 
 // Ajouter ou modifier une activité.
 function openEditor(id, day) {
