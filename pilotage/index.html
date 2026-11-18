@@ -87,13 +87,13 @@ svg { flex: 0 0 auto; }
 table { width: 100%; border-collapse: collapse; table-layout: fixed; }
 thead th { position: sticky; top: 0; z-index: 1; padding: 12px 8px 10px; font: 800 17px/1 var(--cond); text-transform: uppercase; letter-spacing: .05em; background: var(--paper); border-bottom: 1px solid var(--paper-line); }
 thead th.acts { text-align: left; width: 33%; padding-left: 14px; color: var(--paper-ink-2); }
-thead th.shift-h { color: var(--c); }
+thead th.shift-h { color: var(--c); background: color-mix(in srgb, var(--c) 16%, #fff); border-bottom: 3px solid var(--c); }
 thead th.shift-h span { display: inline-flex; align-items: center; gap: 7px; }
 thead th.shift-h span::before { content: ""; width: 10px; height: 10px; border-radius: 3px; background: var(--c); }
 thead th.shift-h em { font-style: normal; }
 thead th.shift-h .short { display: none; }
 thead th.shift-h small { display: block; margin-top: 5px; font: 600 12px/1 var(--font); letter-spacing: 0; text-transform: none; color: var(--paper-ink-2); }
-thead th.now { background: color-mix(in srgb, var(--c) 12%, var(--paper)); }
+thead th.now { background: color-mix(in srgb, var(--c) 28%, #fff); }
 thead th.now small { color: var(--c); font-weight: 800; }
 tbody tr { border-top: 1px solid var(--paper-line); }
 tbody tr:first-child { border-top: 0; }
@@ -105,8 +105,13 @@ tbody td { padding: 0; vertical-align: middle; }
 tbody tr.pole td:first-child { background: var(--pole); }
 tbody tr:hover td { background: #e2e8fb; }
 tbody tr.pole:hover td:first-child { background: #ffe97f; }
-td.who { text-align: center; }
-td.who.now { background: color-mix(in srgb, var(--c) 9%, var(--paper)) !important; }
+/* Chaque quart garde sa couleur de fond : vert le matin, orange l'après-midi, violet la nuit. */
+td.who { text-align: center; background: color-mix(in srgb, var(--c) 10%, #fff) !important; }
+tbody tr:nth-child(even) td.who { background: color-mix(in srgb, var(--c) 15%, #fff) !important; }
+tbody tr:hover td.who { background: color-mix(in srgb, var(--c) 22%, #fff) !important; }
+td.who.now { background: color-mix(in srgb, var(--c) 20%, #fff) !important; }
+tbody tr:nth-child(even) td.who.now { background: color-mix(in srgb, var(--c) 25%, #fff) !important; }
+td.who + td.who { border-left: 1px solid #fff; }
 td.who button { width: 100%; min-height: 46px; border: 0; background: none; color: var(--paper-ink); padding: 4px 6px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font: 700 18px/1.15 var(--cond); letter-spacing: .03em; }
 td.who .none { color: #b6bdd8; font-weight: 600; }
 td.who .note { width: 18px; height: 18px; color: var(--red); }
