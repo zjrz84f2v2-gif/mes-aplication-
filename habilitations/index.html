@@ -1373,7 +1373,7 @@ document.addEventListener('click', (e) => {
 
 const canLink = 'showOpenFilePicker' in window;
 // À changer quand la façon de lire les fichiers change : les fichiers raccordés sont alors relus.
-const READER_VERSION = '2026-11-17a';
+const READER_VERSION = '2026-11-18a';
 const handles = {};
 let linkNeedsTap = false;
 
@@ -1533,7 +1533,17 @@ async function importExcel(file, kind, verbose) {
     return toast('Ce fichier n’est pas un fichier Excel lisible.');
   }
   lastFiles[kind] = file;
+  importSeen = new Set();
   const report = kind === 'plan' ? importPlanning(wb) : importHabilitations(wb);
+  const seen = importSeen;
+  importSeen = null;
+  if (report) {
+    // Le fichier est la seule source : on oublie les personnes qui venaient d'anciens fichiers.
+    const before = state.people.length;
+    state.people = state.people.filter((p) => seen.has(p.id) || (kind === 'hab' ? p.planOnly : !p.planOnly));
+    const gone = before - state.people.length;
+    if (gone) console.info(`${gone} personne(s) d'anciens fichiers retirée(s)`);
+  }
   if (!report) return toast(kind === 'plan' ? 'Je ne trouve pas les colonnes Nom, Prénom, Type, Du, Au dans ce fichier.' : 'Je ne trouve pas les colonnes Nom et Prénom dans ce fichier.');
   state.links[kind] = { name: file.name, at: Date.now(), modified: file.lastModified, reader: READER_VERSION };
   save();
@@ -1642,7 +1652,15 @@ function findByLastName(nom) {
   return hits;
 }
 
+// Les personnes vues pendant la lecture d'un fichier (pour oublier celles des anciens fichiers).
+let importSeen = null;
 function findOrCreatePerson(nom, prenom, fromPlan) {
+  const p = findOrCreatePerson0(nom, prenom, fromPlan);
+  if (p && importSeen) importSeen.add(p.id);
+  return p;
+}
+
+function findOrCreatePerson0(nom, prenom, fromPlan) {
   if (!validName(nom, prenom)) return null;
   if (fromPlan && !norm(prenom)) {
     const hits = findByLastName(nom);
@@ -1739,12 +1757,16 @@ function importHabilitations(wb) {
   let found = false;
   seenWords = {};
   // Les dates viennent seulement de ce fichier : on repart de zéro (plus de restes d'une ancienne lecture).
-  const oldDates = state.people.map((p) => [p, p.dates, p.got]);
+  // Pareil pour les postes et les niveaux : seulement ceux du fichier lu maintenant.
+  const oldDates = state.people.map((p) => [p, p.dates, p.got, p.skills]);
   const oldEch = state.echeances;
+  const oldPostes = state.postes;
   state.echeances = [];
+  state.postes = [];
   state.people.forEach((p) => {
     p.dates = {};
     p.got = {};
+    p.skills = {};
   });
   for (const name of wb.SheetNames) {
     const rows = sheetRows(wb.Sheets[name]);
@@ -1860,7 +1882,8 @@ function importHabilitations(wb) {
   if (!found) {
     // Pas un fichier d'habilitations : on remet tout comme avant.
     state.echeances = oldEch;
-    oldDates.forEach(([p, d, g]) => Object.assign(p, { dates: d || {}, got: g || {} }));
+    state.postes = oldPostes;
+    oldDates.forEach(([p, d, g, sk]) => Object.assign(p, { dates: d || {}, got: g || {}, skills: sk || {} }));
     return null;
   }
   mergePlanOnly();
