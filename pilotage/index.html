@@ -1,0 +1,637 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#101a4d">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Pilotage atelier</title>
+<style>
+:root {
+  --bg: #0d1640;
+  --navy: #16246b;
+  --navy-2: #1f3190;
+  --line: rgba(255, 255, 255, .16);
+  --ink: #eef2ff;
+  --ink-2: #b9c3ec;
+  --paper: #f4f6fc;
+  --paper-ink: #16204a;
+  --paper-line: #d6dcef;
+  --sel: #8fd0ff;
+  --sel-ink: #0b1a4a;
+  --qm: #dff0ff;
+  --qam: #fff6d6;
+  --qn: #ece6ff;
+  --pole: #fff1a8;
+  --red: #d8342b;
+  --blue: #3047c9;
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--ink); font: 16px/1.35 var(--font); min-height: 100vh; -webkit-text-size-adjust: 100%; }
+button { font: inherit; color: inherit; cursor: pointer; }
+:focus-visible { outline: 3px solid var(--sel); outline-offset: 2px; }
+.app { max-width: 1800px; margin: 0 auto; padding: max(12px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) 16px max(14px, env(safe-area-inset-left)); display: flex; flex-direction: column; gap: 12px; min-height: 100vh; }
+
+/* En-tête */
+.head { display: flex; align-items: center; gap: 14px; }
+.badge { flex: 0 0 auto; background: #fff; color: var(--navy); border-radius: 10px; padding: 8px 14px; font-weight: 900; font-size: 20px; letter-spacing: .02em; box-shadow: 0 0 0 3px rgba(255,255,255,.15); }
+.titles { flex: 1; min-width: 0; border-left: 2px solid var(--line); padding-left: 14px; }
+.titles small { display: block; font-weight: 800; font-size: 15px; letter-spacing: .04em; text-transform: uppercase; color: var(--ink); }
+.titles h1 { margin: 2px 0 0; font-size: clamp(20px, 2.4vw, 30px); font-weight: 900; letter-spacing: .01em; text-transform: uppercase; }
+.titles h1 b { color: var(--sel); }
+.week { flex: 0 0 auto; border: 2px solid var(--line); border-radius: 14px; padding: 8px 18px; text-align: center; background: rgba(255,255,255,.04); }
+.week b { display: block; font-size: clamp(18px, 2vw, 26px); font-weight: 900; }
+.week b span { color: var(--sel); }
+.week small { color: var(--ink-2); font-size: 13px; }
+.tool { flex: 0 0 auto; width: 46px; height: 46px; border-radius: 12px; border: 1.5px solid var(--line); background: rgba(255,255,255,.06); display: flex; align-items: center; justify-content: center; padding: 0; }
+.tool svg { width: 22px; height: 22px; }
+
+/* Jours */
+.days { display: flex; gap: 8px; align-items: stretch; }
+.days .arrow { flex: 0 0 auto; width: 40px; border-radius: 10px; border: 1.5px solid var(--line); background: var(--navy); font-weight: 900; font-size: 20px; }
+.day { flex: 1; min-width: 0; border-radius: 10px; border: 1.5px solid var(--line); background: var(--navy); padding: 6px 4px; text-align: center; }
+.day b { display: block; font-size: 15px; }
+.day small { color: var(--ink-2); font-size: 12px; }
+.day.today { border-color: var(--sel); }
+.day[aria-pressed="true"] { background: var(--sel); color: var(--sel-ink); border-color: var(--sel); }
+.day[aria-pressed="true"] small { color: var(--sel-ink); }
+
+/* Corps : tableau + panneaux */
+.body { display: grid; grid-template-columns: minmax(0, 2.1fr) minmax(280px, 1fr); gap: 12px; flex: 1; min-height: 0; }
+.board { background: var(--paper); color: var(--paper-ink); border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; min-height: 0; }
+table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+thead th { position: sticky; top: 0; z-index: 1; padding: 9px 8px; font-size: 14px; font-weight: 900; text-transform: uppercase; letter-spacing: .03em; }
+thead th.acts { background: var(--blue); color: #fff; text-align: left; width: 34%; }
+thead th.qm { background: var(--qm); }
+thead th.qam { background: var(--qam); }
+thead th.qn { background: var(--qn); }
+tbody tr { border-top: 1px solid var(--paper-line); }
+tbody td { padding: 0; vertical-align: middle; }
+.act { width: 100%; text-align: left; border: 0; background: none; padding: 6px 10px; display: flex; flex-direction: column; color: var(--paper-ink); }
+.act b { font-size: 14px; font-weight: 800; }
+.act small { font-size: 11px; color: #5a6390; font-weight: 700; }
+tr.pole .act { background: var(--pole); }
+td.who { text-align: center; font-weight: 800; font-size: 14px; }
+td.who button { width: 100%; min-height: 40px; border: 0; background: none; color: var(--paper-ink); font-weight: 800; padding: 4px; }
+td.who .none { color: #a3aac6; font-weight: 600; }
+td.who .note { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--red); margin-left: 4px; vertical-align: 2px; }
+td.qm { background: color-mix(in srgb, var(--qm) 45%, #fff); }
+td.qam { background: color-mix(in srgb, var(--qam) 45%, #fff); }
+td.qn { background: color-mix(in srgb, var(--qn) 45%, #fff); }
+.scroll { overflow: auto; flex: 1; min-height: 0; }
+
+/* Détail d'une activité */
+.detail { display: grid; grid-template-columns: minmax(150px, 26%) 1fr; flex: 1; min-height: 0; }
+.side { border-right: 1px solid var(--paper-line); overflow: auto; }
+.side h3 { margin: 0; background: var(--blue); color: #fff; padding: 9px 10px; font-size: 14px; text-transform: uppercase; }
+.side button { display: block; width: 100%; text-align: left; border: 0; border-top: 1px solid var(--paper-line); background: none; padding: 8px 10px; font-size: 13px; font-weight: 700; color: var(--paper-ink); }
+.side button[aria-current="true"] { background: #dfe6ff; }
+.side button.pole { background: var(--pole); }
+.pane { padding: 14px; overflow: auto; }
+.pane-head { display: flex; align-items: center; gap: 10px; }
+.pane-head h2 { flex: 1; margin: 0; font-size: 22px; font-weight: 900; }
+.back { border: 0; background: var(--blue); color: #fff; border-radius: 10px; padding: 10px 14px; font-weight: 800; }
+.shifts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 12px; }
+.shift { border: 2px solid transparent; border-radius: 10px; padding: 8px; background: #fff; text-align: center; color: var(--paper-ink); }
+.shift small { display: block; font-size: 12px; font-weight: 800; text-transform: uppercase; color: #5a6390; }
+.shift b { font-size: 17px; }
+.shift[aria-pressed="true"] { border-color: var(--blue); }
+.consigne { margin-top: 12px; background: #fff; border-left: 4px solid var(--blue); border-radius: 10px; padding: 12px 14px; white-space: pre-wrap; min-height: 140px; font-size: 16px; }
+.consigne.empty { color: #8b93b6; font-style: italic; }
+
+/* Panneaux Sécurité / Qualité */
+.panels { display: flex; flex-direction: column; gap: 12px; min-height: 0; }
+.panel { background: var(--paper); color: var(--paper-ink); border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; flex: 1; min-height: 160px; }
+.panel h2 { margin: 0; padding: 10px 14px; color: #fff; font-size: 20px; font-weight: 900; text-transform: uppercase; }
+.panel.secu h2 { background: var(--red); }
+.panel.qual h2 { background: var(--blue); }
+.panel .msgs { overflow: auto; padding: 10px 14px; flex: 1; }
+.zone { font-weight: 900; margin: 6px 0 2px; }
+.zone:first-child { margin-top: 0; }
+.msg { margin: 0 0 6px; font-size: 14px; }
+.msg::before { content: "• "; }
+.msgs .nothing { color: #8b93b6; font-style: italic; }
+
+.foot { color: var(--ink-2); font-size: 12px; text-align: right; }
+.empty-app { background: var(--paper); color: var(--paper-ink); border-radius: 14px; padding: 28px; text-align: center; max-width: 640px; margin: 40px auto; }
+.empty-app h2 { margin: 0 0 8px; }
+.btn { display: inline-flex; align-items: center; justify-content: center; min-height: 50px; padding: 0 20px; border-radius: 12px; border: 0; background: var(--blue); color: #fff; font-weight: 800; font-size: 17px; margin: 6px; text-decoration: none; }
+.btn.ghost { background: #fff; color: var(--paper-ink); border: 1.5px solid var(--paper-line); }
+
+/* Feuille Réglages */
+.sheet-back { position: fixed; inset: 0; background: rgba(5, 10, 30, .55); z-index: 20; display: flex; align-items: center; justify-content: center; padding: 16px; }
+.sheet { background: var(--paper); color: var(--paper-ink); border-radius: 16px; width: 100%; max-width: 560px; max-height: 92vh; overflow: auto; padding: 20px; }
+.sheet h2 { margin: 0 0 6px; }
+.sheet p { margin: 8px 0; color: #4a5380; }
+.sheet .row { display: flex; flex-wrap: wrap; gap: 4px; margin: 10px -6px; }
+.file-state { background: #fff; border: 1px solid var(--paper-line); border-radius: 10px; padding: 10px 12px; font-weight: 700; }
+.toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); background: #fff; color: var(--paper-ink); padding: 12px 18px; border-radius: 999px; font-weight: 800; z-index: 30; box-shadow: 0 10px 30px -10px rgba(0,0,0,.5); max-width: calc(100% - 32px); text-align: center; }
+
+/* Téléphone / petit écran : tout l'un sous l'autre. */
+@media (max-width: 900px) {
+  .body { grid-template-columns: 1fr; }
+  .head { flex-wrap: wrap; }
+  .titles { order: 2; flex-basis: calc(100% - 140px); }
+  .week { order: 3; flex-basis: 100%; display: flex; align-items: baseline; justify-content: center; gap: 10px; padding: 6px; }
+  .days { overflow-x: auto; }
+  .day { min-width: 64px; }
+  thead th.acts { width: 40%; }
+  .detail { grid-template-columns: 1fr; }
+  .side { display: none; }
+  .panel { flex: none; }
+  .panel .msgs { max-height: none; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+</head>
+<body>
+<div class="app" id="app"></div>
+<input type="file" id="pick" accept=".xlsx,.xlsm,.xls" hidden>
+<script>
+'use strict';
+
+// ---------- Données : seulement ce qu'il y a dans le fichier Excel lu maintenant ----------
+
+const KEY = 'pilotage-atelier-v1';
+let data = load(); // { infos, acts:[{name,rp,pole}], aff:{date:{act:{M,AM,N,cM,cAM,cN}}}, secu:[{du,au,zone,msg}], qual:[...], file, at }
+function load() {
+  try {
+    return JSON.parse(localStorage.getItem(KEY)) || null;
+  } catch (e) {
+    return null;
+  }
+}
+function save() {
+  try {
+    localStorage.setItem(KEY, JSON.stringify(data));
+  } catch (e) {}
+}
+
+const pad = (n) => String(n).padStart(2, '0');
+const iso = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const parseIso = (s) => {
+  const [y, m, d] = s.split('-').map(Number);
+  return new Date(y, m - 1, d);
+};
+const addDays = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
+const monday = (d) => addDays(d, -((d.getDay() + 6) % 7));
+const todayIso = () => iso(new Date());
+const ddmm = (d) => `${pad(d.getDate())}/${pad(d.getMonth() + 1)}`;
+function isoWeek(d) {
+  const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const day = t.getUTCDay() || 7;
+  t.setUTCDate(t.getUTCDate() + 4 - day);
+  const y0 = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
+  return { week: Math.ceil(((t - y0) / 864e5 + 1) / 7), year: t.getUTCFullYear() };
+}
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const norm = (s) => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+
+let ui = { day: todayIso(), act: null, shift: 'M' };
+const SHIFTS = [
+  ['M', 'qm', 'QM · Matin', 'Matin'],
+  ['AM', 'qam', 'QAM · Après-midi', 'Après-midi'],
+  ['N', 'qn', 'QN · Nuit', 'Nuit'],
+];
+const DAYS = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
+const icons = {
+  gear: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',
+  reload: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>',
+  full: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>',
+};
+
+// ---------- Affichage ----------
+
+const app = document.getElementById('app');
+function render() {
+  if (!data) {
+    app.innerHTML = headHtml() + `<div class="empty-app"><h2>L’écran est vide</h2><p>Raccorde ton fichier Excel « Pilotage atelier » : l’écran se remplit tout seul et se met à jour quand le fichier change.</p>
+      <button class="btn" data-action="link">Raccorder mon fichier Excel</button><br><button class="btn ghost" data-action="demo">Voir avec l’exemple</button></div>`;
+    return;
+  }
+  const day = parseIso(ui.day);
+  app.innerHTML = headHtml() + daysHtml(day) + `<div class="body">${ui.act ? detailHtml() : boardHtml()}${panelsHtml()}</div>
+    <div class="foot">Fichier : ${esc(data.file || '—')} · lu le ${esc(new Date(data.at).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }))}</div>`;
+}
+
+function headHtml() {
+  const d = parseIso(ui.day);
+  const w = isoWeek(d);
+  const m = monday(d);
+  const titre = data?.infos?.titre || 'EP1 | Pilotage atelier';
+  const [a, ...b] = titre.split('|');
+  return `<header class="head">
+    <div class="badge" aria-hidden="true">${esc((a || 'EP1').trim().split(' ')[0])}</div>
+    <div class="titles"><small>${esc(data?.infos?.atelier || 'Atelier de production')}</small><h1>${b.length ? `<b>${esc(a.trim())}</b> | ${esc(b.join('|').trim())}` : esc(titre)}</h1></div>
+    <div class="week"><b>Semaine <span>${w.week}</span> / ${w.year}</b><small>Du ${ddmm(m)} au ${ddmm(addDays(m, 6))}</small></div>
+    <button class="tool" data-action="reload" aria-label="Actualiser" title="Actualiser">${icons.reload}</button>
+    <button class="tool" data-action="full" aria-label="Plein écran" title="Plein écran">${icons.full}</button>
+    <button class="tool" data-action="settings" aria-label="Réglages et fichier Excel" title="Réglages">${icons.gear}</button>
+  </header>`;
+}
+
+function daysHtml(day) {
+  const m = monday(day);
+  const t = todayIso();
+  return `<nav class="days" aria-label="Jours de la semaine"><button class="arrow" data-week="-1" aria-label="Semaine précédente">‹</button>${DAYS.map((n, i) => {
+    const d = addDays(m, i);
+    const s = iso(d);
+    return `<button class="day${s === t ? ' today' : ''}" data-day="${s}" aria-pressed="${s === ui.day}"><b>${n}</b><small>${ddmm(d)}</small></button>`;
+  }).join('')}<button class="arrow" data-week="1" aria-label="Semaine suivante">›</button></nav>`;
+}
+
+const dayAff = () => data.aff?.[ui.day] || {};
+// Les activités : la liste de l'onglet Activités, puis celles qui n'y sont pas.
+function actList() {
+  const list = (data.acts || []).slice();
+  for (const name of Object.keys(dayAff())) if (!list.some((a) => norm(a.name) === norm(name))) list.push({ name, rp: '', pole: false });
+  return list;
+}
+const affOf = (name) => {
+  const a = dayAff();
+  return a[name] || a[Object.keys(a).find((k) => norm(k) === norm(name))] || {};
+};
+
+function boardHtml() {
+  const acts = actList();
+  const rows = acts
+    .map((a) => {
+      const f = affOf(a.name);
+      return `<tr class="${a.pole ? 'pole' : ''}"><td><button class="act" data-act="${esc(a.name)}"><b>${esc(a.name)}</b>${a.rp ? `<small>RP : ${esc(a.rp)}</small>` : ''}</button></td>${SHIFTS.map(([k, c, , label]) => `<td class="who ${c}"><button data-act="${esc(a.name)}" data-shift="${k}" aria-label="${esc(a.name)}, ${label} : ${esc(f[k] || 'personne')}">${f[k] ? esc(f[k]) : '<span class="none">—</span>'}${f['c' + k] ? '<span class="note" title="Consigne"></span>' : ''}</button></td>`).join('')}</tr>`;
+    })
+    .join('');
+  return `<section class="board" aria-label="Activités et affectations"><div class="scroll"><table><thead><tr><th class="acts">Activités et affectations</th>${SHIFTS.map(([, c, l]) => `<th class="${c}">${l}</th>`).join('')}</tr></thead><tbody>${rows || `<tr><td colspan="4" style="padding:20px;text-align:center;color:#8b93b6">Rien dans le fichier pour ce jour-là.</td></tr>`}</tbody></table></div></section>`;
+}
+
+function detailHtml() {
+  const acts = actList();
+  const f = affOf(ui.act);
+  const c = f['c' + ui.shift];
+  return `<section class="board"><div class="detail">
+    <nav class="side" aria-label="Activités"><h3>Activités</h3>${acts.map((a) => `<button class="${a.pole ? 'pole' : ''}" data-act="${esc(a.name)}" aria-current="${norm(a.name) === norm(ui.act)}">${esc(a.name)}</button>`).join('')}</nav>
+    <div class="pane">
+      <div class="pane-head"><h2>${esc(ui.act)}</h2><button class="back" data-action="board">← Planning</button></div>
+      <div class="shifts">${SHIFTS.map(([k, , , l]) => `<button class="shift" data-shift-only="${k}" aria-pressed="${ui.shift === k}"><small>${l}</small><b>${esc(f[k] || '—')}</b></button>`).join('')}</div>
+      <div class="consigne${c ? '' : ' empty'}">${c ? esc(c) : 'Aucune consigne renseignée pour ce quart.'}</div>
+    </div></div></section>`;
+}
+
+// Messages du jour choisi (sans date = tous les jours), rangés par zone.
+function msgsHtml(list) {
+  const on = (list || []).filter((m) => (!m.du || m.du <= ui.day) && (!m.au || m.au >= ui.day) && (m.du || m.au || true));
+  if (!on.length) return '<p class="nothing">Rien de particulier.</p>';
+  const zones = [...new Set(on.map((m) => m.zone || ''))];
+  return zones.map((z) => `${z ? `<div class="zone">${esc(z)} :</div>` : ''}${on.filter((m) => (m.zone || '') === z).map((m) => `<p class="msg">${esc(m.msg)}</p>`).join('')}`).join('');
+}
+function panelsHtml() {
+  return `<aside class="panels"><section class="panel secu"><h2>Sécurité</h2><div class="msgs">${msgsHtml(data.secu)}</div></section>
+    <section class="panel qual"><h2>Qualité</h2><div class="msgs">${msgsHtml(data.qual)}</div></section></aside>`;
+}
+
+// ---------- Actions ----------
+
+document.addEventListener('click', (e) => {
+  touched();
+  const back = e.target.closest('.sheet-back');
+  if (back && (e.target === back || e.target.closest('[data-close]'))) return closeSheet();
+  const day = e.target.closest('[data-day]');
+  if (day) {
+    ui.day = day.dataset.day;
+    return render();
+  }
+  const wk = e.target.closest('[data-week]');
+  if (wk) {
+    ui.day = iso(addDays(parseIso(ui.day), 7 * Number(wk.dataset.week)));
+    return render();
+  }
+  const only = e.target.closest('[data-shift-only]');
+  if (only) {
+    ui.shift = only.dataset.shiftOnly;
+    return render();
+  }
+  const act = e.target.closest('[data-act]');
+  if (act) {
+    ui.act = act.dataset.act;
+    if (act.dataset.shift) ui.shift = act.dataset.shift;
+    render();
+    return window.scrollTo(0, 0);
+  }
+  const a = e.target.closest('[data-action]')?.dataset.action;
+  if (a === 'board') {
+    ui.act = null;
+    render();
+  } else if (a === 'settings') openSettings();
+  else if (a === 'link') linkFile();
+  else if (a === 'pick') document.getElementById('pick').click();
+  else if (a === 'demo') loadDemo();
+  else if (a === 'reread') refresh(true);
+  else if (a === 'unlink') unlink();
+  else if (a === 'reload') reloadPage();
+  else if (a === 'full') {
+    if (document.fullscreenElement) document.exitFullscreen?.();
+    else document.documentElement.requestFullscreen?.().catch(() => toast('Plein écran impossible ici : touche F11.'));
+  }
+});
+
+let toastTimer;
+function toast(t) {
+  document.querySelector('.toast')?.remove();
+  const el = document.createElement('div');
+  el.className = 'toast';
+  el.setAttribute('role', 'status');
+  el.textContent = t;
+  document.body.appendChild(el);
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.remove(), 2600);
+}
+
+function openSettings() {
+  closeSheet();
+  const back = document.createElement('div');
+  back.className = 'sheet-back';
+  const linked = !!handle;
+  back.innerHTML = `<div class="sheet" role="dialog" aria-modal="true" aria-label="Réglages">
+    <h2>Fichier Excel</h2>
+    <p class="file-state">${data ? `${esc(data.file)} · lu le ${esc(new Date(data.at).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }))}` : 'Aucun fichier pour l’instant.'}</p>
+    ${canLink ? `<p>${linked ? 'Le fichier est <b>raccordé</b> : l’écran le relit tout seul toutes les 30 secondes.' : 'Raccorde le fichier : l’écran le relira tout seul dès qu’il change.'}</p>` : '<p>Sur ce navigateur, l’appli ne peut pas relire le fichier toute seule : choisis-le à nouveau quand il change (sur ordinateur, Chrome ou Edge le relisent tout seuls).</p>'}
+    <div class="row">
+      ${canLink ? `<button class="btn" data-action="link">${linked ? 'Changer de fichier' : 'Raccorder mon fichier Excel'}</button>${linked ? '<button class="btn ghost" data-action="reread">Relire maintenant</button>' : ''}` : '<button class="btn" data-action="pick">Choisir mon fichier Excel</button>'}
+      <a class="btn ghost" href="excel/pilotage-atelier.xlsx" download>Télécharger le modèle Excel</a>
+      <button class="btn ghost" data-action="demo">Voir avec l’exemple</button>
+      ${data ? '<button class="btn ghost" data-action="unlink">Vider l’écran</button>' : ''}
+    </div>
+    <p>L’appli prend <b>seulement</b> ce qu’il y a dans le fichier lu : rien n’est gardé des anciens fichiers. Les données restent sur cet appareil.</p>
+    <div class="row"><button class="btn ghost" data-close>Fermer</button></div>
+  </div>`;
+  document.body.appendChild(back);
+}
+function closeSheet() {
+  document.querySelector('.sheet-back')?.remove();
+}
+
+// Écran au mur : retour tout seul sur aujourd'hui après 3 minutes sans toucher, et au changement de jour.
+let idleTimer;
+let lastToday = todayIso();
+function touched() {
+  clearTimeout(idleTimer);
+  idleTimer = setTimeout(() => {
+    if (document.querySelector('.sheet-back')) return touched();
+    ui = { day: todayIso(), act: null, shift: 'M' };
+    render();
+  }, 180000);
+}
+setInterval(() => {
+  if (todayIso() !== lastToday) {
+    if (ui.day === lastToday) ui.day = todayIso();
+    lastToday = todayIso();
+    render();
+  }
+}, 60000);
+
+function reloadPage() {
+  toast('J’actualise…');
+  const u = new URL(location.href);
+  u.searchParams.set('r', Date.now());
+  location.replace(u.toString());
+}
+
+// ---------- Lire le fichier Excel ----------
+
+let xlsxWait;
+function loadXlsx() {
+  if (window.XLSX) return Promise.resolve();
+  if (!xlsxWait)
+    xlsxWait = new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+      s.onload = resolve;
+      s.onerror = () => {
+        xlsxWait = null;
+        reject(new Error('xlsx'));
+      };
+      document.head.appendChild(s);
+    });
+  return xlsxWait;
+}
+
+const cellText = (v) => (v instanceof Date ? '' : String(v ?? '').replace(/\r/g, '').trim());
+function toIso(v) {
+  if (v instanceof Date && !isNaN(v)) return iso(new Date(v.getTime() + 12 * 3600e3));
+  if (typeof v === 'number' && v > 30000 && v < 80000) return iso(new Date(Math.round((v - 25569) * 864e5) + 12 * 3600e3));
+  const m = String(v ?? '').match(/(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2,4})/);
+  if (!m) return '';
+  const y = m[3].length === 2 ? 2000 + Number(m[3]) : Number(m[3]);
+  return `${y}-${pad(m[2])}-${pad(m[1])}`;
+}
+const rowsOf = (ws) => XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null, blankrows: false });
+const sheetLike = (wb, re) => wb.SheetNames.find((n) => re.test(norm(n)));
+// La ligne de titres : la première qui contient les mots attendus.
+function headerOf(rows, must) {
+  for (let i = 0; i < Math.min(rows.length, 15); i++) {
+    const h = (rows[i] || []).map((v) => norm(cellText(v)));
+    if (must.every((re) => h.some((x) => re.test(x)))) return { i, h };
+  }
+  return null;
+}
+const colOf = (h, re, not) => h.findIndex((x) => re.test(x) && !(not && not.test(x)));
+
+function readWorkbook(wb, fileName) {
+  const out = { infos: {}, acts: [], aff: {}, secu: [], qual: [], file: fileName, at: Date.now() };
+  // Infos
+  const si = sheetLike(wb, /^info/);
+  if (si)
+    for (const r of rowsOf(wb.Sheets[si])) {
+      const k = norm(cellText(r?.[0]));
+      if (k === 'atelier') out.infos.atelier = cellText(r[1]);
+      if (k === 'titre') out.infos.titre = cellText(r[1]);
+    }
+  // Activités
+  const sa = sheetLike(wb, /^activit/);
+  if (sa) {
+    const rows = rowsOf(wb.Sheets[sa]);
+    const hd = headerOf(rows, [/activit/]);
+    if (hd) {
+      const cA = colOf(hd.h, /activit/), cR = colOf(hd.h, /responsable|\brp\b/), cP = colOf(hd.h, /pole|surlign/);
+      for (const r of rows.slice(hd.i + 1)) {
+        const name = cellText(r?.[cA]);
+        if (!name) continue;
+        out.acts.push({ name, rp: cR >= 0 ? cellText(r[cR]) : '', pole: cP >= 0 && /^(oui|x|yes|1|o)$/i.test(cellText(r[cP])) });
+      }
+    }
+  }
+  // Affectations
+  const sf = sheetLike(wb, /affect/) || wb.SheetNames.find((n) => headerOf(rowsOf(wb.Sheets[n]), [/date/, /activit/, /matin|qm/]));
+  let found = false;
+  if (sf) {
+    const rows = rowsOf(wb.Sheets[sf]);
+    const hd = headerOf(rows, [/date/, /activit/]);
+    if (hd) {
+      found = true;
+      const h = hd.h;
+      const c = {
+        date: colOf(h, /date/),
+        act: colOf(h, /activit/),
+        M: colOf(h, /matin|\bqm\b/, /consigne/),
+        AM: colOf(h, /apres|\bqam\b/, /consigne/),
+        N: colOf(h, /nuit|\bqn\b/, /consigne/),
+        cM: colOf(h, /consigne.*(matin|qm)/),
+        cAM: colOf(h, /consigne.*(apres|qam)/),
+        cN: colOf(h, /consigne.*(nuit|qn)/),
+      };
+      let lastDate = '';
+      for (const r of rows.slice(hd.i + 1)) {
+        if (!r) continue;
+        const d = toIso(r[c.date]) || lastDate; // date écrite une seule fois pour plusieurs lignes
+        const name = cellText(r[c.act]);
+        if (!d || !name) continue;
+        lastDate = d;
+        const f = {};
+        for (const k of ['M', 'AM', 'N', 'cM', 'cAM', 'cN']) if (c[k] >= 0 && cellText(r[c[k]])) f[k] = cellText(r[c[k]]);
+        (out.aff[d] = out.aff[d] || {})[name] = f;
+      }
+    }
+  }
+  // Sécurité et Qualité
+  for (const [key, re] of [['secu', /^secu/], ['qual', /^qualit/]]) {
+    const sn = sheetLike(wb, re);
+    if (!sn) continue;
+    const rows = rowsOf(wb.Sheets[sn]);
+    const hd = headerOf(rows, [/message|consigne|texte|info/]);
+    if (!hd) continue;
+    const cDu = colOf(hd.h, /^du$|debut|^date/), cAu = colOf(hd.h, /^au$|fin/), cZ = colOf(hd.h, /zone|secteur|batiment/), cM = colOf(hd.h, /message|consigne|texte|info/);
+    for (const r of rows.slice(hd.i + 1)) {
+      const msg = cellText(r?.[cM]);
+      if (!msg) continue;
+      out[key].push({ du: cDu >= 0 ? toIso(r[cDu]) : '', au: cAu >= 0 ? toIso(r[cAu]) : '', zone: cZ >= 0 ? cellText(r[cZ]) : '', msg });
+    }
+  }
+  return found || out.acts.length || out.secu.length || out.qual.length ? out : null;
+}
+
+async function importFile(file, verbose) {
+  try {
+    await loadXlsx();
+  } catch (e) {
+    return toast('Il faut internet la première fois pour lire le fichier Excel.');
+  }
+  let wb;
+  try {
+    wb = XLSX.read(await file.arrayBuffer(), { type: 'array', cellDates: true });
+  } catch (e) {
+    return toast('Ce fichier n’est pas un fichier Excel lisible.');
+  }
+  const out = readWorkbook(wb, file.name);
+  if (!out) return toast('Je ne trouve pas l’onglet « Affectations » (colonnes Date, Activité, Matin…) dans ce fichier.');
+  // Seulement ce fichier : on remplace tout.
+  data = out;
+  data.modified = file.lastModified;
+  save();
+  if (ui.act && !actList().some((a) => norm(a.name) === norm(ui.act))) ui.act = null;
+  closeSheet();
+  render();
+  if (verbose) {
+    const days = Object.keys(data.aff).length;
+    toast(`Fichier lu : ${data.acts.length || actList().length} activités, ${days} jour${days > 1 ? 's' : ''}.`);
+  }
+}
+
+// Raccorder le fichier (Chrome / Edge sur ordinateur) : relu tout seul quand il change.
+const canLink = 'showOpenFilePicker' in window;
+let handle = null;
+function idb() {
+  return new Promise((resolve, reject) => {
+    const r = indexedDB.open('pilotage-fichier', 1);
+    r.onupgradeneeded = () => r.result.createObjectStore('h');
+    r.onsuccess = () => resolve(r.result);
+    r.onerror = () => reject(r.error);
+  });
+}
+async function idbDo(mode, fn) {
+  const db = await idb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('h', mode);
+    const req = fn(tx.objectStore('h'));
+    tx.oncomplete = () => resolve(req?.result);
+    tx.onerror = () => reject(tx.error);
+  });
+}
+async function linkFile() {
+  if (!canLink) return document.getElementById('pick').click();
+  try {
+    const [h] = await window.showOpenFilePicker({ types: [{ description: 'Excel', accept: { 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx', '.xlsm'], 'application/vnd.ms-excel': ['.xls'] } }] });
+    handle = h;
+    await idbDo('readwrite', (st) => st.put(h, 'file')).catch(() => {});
+    await importFile(await h.getFile(), true);
+  } catch (e) {
+    if (e.name !== 'AbortError') toast('Impossible d’ouvrir ce fichier.');
+  }
+}
+let needTap = false;
+async function refresh(fromTap) {
+  try {
+    if (!handle) handle = await idbDo('readonly', (st) => st.get('file')).catch(() => null);
+    if (!handle) return fromTap && toast('Aucun fichier raccordé.');
+    let perm = await handle.queryPermission({ mode: 'read' });
+    if (perm !== 'granted' && fromTap) perm = await handle.requestPermission({ mode: 'read' });
+    if (perm !== 'granted') {
+      if (!needTap) {
+        needTap = true;
+        showTapBanner();
+      }
+      return;
+    }
+    needTap = false;
+    document.querySelector('.tap-banner')?.remove();
+    const f = await handle.getFile();
+    if (fromTap || !data || f.lastModified !== data.modified || f.name !== data.file) await importFile(f, fromTap);
+  } catch (e) {
+    if (fromTap) toast('Impossible de relire le fichier : raccorde-le à nouveau dans les réglages.');
+  }
+}
+// Après un redémarrage, le navigateur demande une fois l'autorisation de relire le fichier.
+function showTapBanner() {
+  if (document.querySelector('.tap-banner')) return;
+  const b = document.createElement('button');
+  b.className = 'btn tap-banner';
+  b.style.cssText = 'position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:25';
+  b.textContent = 'Touche ici pour relire le fichier Excel';
+  b.addEventListener('click', () => refresh(true));
+  document.body.appendChild(b);
+}
+async function unlink() {
+  handle = null;
+  await idbDo('readwrite', (st) => st.delete('file')).catch(() => {});
+  data = null;
+  try {
+    localStorage.removeItem(KEY);
+  } catch (e) {}
+  closeSheet();
+  render();
+  toast('Écran vidé.');
+}
+document.getElementById('pick').addEventListener('change', (e) => {
+  const f = e.target.files?.[0];
+  if (f) importFile(f, true);
+  e.target.value = '';
+});
+async function loadDemo() {
+  toast('Je charge l’exemple…');
+  try {
+    const r = await fetch('excel/pilotage-atelier.xlsx', { cache: 'no-store' });
+    await importFile(new File([await r.blob()], 'Exemple (noms inventés)'), true);
+  } catch (e) {
+    toast('Impossible de charger l’exemple : vérifie ta connexion internet.');
+  }
+}
+
+document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && (refresh(false), render()));
+setInterval(() => document.visibilityState === 'visible' && refresh(false), 30000);
+
+render();
+touched();
+refresh(false);
+</script>
+</body>
+</html>
