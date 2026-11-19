@@ -155,6 +155,11 @@ svg { flex: 0 0 auto; }
 .hw-meta .rendu-tag svg { width: 14px; height: 14px; stroke: var(--ok); }
 .hw-meta .grade { font-weight: 800; color: var(--ink); background: var(--mark); padding: 0 7px; border-radius: 6px; }
 
+.prof { display: inline-flex; align-items: center; gap: 4px; font-weight: 600; color: var(--ink-2); }
+.prof svg { width: 14px; height: 14px; }
+.meta-line .prof { font-size: 15px; }
+.step-edit span svg { width: 16px; height: 16px; display: block; color: var(--ink-3); }
+
 /* Matières */
 .subj-row { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-top: 1px solid var(--line); }
 .subj-row:first-child { border-top: 0; }
@@ -367,6 +372,7 @@ const mark = (s, size = 20) => (ANIMALS_ON && s ? animalSvg(animalOf(s), s.color
 const subjStyle = (s) => (s ? `--c:${s.color};--c2:${inkOf(s.color)}` : '--c:#C9CCD8;--c2:var(--ink-2)');
 
 const icons = {
+  user: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="3.6"/><path d="M5 20a7 7 0 0 1 14 0"/></svg>',
   search: '<svg class="s-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>',
   plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>',
   check: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
@@ -407,6 +413,8 @@ function render() {
   f.innerHTML = ui.tab === 'subjects' ? `<button class="btn" data-action="new-subject">${icons.plus} Nouvelle matière</button>` : `<button class="btn" data-action="new">${icons.plus} Nouveau devoir</button>`;
 }
 
+// Le prof d'un devoir (parmi ceux de sa matière).
+const teacherOf = (h) => subject(h.subject)?.teachers?.find((t) => t.id === h.teacher) || null;
 const tabHtml = (todo, done) => (ui.tab === 'subjects' ? subjectsHtml() : ui.tab === 'done' ? doneHtml(done) : todoHtml(todo));
 const contentHtml = (todo, done) => (ui.q.trim() ? searchHtml() : tabHtml(todo, done));
 
@@ -414,7 +422,7 @@ const contentHtml = (todo, done) => (ui.q.trim() ? searchHtml() : tabHtml(todo, 
 const snorm = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 function searchHtml() {
   const words = snorm(ui.q).split(/\s+/).filter(Boolean);
-  const hay = (h) => snorm([h.title, subject(h.subject)?.name, h.note, h.grade, ...(h.steps || []).map((x) => x.text), ...(h.files || []).map((x) => x.name), ...(h.result || []).map((x) => x.name), h.due ? fmt(h.due, { day: 'numeric', month: 'long' }) : ''].join(' '));
+  const hay = (h) => snorm([h.title, subject(h.subject)?.name, teacherOf(h)?.name, h.note, h.grade, ...(h.steps || []).map((x) => x.text), ...(h.files || []).map((x) => x.name), ...(h.result || []).map((x) => x.name), h.due ? fmt(h.due, { day: 'numeric', month: 'long' }) : ''].join(' '));
   const hits = db.hw.filter((h) => words.every((w) => hay(h).includes(w)));
   if (!hits.length) return `<div class="empty"><b>Aucun travail trouvé</b>Rien ne correspond à « ${esc(ui.q.trim())} ».</div>`;
   const todo = hits.filter((h) => !h.done).sort(byDue);
@@ -431,7 +439,7 @@ function hwHtml(h) {
   return `<div class="hw${h.done ? ' done' : ''}" style="${subjStyle(s)}">
     <button class="check" data-done="${h.id}" aria-label="${h.done ? 'Remettre à faire' : 'C’est fait'} : ${esc(h.title)}" aria-pressed="${!!h.done}">${icons.check}</button>
     <button class="hw-body" data-open="${h.id}"><span class="hw-title">${esc(h.title)}</span>
-      <span class="hw-meta">${s ? `<span class="subj">${ANIMALS_ON ? mark(s, 20) : ''}${esc(s.name)}</span>` : ''}${st.length ? `<span class="steps-count">${stDone}/${st.length} étapes</span>` : ''}${n ? `<span class="clip">${icons.clip}${n}</span>` : ''}${h.note ? '<span>note</span>' : ''}${h.grade ? `<span class="grade">${esc(h.grade)}</span>` : ''}</span>${(h.result || []).length ? `<span class="rpill"><b style="--fc:${fileKind(h.result[0]).c}">${esc(fileKind(h.result[0]).short)}</b><span>Rendu : ${esc(h.result[0].name)}${h.result.length > 1 ? ` +${h.result.length - 1}` : ''}</span></span>` : ''}${st.length ? `<span class="bar"><i style="width:${Math.round((100 * stDone) / st.length)}%"></i></span>` : ''}</button>
+      <span class="hw-meta">${s ? `<span class="subj">${ANIMALS_ON ? mark(s, 20) : ''}${esc(s.name)}</span>` : ''}${teacherOf(h) ? `<span class="prof">${icons.user}${esc(teacherOf(h).name)}</span>` : ''}${st.length ? `<span class="steps-count">${stDone}/${st.length} étapes</span>` : ''}${n ? `<span class="clip">${icons.clip}${n}</span>` : ''}${h.note ? '<span>note</span>' : ''}${h.grade ? `<span class="grade">${esc(h.grade)}</span>` : ''}</span>${(h.result || []).length ? `<span class="rpill"><b style="--fc:${fileKind(h.result[0]).c}">${esc(fileKind(h.result[0]).short)}</b><span>Rendu : ${esc(h.result[0].name)}${h.result.length > 1 ? ` +${h.result.length - 1}` : ''}</span></span>` : ''}${st.length ? `<span class="bar"><i style="width:${Math.round((100 * stDone) / st.length)}%"></i></span>` : ''}</button>
     <span class="due ${dueClass(h.due, h.done)}">${esc(h.done ? 'Fait' : dueText(h.due))}</span>
   </div>`;
 }
@@ -487,7 +495,7 @@ function subjectsHtml() {
   return `<section class="group"><h2>Matières <small>${db.subjects.length}</small></h2><div class="list">${db.subjects
     .map((s) => {
       const todo = db.hw.filter((h) => h.subject === s.id && !h.done).length;
-      return `<div class="subj-row" style="${subjStyle(s)}">${ANIMALS_ON ? mark(s, 40) : '<span class="dot"></span>'}<button class="grow" data-see="${s.id}"><b>${esc(s.name)}</b><small>${todo ? `${todo} à faire` : 'Rien à faire'}</small></button><button class="small-btn" data-edit-subject="${s.id}" aria-label="Modifier ${esc(s.name)}">${icons.edit}</button></div>`;
+      return `<div class="subj-row" style="${subjStyle(s)}">${ANIMALS_ON ? mark(s, 40) : '<span class="dot"></span>'}<button class="grow" data-see="${s.id}"><b>${esc(s.name)}</b><small>${esc([(s.teachers || []).map((t) => t.name).join(', '), todo ? `${todo} à faire` : 'Rien à faire'].filter(Boolean).join(' · '))}</small></button><button class="small-btn" data-edit-subject="${s.id}" aria-label="Modifier ${esc(s.name)}">${icons.edit}</button></div>`;
     })
     .join('')}</div></section><p class="hint">Touche une matière pour voir ses devoirs.</p>${hasPack ? '' : packHtml()}`;
 }
@@ -706,6 +714,7 @@ async function shareFile(file) {
 function openEditor(id) {
   const cur = id ? db.hw.find((x) => x.id === id) : null;
   let subj = cur?.subject ?? (ui.filter !== 'all' ? ui.filter : null);
+  let teacher = cur?.teacher || null;
   let due = cur?.due || iso(addDays(new Date(), 1));
   let files = (cur?.files || []).slice();
   let steps = (cur?.steps || []).map((x) => ({ ...x }));
@@ -721,6 +730,7 @@ function openEditor(id) {
       <input id="hw-title" class="field" value="${esc(cur?.title || '')}" placeholder="ex. Exercices 4 à 7 page 52" maxlength="160" enterkeyhint="done" autocomplete="off">
       <span class="label">Matière</span>
       <div class="row" id="subj-pick"></div>
+      <div id="teacher-box"></div>
       <span class="label">À rendre pour quand ?</span>
       <div class="row">${quick.map(([l, d]) => `<button type="button" class="chip" data-due="${d}" aria-pressed="${due === d}">${l}</button>`).join('')}
         <input type="date" class="field" id="hw-due" value="${due}" aria-label="Choisir la date"></div>
@@ -741,6 +751,13 @@ function openEditor(id) {
   const drawSubjects = () => {
     subjBox.innerHTML = db.subjects.map((s) => `<button type="button" class="chip" style="${subjStyle(s)}" data-subj="${s.id}" aria-pressed="${subj === s.id}">${mark(s)}${esc(s.name)}</button>`).join('') + `<button type="button" class="chip" data-subj-new>${icons.plus} Nouvelle</button>`;
     subjBox.querySelectorAll('.chip svg').forEach((x) => (x.style.cssText = 'width:16px;height:16px'));
+    // Les profs de la matière choisie ; un seul prof : il est choisi tout seul.
+    const ts = subject(subj)?.teachers || [];
+    if (teacher && !ts.some((t) => t.id === teacher)) teacher = null;
+    if (!teacher && ts.length === 1 && !cur) teacher = ts[0].id;
+    back.querySelector('#teacher-box').innerHTML = subj
+      ? `<span class="label">Prof</span><div class="row">${ts.map((t) => `<button type="button" class="chip" data-teacher="${t.id}" aria-pressed="${teacher === t.id}">${icons.user}${esc(t.name)}</button>`).join('')}<button type="button" class="chip" data-teacher-new>${icons.plus} ${ts.length ? 'Autre prof' : 'Ajouter le prof'}</button></div>`
+      : '';
   };
   drawSubjects();
   const dueIn = back.querySelector('#hw-due');
@@ -800,6 +817,7 @@ function openEditor(id) {
     const s = e.target.closest('[data-subj]');
     if (s) {
       subj = subj === s.dataset.subj ? null : s.dataset.subj;
+      teacher = null;
       return drawSubjects();
     }
     if (e.target.closest('[data-subj-new]')) {
@@ -809,6 +827,21 @@ function openEditor(id) {
       db.subjects.push(ns);
       save();
       subj = ns.id;
+      return drawSubjects();
+    }
+    const tc = e.target.closest('[data-teacher]');
+    if (tc) {
+      teacher = teacher === tc.dataset.teacher ? null : tc.dataset.teacher;
+      return drawSubjects();
+    }
+    if (e.target.closest('[data-teacher-new]')) {
+      const sb = subject(subj);
+      const name = (prompt(`Nom du prof de ${sb.name} (ex. Mme Martin) :`) || '').trim();
+      if (!name) return;
+      const t = { id: uid(), name: name.slice(0, 60) };
+      sb.teachers = [...(sb.teachers || []), t];
+      save();
+      teacher = t.id;
       return drawSubjects();
     }
     const q = e.target.closest('[data-due]');
@@ -846,7 +879,7 @@ function openEditor(id) {
       back.querySelector('#hw-title').focus();
       return toast('Écris ce qu’il faut faire.');
     }
-    const data = { title, subject: subj || null, due: dueIn.value || '', note: back.querySelector('#hw-note').value.trim(), files, steps };
+    const data = { title, subject: subj || null, teacher: subj ? teacher : null, due: dueIn.value || '', note: back.querySelector('#hw-note').value.trim(), files, steps };
     if (stepIn.value.trim()) data.steps.push({ id: uid(), text: stepIn.value.trim(), done: false });
     if (cur) {
       (cur.files || []).filter((x) => !files.some((y) => y.id === x.id)).forEach((x) => delFile(x.id));
@@ -868,7 +901,7 @@ async function openDetail(id) {
   const s = subject(h.subject);
   let confirmDel = false;
   const back = showSheet(`<div class="sheet-head"><h3>${esc(h.title)}</h3>${closeBtn}</div>
-    <p class="meta-line">${s ? `<span class="badge" style="${subjStyle(s)}">${mark(s, 22)}${esc(s.name)}</span>` : ''}<span>${h.due ? `À rendre ${esc(fmt(h.due, { weekday: 'long', day: 'numeric', month: 'long' }))}` : 'Sans date'}</span>${h.done ? '<span style="color:var(--ok);font-weight:700">· Fait</span>' : h.due && daysLeft(h.due) < 0 ? '<span style="color:var(--late);font-weight:700">· En retard</span>' : ''}</p>
+    <p class="meta-line">${s ? `<span class="badge" style="${subjStyle(s)}">${mark(s, 22)}${esc(s.name)}</span>` : ''}${teacherOf(h) ? `<span class="prof">${icons.user}${esc(teacherOf(h).name)}</span>` : ''}<span>${h.due ? `À rendre ${esc(fmt(h.due, { weekday: 'long', day: 'numeric', month: 'long' }))}` : 'Sans date'}</span>${h.done ? '<span style="color:var(--ok);font-weight:700">· Fait</span>' : h.due && daysLeft(h.due) < 0 ? '<span style="color:var(--late);font-weight:700">· En retard</span>' : ''}</p>
     ${h.note ? `<div class="note-box">${esc(h.note)}</div>` : ''}
     ${(h.steps || []).length ? `<span class="label">Étapes <small id="steps-sum"></small></span><div class="list" id="steps-list"></div>` : ''}
     ${h.done ? '<div id="rendu-slot"></div>' : ''}
@@ -1008,9 +1041,32 @@ function openSubject(id) {
       <input id="s-name" class="field" value="${esc(cur?.name || '')}" placeholder="ex. Maths" maxlength="40" autocomplete="off">
       <span class="label">Couleur</span>
       <div class="colors">${COLORS.map((c) => `<button type="button" class="color" style="--c:${c}" data-color="${c}" aria-label="Couleur" aria-pressed="${c === color}"></button>`).join('')}</div>
+      <span class="label">Prof <small>(un ou plusieurs, facultatif)</small></span>
+      <div class="steps-edit" id="teachers"></div>
+      <div class="row"><input id="t-new" class="field" placeholder="ex. Mme Martin" maxlength="60" autocomplete="off" enterkeyhint="done" style="flex:1 1 200px"><button type="button" class="chip" data-t-add>${icons.plus} Ajouter</button></div>
       ${ANIMALS_ON ? '<span class="label">Chien</span><div class="animals" id="animals"></div>' : ''}
       <div class="actions"><button class="btn" type="submit">${cur ? 'Enregistrer' : 'Ajouter la matière'}</button>${cur ? '<button class="btn danger" type="button" data-del>Supprimer la matière</button>' : ''}</div>
     </form>`);
+  let teachers = (cur?.teachers || []).map((t) => ({ ...t }));
+  const tIn = back.querySelector('#t-new');
+  const drawTeachers = () => {
+    back.querySelector('#teachers').innerHTML = teachers.map((t) => `<div class="step-edit"><span>${icons.user}</span><b>${esc(t.name)}</b><button type="button" class="rm-step" data-t-rm="${t.id}" aria-label="Enlever ${esc(t.name)}">${icons.close}</button></div>`).join('');
+  };
+  drawTeachers();
+  const addTeacher = () => {
+    const n = tIn.value.trim();
+    if (!n) return tIn.focus();
+    teachers.push({ id: uid(), name: n });
+    tIn.value = '';
+    drawTeachers();
+    tIn.focus();
+  };
+  tIn.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      addTeacher();
+    }
+  });
   const drawAnimals = () => {
     const box = back.querySelector('#animals');
     if (box) box.innerHTML = ANIMAL_KEYS.map((k) => `<button type="button" class="animal-btn" data-animal="${k}" aria-pressed="${k === animal}" aria-label="${ANIMALS[k].name}">${animalSvg(k, color, 40)}<small>${ANIMALS[k].name}</small>${ANIMALS[k].star ? '<em class="star">La star</em>' : ''}</button>`).join('');
@@ -1027,6 +1083,12 @@ function openSubject(id) {
     if (an) {
       animal = an.dataset.animal;
       return drawAnimals();
+    }
+    if (e.target.closest('[data-t-add]')) return addTeacher();
+    const tr = e.target.closest('[data-t-rm]');
+    if (tr) {
+      teachers = teachers.filter((t) => t.id !== tr.dataset.tRm);
+      return drawTeachers();
     }
     const del = e.target.closest('[data-del]');
     if (del) {
@@ -1048,8 +1110,11 @@ function openSubject(id) {
     e.preventDefault();
     const name = back.querySelector('#s-name').value.trim();
     if (!name) return back.querySelector('#s-name').focus();
-    if (cur) Object.assign(cur, { name, color, animal });
-    else db.subjects.push({ id: uid(), name, color, animal });
+    if (tIn.value.trim()) teachers.push({ id: uid(), name: tIn.value.trim() });
+    if (cur) {
+      Object.assign(cur, { name, color, animal, teachers });
+      db.hw.forEach((h) => h.subject === cur.id && h.teacher && !teachers.some((t) => t.id === h.teacher) && (h.teacher = null));
+    } else db.subjects.push({ id: uid(), name, color, animal, teachers });
     save();
     closeSheet();
     render();
