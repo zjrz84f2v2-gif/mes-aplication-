@@ -169,6 +169,11 @@ svg { flex: 0 0 auto; }
 @keyframes arm { to { box-shadow: 0 0 0 7px color-mix(in srgb, var(--ok) 12%, transparent); } }
 .btn.confirm { background: #fff; color: var(--ok); border: 2px solid var(--ok); box-shadow: none; }
 
+.check.loop { border-color: color-mix(in srgb, var(--accent) 45%, transparent); background: color-mix(in srgb, var(--accent) 8%, #fff); color: var(--accent); cursor: default; }
+.check.loop svg { width: 18px; height: 18px; opacity: 1; stroke: currentColor; }
+.const-note { display: flex; align-items: center; gap: 10px; margin: 0; background: color-mix(in srgb, var(--accent) 8%, #fff); color: var(--accent); border-radius: 14px; padding: 14px 16px; font-weight: 700; }
+.const-note svg { width: 22px; height: 22px; }
+
 /* Matières */
 .subj-row { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-top: 1px solid var(--line); }
 .subj-row:first-child { border-top: 0; }
@@ -258,6 +263,7 @@ const COLORS = document.documentElement.dataset.theme === 'ddt'
   ? ['#D94F86', '#E9784F', '#5FA36A', '#8E6CCF', '#D9A23B', '#4E9BC2', '#C0679A', '#A57B5C']
   : ['#2B3FA8', '#C2410C', '#2E7D4F', '#7E3FBF', '#B7791F', '#C2417A', '#0E7490', '#4D5466'];
 let db = load();
+db.hw.forEach((h) => h.constant && h.done && Object.assign(h, { done: false, doneAt: null }));
 function load() {
   try {
     const d = JSON.parse(localStorage.getItem(KEY));
@@ -448,7 +454,7 @@ function hwHtml(h) {
   const st = h.steps || [];
   const stDone = st.filter((x) => x.done).length;
   return `<div class="hw${h.done ? ' done' : ''}" style="${subjStyle(s)}">
-    <button class="check" data-done="${h.id}" aria-label="${h.done ? 'Remettre à faire' : 'C’est fait'} : ${esc(h.title)}" aria-pressed="${!!h.done}">${icons.check}</button>
+    ${h.constant ? `<span class="check loop" title="Constant : à faire en continu" aria-label="Constant : à faire en continu">${icons.loop}</span>` : `<button class="check" data-done="${h.id}" aria-label="${h.done ? 'Remettre à faire' : 'C’est fait'} : ${esc(h.title)}" aria-pressed="${!!h.done}">${icons.check}</button>`}
     <button class="hw-body" data-open="${h.id}"><span class="hw-title">${esc(h.title)}</span>
       <span class="hw-meta">${s ? `<span class="subj">${ANIMALS_ON ? mark(s, 20) : ''}${esc(s.name)}</span>` : ''}${teacherOf(h) ? `<span class="prof">${icons.user}${esc(teacherOf(h).name)}</span>` : ''}${st.length ? `<span class="steps-count">${stDone}/${st.length} étapes</span>` : ''}${n ? `<span class="clip">${icons.clip}${n}</span>` : ''}${h.note ? '<span>note</span>' : ''}${h.grade ? `<span class="grade">${esc(h.grade)}</span>` : ''}</span>${(h.result || []).length ? `<span class="rpill"><b style="--fc:${fileKind(h.result[0]).c}">${esc(fileKind(h.result[0]).short)}</b><span>Rendu : ${esc(h.result[0].name)}${h.result.length > 1 ? ` +${h.result.length - 1}` : ''}</span></span>` : ''}${st.length ? `<span class="bar"><i style="width:${Math.round((100 * stDone) / st.length)}%"></i></span>` : ''}</button>
     <span class="due ${h.constant && !h.done ? 'const' : dueClass(h.due, h.done)}">${esc(h.done ? 'Fait' : h.constant ? 'Constant' : dueText(h.due))}</span>
@@ -673,7 +679,7 @@ function armDone(btn) {
 
 function toggleDone(id) {
   const h = db.hw.find((x) => x.id === id);
-  if (!h) return;
+  if (!h || (h.constant && !h.done)) return;
   h.done = !h.done;
   h.doneAt = h.done ? Date.now() : null;
   save();
@@ -1000,6 +1006,7 @@ function openEditor(id) {
     }
     const data = { title, subject: subj || null, teacher: subj ? teacher : null, due: constant ? '' : dueIn.value || '', constant: constant && !dueIn.value, note: back.querySelector('#hw-note').value.trim(), files, steps };
     if (stepIn.value.trim()) data.steps.push({ id: uid(), text: stepIn.value.trim(), done: false });
+    if (data.constant) Object.assign(data, { done: false, doneAt: null });
     if (cur) {
       (cur.files || []).filter((x) => !files.some((y) => y.id === x.id)).forEach((x) => delFile(x.id));
       Object.assign(cur, data);
@@ -1026,7 +1033,7 @@ async function openDetail(id) {
     ${h.done ? '<div id="rendu-slot"></div>' : ''}
     ${(h.files || []).length ? `<span class="label">Photos et fichiers de l’énoncé</span><div class="files" id="files"></div>` : ''}
     <section class="rendu${h.done ? ' on' : ''}">
-      <h4>Mon rendu <small>${h.done ? 'le résultat de ton travail' : 'quand c’est fait'}</small></h4>
+      <h4>${h.constant ? 'Mes travaux' : 'Mon rendu'} <small>${h.constant ? 'ajoute tes travaux au fur et à mesure' : h.done ? 'le résultat de ton travail' : 'quand c’est fait'}</small></h4>
       <div class="files" id="result"></div>
       <div class="add-files">
         <label class="btn ghost pick">${icons.camera} Photo<input type="file" accept="image/*" capture="environment" id="res-photo"></label>
@@ -1036,7 +1043,7 @@ async function openDetail(id) {
       <input id="res-grade" class="field" value="${esc(h.grade || '')}" placeholder="ex. 15/20, A, très bien…" maxlength="40" autocomplete="off" style="max-width:240px">
     </section>
     <div class="actions">
-      <button class="btn ${h.done ? 'ghost' : 'ok'}" data-toggle>${h.done ? 'Remettre à faire' : `${icons.check} C’est fait !`}</button>
+      ${h.constant ? '<p class="const-note">' + icons.loop + '<span>Travail constant : il se fait en continu, il reste toujours dans ta liste.</span></p>' : `<button class="btn ${h.done ? 'ghost' : 'ok'}" data-toggle>${h.done ? 'Remettre à faire' : `${icons.check} C’est fait !`}</button>`}
       ${!h.done && h.due && daysLeft(h.due) >= 1 ? `<button class="btn ghost" data-remind>${icons.cal} Rappel dans mon agenda</button>` : ''}
       <button class="btn ghost" data-edit>${icons.edit} Modifier</button>
       <button class="btn danger" data-del>Supprimer</button>
