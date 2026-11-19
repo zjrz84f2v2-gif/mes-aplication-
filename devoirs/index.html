@@ -163,6 +163,12 @@ svg { flex: 0 0 auto; }
 .backup { margin-top: 26px; background: var(--card); border-radius: var(--radius); padding: 14px; box-shadow: 0 12px 30px -22px rgba(29, 35, 64, .45); }
 .backup h4 { margin: 0 0 6px; font: 800 20px/1.2 var(--display); }
 
+.due.const { background: color-mix(in srgb, var(--accent) 12%, #fff); color: var(--accent); }
+.chip svg { width: 16px; height: 16px; }
+.check.arm { border-color: var(--ok); box-shadow: 0 0 0 4px color-mix(in srgb, var(--ok) 30%, transparent); animation: arm .9s ease-in-out infinite alternate; }
+@keyframes arm { to { box-shadow: 0 0 0 7px color-mix(in srgb, var(--ok) 12%, transparent); } }
+.btn.confirm { background: #fff; color: var(--ok); border: 2px solid var(--ok); box-shadow: none; }
+
 /* Matières */
 .subj-row { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-top: 1px solid var(--line); }
 .subj-row:first-child { border-top: 0; }
@@ -375,6 +381,7 @@ const mark = (s, size = 20) => (ANIMALS_ON && s ? animalSvg(animalOf(s), s.color
 const subjStyle = (s) => (s ? `--c:${s.color};--c2:${inkOf(s.color)}` : '--c:#C9CCD8;--c2:var(--ink-2)');
 
 const icons = {
+  loop: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 2l3 3-3 3"/><path d="M4 11V9a4 4 0 0 1 4-4h12"/><path d="M7 22l-3-3 3-3"/><path d="M20 13v2a4 4 0 0 1-4 4H4"/></svg>',
   reload: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>',
   user: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="3.6"/><path d="M5 20a7 7 0 0 1 14 0"/></svg>',
   search: '<svg class="s-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>',
@@ -426,7 +433,7 @@ const contentHtml = (todo, done) => (ui.q.trim() ? searchHtml() : tabHtml(todo, 
 const snorm = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 function searchHtml() {
   const words = snorm(ui.q).split(/\s+/).filter(Boolean);
-  const hay = (h) => snorm([h.title, subject(h.subject)?.name, teacherOf(h)?.name, h.note, h.grade, ...(h.steps || []).map((x) => x.text), ...(h.files || []).map((x) => x.name), ...(h.result || []).map((x) => x.name), h.due ? fmt(h.due, { day: 'numeric', month: 'long' }) : ''].join(' '));
+  const hay = (h) => snorm([h.constant ? 'constant' : '', h.title, subject(h.subject)?.name, teacherOf(h)?.name, h.note, h.grade, ...(h.steps || []).map((x) => x.text), ...(h.files || []).map((x) => x.name), ...(h.result || []).map((x) => x.name), h.due ? fmt(h.due, { day: 'numeric', month: 'long' }) : ''].join(' '));
   const hits = db.hw.filter((h) => words.every((w) => hay(h).includes(w)));
   if (!hits.length) return `<div class="empty"><b>Aucun travail trouvé</b>Rien ne correspond à « ${esc(ui.q.trim())} ».</div>`;
   const todo = hits.filter((h) => !h.done).sort(byDue);
@@ -444,7 +451,7 @@ function hwHtml(h) {
     <button class="check" data-done="${h.id}" aria-label="${h.done ? 'Remettre à faire' : 'C’est fait'} : ${esc(h.title)}" aria-pressed="${!!h.done}">${icons.check}</button>
     <button class="hw-body" data-open="${h.id}"><span class="hw-title">${esc(h.title)}</span>
       <span class="hw-meta">${s ? `<span class="subj">${ANIMALS_ON ? mark(s, 20) : ''}${esc(s.name)}</span>` : ''}${teacherOf(h) ? `<span class="prof">${icons.user}${esc(teacherOf(h).name)}</span>` : ''}${st.length ? `<span class="steps-count">${stDone}/${st.length} étapes</span>` : ''}${n ? `<span class="clip">${icons.clip}${n}</span>` : ''}${h.note ? '<span>note</span>' : ''}${h.grade ? `<span class="grade">${esc(h.grade)}</span>` : ''}</span>${(h.result || []).length ? `<span class="rpill"><b style="--fc:${fileKind(h.result[0]).c}">${esc(fileKind(h.result[0]).short)}</b><span>Rendu : ${esc(h.result[0].name)}${h.result.length > 1 ? ` +${h.result.length - 1}` : ''}</span></span>` : ''}${st.length ? `<span class="bar"><i style="width:${Math.round((100 * stDone) / st.length)}%"></i></span>` : ''}</button>
-    <span class="due ${dueClass(h.due, h.done)}">${esc(h.done ? 'Fait' : dueText(h.due))}</span>
+    <span class="due ${h.constant && !h.done ? 'const' : dueClass(h.due, h.done)}">${esc(h.done ? 'Fait' : h.constant ? 'Constant' : dueText(h.due))}</span>
   </div>`;
 }
 
@@ -471,7 +478,8 @@ function todoHtml(todo) {
     ['', 'Demain', (h) => h.due && daysLeft(h.due) === 1],
     ['', 'Cette semaine', (h) => h.due && daysLeft(h.due) > 1 && daysLeft(h.due) < 7],
     ['', 'Plus tard', (h) => h.due && daysLeft(h.due) >= 7],
-    ['', 'Sans date', (h) => !h.due],
+    ['', 'Constant', (h) => !h.due && h.constant],
+    ['', 'Sans date', (h) => !h.due && !h.constant],
   ];
   for (const [cls, title, test] of groups) {
     const g = list.filter(test);
@@ -603,7 +611,7 @@ document.addEventListener('click', (e) => {
     return window.scrollTo(0, 0);
   }
   const d = e.target.closest('[data-done]');
-  if (d) return toggleDone(d.dataset.done);
+  if (d) return armDone(d);
   const o = e.target.closest('[data-open]');
   if (o) return openDetail(o.dataset.open);
   const es = e.target.closest('[data-edit-subject]');
@@ -640,6 +648,28 @@ document.addEventListener('click', (e) => {
     toast('Devoirs faits effacés.');
   }
 });
+
+// Sécurité : il faut appuyer deux fois (dans les 3 secondes) pour cocher ou décocher un devoir.
+let armed = null;
+function armDone(btn) {
+  const id = btn.dataset.done;
+  if (armed && armed.id === id && Date.now() < armed.until) {
+    clearTimeout(armed.timer);
+    armed = null;
+    return toggleDone(id);
+  }
+  if (armed) {
+    clearTimeout(armed.timer);
+    document.querySelector('.check.arm')?.classList.remove('arm');
+  }
+  const h = db.hw.find((x) => x.id === id);
+  btn.classList.add('arm');
+  armed = { id, until: Date.now() + 3000, timer: setTimeout(() => {
+    armed = null;
+    document.querySelector('.check.arm')?.classList.remove('arm');
+  }, 3000) };
+  toast(h?.done ? 'Appuie encore pour le remettre à faire' : 'Appuie encore sur la case pour confirmer');
+}
 
 function toggleDone(id) {
   const h = db.hw.find((x) => x.id === id);
@@ -787,7 +817,8 @@ function openEditor(id) {
   const cur = id ? db.hw.find((x) => x.id === id) : null;
   let subj = cur?.subject ?? (ui.filter !== 'all' ? ui.filter : null);
   let teacher = cur?.teacher || null;
-  let due = cur?.due || iso(addDays(new Date(), 1));
+  let constant = !!cur?.constant;
+  let due = constant ? '' : cur?.due || iso(addDays(new Date(), 1));
   let files = (cur?.files || []).slice();
   let steps = (cur?.steps || []).map((x) => ({ ...x }));
   const added = []; // fichiers ajoutés dans cette feuille (à effacer si on annule)
@@ -804,8 +835,10 @@ function openEditor(id) {
       <div class="row" id="subj-pick"></div>
       <div id="teacher-box"></div>
       <span class="label">À rendre pour quand ?</span>
-      <div class="row">${quick.map(([l, d]) => `<button type="button" class="chip" data-due="${d}" aria-pressed="${due === d}">${l}</button>`).join('')}
+      <div class="row">${quick.map(([l, d]) => `<button type="button" class="chip" data-due="${d}" aria-pressed="${!constant && due === d}">${l}</button>`).join('')}
+        <button type="button" class="chip" data-constant aria-pressed="${constant}">${icons.loop} Constant</button>
         <input type="date" class="field" id="hw-due" value="${due}" aria-label="Choisir la date"></div>
+      <p class="hint" id="constant-hint"${constant ? '' : ' hidden'}>Constant : un travail à faire en continu, sans date de rendu.</p>
       <label class="label" for="hw-note">Note <small>(facultatif)</small></label>
       <textarea id="hw-note" class="field" placeholder="Détails, ce qu’il faut apprendre…">${esc(cur?.note || '')}</textarea>
       <span class="label">Étapes <small>(facultatif : pour un gros projet)</small></span>
@@ -833,9 +866,14 @@ function openEditor(id) {
   };
   drawSubjects();
   const dueIn = back.querySelector('#hw-due');
-  const syncDue = () => back.querySelectorAll('[data-due]').forEach((c) => c.setAttribute('aria-pressed', String(c.dataset.due === due)));
+  const syncDue = () => {
+    back.querySelectorAll('[data-due]').forEach((c) => c.setAttribute('aria-pressed', String(!constant && c.dataset.due === due)));
+    back.querySelector('[data-constant]').setAttribute('aria-pressed', String(constant));
+    back.querySelector('#constant-hint').hidden = !constant;
+  };
   dueIn.addEventListener('change', () => {
     due = dueIn.value;
+    if (due) constant = false;
     syncDue();
   });
   const drawSteps = () => {
@@ -920,6 +958,15 @@ function openEditor(id) {
     if (q) {
       due = q.dataset.due;
       dueIn.value = due;
+      constant = false;
+      return syncDue();
+    }
+    if (e.target.closest('[data-constant]')) {
+      constant = !constant;
+      if (constant) {
+        due = '';
+        dueIn.value = '';
+      }
       return syncDue();
     }
     if (e.target.closest('[data-step-add]')) return addStep();
@@ -951,7 +998,7 @@ function openEditor(id) {
       back.querySelector('#hw-title').focus();
       return toast('Écris ce qu’il faut faire.');
     }
-    const data = { title, subject: subj || null, teacher: subj ? teacher : null, due: dueIn.value || '', note: back.querySelector('#hw-note').value.trim(), files, steps };
+    const data = { title, subject: subj || null, teacher: subj ? teacher : null, due: constant ? '' : dueIn.value || '', constant: constant && !dueIn.value, note: back.querySelector('#hw-note').value.trim(), files, steps };
     if (stepIn.value.trim()) data.steps.push({ id: uid(), text: stepIn.value.trim(), done: false });
     if (cur) {
       (cur.files || []).filter((x) => !files.some((y) => y.id === x.id)).forEach((x) => delFile(x.id));
@@ -962,7 +1009,7 @@ function openEditor(id) {
     closeSheet();
     ui.tab = 'todo';
     render();
-    toast(cur ? 'Modifié !' : `Ajouté pour ${dueText(data.due).toLowerCase()} !`);
+    toast(cur ? 'Modifié !' : data.constant ? 'Ajouté en constant !' : `Ajouté pour ${dueText(data.due).toLowerCase()} !`);
   });
   if (!cur) setTimeout(() => back.querySelector('#hw-title').focus(), 80);
 }
@@ -973,7 +1020,7 @@ async function openDetail(id) {
   const s = subject(h.subject);
   let confirmDel = false;
   const back = showSheet(`<div class="sheet-head"><h3>${esc(h.title)}</h3>${closeBtn}</div>
-    <p class="meta-line">${s ? `<span class="badge" style="${subjStyle(s)}">${mark(s, 22)}${esc(s.name)}</span>` : ''}${teacherOf(h) ? `<span class="prof">${icons.user}${esc(teacherOf(h).name)}</span>` : ''}<span>${h.due ? `À rendre ${esc(fmt(h.due, { weekday: 'long', day: 'numeric', month: 'long' }))}` : 'Sans date'}</span>${h.done ? '<span style="color:var(--ok);font-weight:700">· Fait</span>' : h.due && daysLeft(h.due) < 0 ? '<span style="color:var(--late);font-weight:700">· En retard</span>' : ''}</p>
+    <p class="meta-line">${s ? `<span class="badge" style="${subjStyle(s)}">${mark(s, 22)}${esc(s.name)}</span>` : ''}${teacherOf(h) ? `<span class="prof">${icons.user}${esc(teacherOf(h).name)}</span>` : ''}<span>${h.due ? `À rendre ${esc(fmt(h.due, { weekday: 'long', day: 'numeric', month: 'long' }))}` : h.constant ? 'Constant : à faire en continu' : 'Sans date'}</span>${h.done ? '<span style="color:var(--ok);font-weight:700">· Fait</span>' : h.due && daysLeft(h.due) < 0 ? '<span style="color:var(--late);font-weight:700">· En retard</span>' : ''}</p>
     ${h.note ? `<div class="note-box">${esc(h.note)}</div>` : ''}
     ${(h.steps || []).length ? `<span class="label">Étapes <small id="steps-sum"></small></span><div class="list" id="steps-list"></div>` : ''}
     ${h.done ? '<div id="rendu-slot"></div>' : ''}
@@ -1061,7 +1108,22 @@ async function openDetail(id) {
     }
     const of = e.target.closest('[data-file]');
     if (of) return openFile(h.files.find((x) => x.id === of.dataset.file));
-    if (e.target.closest('[data-toggle]')) {
+    const tg = e.target.closest('[data-toggle]');
+    if (tg && !tg.dataset.sure) {
+      // Premier appui : on demande de confirmer.
+      tg.dataset.sure = '1';
+      const old = tg.innerHTML;
+      tg.classList.add('confirm');
+      tg.textContent = h.done ? 'Appuie encore pour remettre à faire' : 'Appuie encore pour confirmer : c’est fait';
+      setTimeout(() => {
+        if (!document.body.contains(tg)) return;
+        delete tg.dataset.sure;
+        tg.classList.remove('confirm');
+        tg.innerHTML = old;
+      }, 3000);
+      return;
+    }
+    if (tg) {
       const wasDone = h.done;
       closeSheet();
       toggleDone(id);
