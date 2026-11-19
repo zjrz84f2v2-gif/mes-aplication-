@@ -794,27 +794,22 @@ const profHtml = (h) => (teachersOf(h).length ? `<span class="prof">${icons.user
 // Deux dates facultatives : la date de rendu possible et la date butoir (la limite).
 const keyDate = (h) => h.due || h.deadline || '';
 const limitDate = (h) => h.deadline || h.due || '';
-// « dans 3 jours », « dans 2 semaines », « dépassée depuis 1 jour »…
+// Toujours en jours : « dans 3 jours », « dans 40 jours », « dépassée depuis 2 jours »…
 function relText(d, limit) {
   const n = daysLeft(d);
   if (n === 0) return 'aujourd’hui';
   if (n === 1) return 'demain';
   if (n === -1) return limit ? 'dépassée depuis hier' : 'c’était hier';
   if (n < 0) return limit ? `dépassée depuis ${-n} jours` : `il y a ${-n} jours`;
-  if (n < 14) return `dans ${n} jours`;
-  if (n < 60) return `dans ${Math.round(n / 7)} semaines`;
-  return `dans ${Math.round(n / 30)} mois`;
+  return `dans ${n} jours`;
 }
-// La date à droite de chaque devoir, en court : « Demain », « Dans 5 j », « Dans 2 sem. », « Retard 3 j ».
+// La date à droite de chaque devoir, toujours en jours : « Demain », « Dans 12 jours », « Retard 3 j ».
 function shortRel(d) {
   const n = daysLeft(d);
   if (n === 0) return 'Aujourd’hui';
   if (n === 1) return 'Demain';
   if (n < 0) return `Retard ${-n} j`;
-  if (n < 7) return capital(fmt(d, { weekday: 'long' }));
-  if (n < 14) return `Dans ${n} j`;
-  if (n < 60) return `Dans ${Math.round(n / 7)} sem.`;
-  return `Dans ${Math.round(n / 30)} mois`;
+  return `Dans ${n} jours`;
 }
 const shortDate = (d) => fmt(d, { weekday: 'short', day: 'numeric', month: 'short' }).replace(/\./g, '');
 function datesHtml(h, long) {
