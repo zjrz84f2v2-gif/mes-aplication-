@@ -208,7 +208,10 @@ svg { flex: 0 0 auto; }
 .sheet { background: var(--paper); width: 100%; max-width: 640px; max-height: 92%; overflow-y: auto; border-radius: 26px 26px 0 0; padding: 0 max(18px, env(safe-area-inset-right)) calc(24px + env(safe-area-inset-bottom)) max(18px, env(safe-area-inset-left)); animation: rise .32s cubic-bezier(.16, 1, .3, 1); }
 @keyframes rise { from { transform: translateY(40px); opacity: .4; } }
 .band { width: 40px; height: 5px; border-radius: 3px; background: rgba(29, 35, 64, .2); margin: 10px auto 0; }
-.sheet-head { display: flex; align-items: flex-start; gap: 12px; padding-top: 14px; }
+.sheet-head { display: flex; align-items: flex-start; gap: 12px; padding: 14px 0 10px; position: sticky; top: 0; z-index: 3; background: var(--paper); margin: 0 -2px; }
+.sheet .band { position: sticky; top: 0; z-index: 4; }
+.close { width: 44px; height: 44px; background: rgba(29, 35, 64, .1) !important; }
+.close svg { width: 18px !important; height: 18px !important; }
 .sheet-head h3 { flex: 1; margin: 0; font: 800 26px/1.15 var(--display); letter-spacing: -.01em; overflow-wrap: anywhere; }
 .close { width: 40px; height: 40px; border-radius: 50%; border: 0; background: rgba(29, 35, 64, .08); display: flex; align-items: center; justify-content: center; padding: 0; flex: 0 0 auto; }
 .close svg { width: 16px; height: 16px; }
@@ -247,9 +250,13 @@ textarea.field { min-height: 90px; resize: vertical; font-size: 17px; }
 .pick input { position: absolute; inset: 0; opacity: 0; font-size: 0; cursor: pointer; }
 
 .viewer { position: fixed; inset: 0; z-index: 40; background: rgba(10, 12, 24, .94); display: flex; flex-direction: column; }
-.viewer img { flex: 1; min-height: 0; width: 100%; object-fit: contain; }
-.viewer .bar { display: flex; gap: 10px; padding: calc(10px + env(safe-area-inset-top)) 14px 10px; justify-content: flex-end; }
-.viewer .bar button { min-height: 44px; padding: 0 16px; border-radius: 999px; border: 0; background: rgba(255, 255, 255, .14); color: #fff; font-weight: 700; }
+.viewer img { flex: 1 1 auto; min-height: 0; width: 100%; object-fit: contain; }
+.viewer .vbar, .viewer .hint-x { flex: 0 0 auto; }
+.viewer .vbar { display: flex; gap: 10px; align-items: center; padding: calc(10px + env(safe-area-inset-top)) 14px 10px; justify-content: space-between; }
+.viewer .x { width: 52px; height: 52px; padding: 0 !important; display: flex; align-items: center; justify-content: center; background: #fff !important; color: #1D2340 !important; box-shadow: 0 6px 18px -6px rgba(0, 0, 0, .6); }
+.viewer .x svg { width: 20px; height: 20px; }
+.viewer .hint-x { color: rgba(255, 255, 255, .7); font-size: 13px; text-align: center; padding: 8px 0 calc(10px + env(safe-area-inset-bottom)); }
+.viewer .vbar button { min-height: 44px; padding: 0 18px; border-radius: 999px; border: 0; background: rgba(255, 255, 255, .16); color: #fff; font-weight: 700; white-space: nowrap; }
 
 .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(96px + env(safe-area-inset-bottom)); background: var(--ink); color: var(--paper); padding: 12px 18px; font-weight: 700; z-index: 50; max-width: calc(100% - 32px); text-align: center; border-radius: 999px; box-shadow: 0 10px 30px -10px rgba(0, 0, 0, .5); }
 
@@ -1086,11 +1093,11 @@ async function filesGridHtml(files, removable) {
     const k = fileKind(f);
     const img = blob && k.short === 'IMG';
     parts.push(`<div class="frow">
-      <button class="fopen" data-file="${f.id}" aria-label="Ouvrir ${esc(f.name)}">
+ <button type="button" class="fopen" data-file="${f.id}" aria-label="Ouvrir ${esc(f.name)}">
         <span class="fthumb" style="--fc:${k.c}">${img ? `<img src="${blobUrl(blob)}" alt="">` : `<b>${esc(k.short)}</b>`}</span>
         <span class="finfo"><b>${esc(blob ? f.name : 'Fichier introuvable')}</b><small>${esc([k.label, sizeText(f.size || blob?.size)].filter(Boolean).join(' · '))}</small></span>
         <span class="fgo">Ouvrir</span>
-      </button>${removable ? `<button class="rm" data-rm="${f.id}" aria-label="Enlever ${esc(f.name)}">${icons.close}</button>` : ''}
+      </button> ${removable ? `<button type="button" class="rm" data-rm="${f.id}" aria-label="Enlever ${esc(f.name)}">${icons.close}</button>` : ''}
     </div>`);
   }
   return parts.join('');
@@ -1103,7 +1110,7 @@ async function openFile(f) {
     const v = document.createElement('div');
     v.className = 'viewer';
     const u = URL.createObjectURL(blob);
-    v.innerHTML = `<div class="bar"><button data-share>Partager / enregistrer</button><button data-x>Fermer</button></div><img src="${u}" alt="${esc(f.name)}">`;
+    v.innerHTML = `<div class="vbar"><button data-share>Partager</button><button class="x" data-x aria-label="Fermer la photo">${icons.close}</button></div><img src="${u}" alt="${esc(f.name)}"><p class="hint-x">Touche la croix en haut à droite pour revenir.</p>`;
     v.addEventListener('click', (e) => {
       if (e.target.closest('[data-share]')) return shareFile(new File([blob], f.name, { type: f.type }));
       if (e.target.closest('[data-x]') || e.target === v) {
@@ -1586,6 +1593,12 @@ navigator.storage?.persist?.().catch(() => {});
 document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && !document.querySelector('.sheet-back') && render());
 render();
 startSync();
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  const v = document.querySelector('.viewer');
+  if (v) return v.querySelector('[data-x]').click();
+  if (document.querySelector('.sheet-back')) closeSheet();
+});
 </script>
 </body>
 </html>
