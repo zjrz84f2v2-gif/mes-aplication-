@@ -1,0 +1,742 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#F4F6FC">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Devoirs">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="manifest" href="manifest.webmanifest">
+<title>Mes devoirs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700;9..144,800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --paper: #F4F6FC;
+  --card: #FFFFFF;
+  --ink: #1D2340;
+  --ink-2: #565C78;
+  --ink-3: #8C90A6;
+  --line: rgba(29, 35, 64, .12);
+  --accent: #2B3FA8;
+  --accent-ink: #FFFFFF;
+  --late: #B3261E;
+  --soon: #C2570C;
+  --ok: #2E7D4F;
+  --mark: #FFE27A;
+  --radius: 18px;
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+  --display: "Fraunces", Georgia, serif;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; }
+body {
+  background: var(--paper);
+  background-image: linear-gradient(rgba(43, 63, 168, .07) 1px, transparent 1px);
+  background-size: 100% 28px;
+  color: var(--ink); font: 17px/1.4 var(--font); min-height: 100vh; -webkit-text-size-adjust: 100%;
+}
+::selection { background: var(--mark); color: var(--ink); }
+button, input, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; border-radius: 8px; }
+input, textarea { caret-color: var(--accent); }
+.app { max-width: 640px; margin: 0 auto; padding: calc(12px + env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) calc(110px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
+svg { flex: 0 0 auto; }
+
+/* En-tête */
+.top { display: flex; align-items: flex-end; gap: 12px; padding-top: 10px; }
+.top h1 { flex: 1; margin: 0; font: 800 34px/1 var(--display); letter-spacing: -.02em; }
+.top h1 mark { background: linear-gradient(transparent 58%, var(--mark) 58%, var(--mark) 92%, transparent 92%); color: inherit; padding: 0 2px; }
+.top p { margin: 6px 0 0; color: var(--ink-2); font-size: 15px; }
+.icon-btn { width: 44px; height: 44px; border-radius: 50%; border: 1.5px solid var(--line); background: var(--card); display: flex; align-items: center; justify-content: center; padding: 0; color: var(--ink-2); }
+.icon-btn svg { width: 20px; height: 20px; }
+
+.switch { display: flex; background: rgba(29, 35, 64, .07); border-radius: 14px; padding: 4px; margin-top: 18px; }
+.switch button { flex: 1; min-height: 44px; border: 0; background: none; border-radius: 11px; font-weight: 700; font-size: 16px; color: var(--ink-2); }
+.switch button[aria-pressed="true"] { background: var(--card); color: var(--ink); box-shadow: 0 2px 8px -3px rgba(29, 35, 64, .3); }
+.switch small { font-weight: 600; color: var(--ink-3); margin-left: 4px; }
+
+.chips { display: flex; gap: 8px; overflow-x: auto; margin: 14px -16px 0; padding: 2px 16px 4px; scrollbar-width: none; }
+.chips::-webkit-scrollbar { display: none; }
+.chip { flex: 0 0 auto; min-height: 40px; padding: 0 14px; border-radius: 999px; border: 1.5px solid var(--line); background: var(--card); font-weight: 700; font-size: 15px; display: inline-flex; align-items: center; gap: 7px; color: var(--ink); }
+.chip i { width: 10px; height: 10px; border-radius: 50%; background: var(--c); }
+.chip[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+.chip[aria-pressed="true"] i { box-shadow: 0 0 0 2px var(--paper); }
+
+/* Groupes par date */
+.group { margin-top: 22px; }
+.group h2 { display: flex; align-items: baseline; gap: 8px; margin: 0 0 8px; font: 800 20px/1.2 var(--display); letter-spacing: -.01em; }
+.group h2 small { font: 600 14px var(--font); color: var(--ink-2); }
+.group.late h2 { color: var(--late); }
+.list { background: var(--card); border-radius: var(--radius); box-shadow: 0 1px 0 rgba(29, 35, 64, .04), 0 12px 30px -22px rgba(29, 35, 64, .45); overflow: hidden; }
+.hw { display: flex; align-items: center; gap: 12px; padding: 8px 12px 8px 14px; border-top: 1px solid var(--line); min-height: 64px; position: relative; }
+.hw:first-child { border-top: 0; }
+.check { width: 32px; height: 32px; border-radius: 10px; border: 2px solid var(--ink-3); background: transparent; flex: 0 0 auto; display: flex; align-items: center; justify-content: center; padding: 0; }
+.check svg { width: 18px; height: 18px; opacity: 0; }
+.hw.done .check { background: var(--ok); border-color: var(--ok); }
+.hw.done .check svg { opacity: 1; }
+.hw-body { flex: 1; min-width: 0; border: 0; background: none; text-align: left; padding: 4px 0; }
+.hw-title { display: block; font-weight: 700; font-size: 17px; overflow-wrap: anywhere; }
+.hw.done .hw-title { text-decoration: line-through; text-decoration-thickness: 2px; color: var(--ink-3); }
+.hw-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin-top: 3px; font-size: 14px; color: var(--ink-2); }
+.hw-meta .subj { font-weight: 700; color: var(--c2); display: inline-flex; align-items: center; gap: 6px; }
+.hw-meta .subj::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: var(--c); }
+.hw-meta .clip { display: inline-flex; align-items: center; gap: 3px; }
+.hw-meta .clip svg { width: 14px; height: 14px; }
+.due { flex: 0 0 auto; font-weight: 800; font-size: 13px; padding: 5px 9px; border-radius: 9px; background: rgba(29, 35, 64, .07); color: var(--ink-2); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.due.late { background: #FBE3E1; color: var(--late); }
+.due.soon { background: #FDEBDD; color: var(--soon); }
+
+.empty { background: var(--card); border-radius: var(--radius); padding: 26px 20px; text-align: center; color: var(--ink-2); margin-top: 22px; }
+.empty b { display: block; font: 800 22px/1.2 var(--display); color: var(--ink); margin-bottom: 6px; }
+
+/* Matières */
+.subj-row { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-top: 1px solid var(--line); }
+.subj-row:first-child { border-top: 0; }
+.subj-row .dot { width: 16px; height: 16px; border-radius: 50%; background: var(--c); flex: 0 0 auto; }
+.subj-row button.grow { flex: 1; min-width: 0; text-align: left; border: 0; background: none; padding: 4px 0; }
+.subj-row b { display: block; font-size: 17px; }
+.subj-row small { color: var(--ink-2); font-size: 14px; }
+.small-btn { min-height: 40px; padding: 0 14px; border-radius: 999px; border: 1.5px solid var(--line); background: var(--card); font-weight: 700; font-size: 15px; display: inline-flex; align-items: center; gap: 6px; color: var(--ink); }
+
+/* Bouton du bas */
+.footer { position: fixed; left: 0; right: 0; bottom: 0; padding: 12px max(16px, env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); background: linear-gradient(rgba(244, 246, 252, 0), var(--paper) 35%); z-index: 5; }
+.btn { min-height: 56px; width: 100%; padding: 0 22px; border: 0; background: var(--accent); color: var(--accent-ink); font-weight: 800; font-size: 18px; border-radius: 16px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; text-decoration: none; box-shadow: 0 10px 22px -12px rgba(43, 63, 168, .8); }
+.btn svg { width: 22px; height: 22px; }
+.footer .btn { max-width: 608px; margin: 0 auto; display: flex; }
+.btn.ghost { background: var(--card); color: var(--ink); border: 1.5px solid var(--line); box-shadow: none; font-weight: 700; font-size: 17px; }
+.btn.danger { background: transparent; color: var(--late); border: 1.5px solid rgba(179, 38, 30, .35); box-shadow: none; font-size: 17px; }
+.btn.ok { background: var(--ok); box-shadow: 0 10px 22px -12px rgba(46, 125, 79, .8); }
+.actions { display: flex; flex-direction: column; gap: 10px; margin-top: 22px; }
+
+/* Feuilles */
+.sheet-back { position: fixed; inset: 0; background: rgba(29, 35, 64, .45); z-index: 20; display: flex; align-items: flex-end; justify-content: center; }
+.sheet { background: var(--paper); width: 100%; max-width: 640px; max-height: 92%; overflow-y: auto; border-radius: 26px 26px 0 0; padding: 0 max(18px, env(safe-area-inset-right)) calc(24px + env(safe-area-inset-bottom)) max(18px, env(safe-area-inset-left)); animation: rise .32s cubic-bezier(.16, 1, .3, 1); }
+@keyframes rise { from { transform: translateY(40px); opacity: .4; } }
+.band { width: 40px; height: 5px; border-radius: 3px; background: rgba(29, 35, 64, .2); margin: 10px auto 0; }
+.sheet-head { display: flex; align-items: flex-start; gap: 12px; padding-top: 14px; }
+.sheet-head h3 { flex: 1; margin: 0; font: 800 26px/1.15 var(--display); letter-spacing: -.01em; overflow-wrap: anywhere; }
+.close { width: 40px; height: 40px; border-radius: 50%; border: 0; background: rgba(29, 35, 64, .08); display: flex; align-items: center; justify-content: center; padding: 0; flex: 0 0 auto; }
+.close svg { width: 16px; height: 16px; }
+.label { display: block; font-weight: 700; font-size: 16px; margin: 20px 0 8px; }
+.label small { font-weight: 500; color: var(--ink-2); }
+.field { width: 100%; min-height: 54px; border: 1.5px solid var(--line); background: var(--card); border-radius: 14px; padding: 12px 14px; font-size: 18px; }
+textarea.field { min-height: 90px; resize: vertical; font-size: 17px; }
+.field::placeholder { color: var(--ink-3); }
+.row { display: flex; gap: 8px; flex-wrap: wrap; }
+.row .field[type=date] { flex: 1 1 160px; }
+.hint { color: var(--ink-2); font-size: 15px; margin: 8px 0 0; }
+.meta-line { color: var(--ink-2); margin: 6px 0 0; font-size: 16px; display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
+.badge { display: inline-flex; align-items: center; gap: 6px; font-weight: 800; font-size: 14px; padding: 4px 10px; border-radius: 999px; background: color-mix(in srgb, var(--c) 16%, #fff); color: var(--c2); }
+.badge i { width: 9px; height: 9px; border-radius: 50%; background: var(--c); }
+.note-box { background: var(--card); border-radius: 14px; padding: 12px 14px; margin: 14px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.colors { display: flex; flex-wrap: wrap; gap: 10px; }
+.color { width: 40px; height: 40px; border-radius: 50%; border: 0; background: var(--c); }
+.color[aria-pressed="true"] { box-shadow: 0 0 0 3px var(--paper), 0 0 0 5px var(--ink); }
+
+/* Pièces jointes */
+.files { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 10px; margin-top: 10px; }
+.file { position: relative; aspect-ratio: 1; border-radius: 14px; overflow: hidden; background: var(--card); border: 1.5px solid var(--line); }
+.file > button.open { width: 100%; height: 100%; border: 0; padding: 0; background: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; }
+.file img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.file .doc { font-size: 12px; font-weight: 700; color: var(--ink-2); padding: 0 8px; text-align: center; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
+.file .doc-ico { width: 34px; height: 34px; color: var(--accent); }
+.file .rm { position: absolute; top: 6px; right: 6px; width: 30px; height: 30px; border-radius: 50%; border: 0; background: rgba(29, 35, 64, .7); color: #fff; display: flex; align-items: center; justify-content: center; padding: 0; }
+.file .rm svg { width: 12px; height: 12px; }
+.add-files { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.pick { position: relative; overflow: hidden; }
+.pick input { position: absolute; inset: 0; opacity: 0; font-size: 0; cursor: pointer; }
+
+.viewer { position: fixed; inset: 0; z-index: 40; background: rgba(10, 12, 24, .94); display: flex; flex-direction: column; }
+.viewer img { flex: 1; min-height: 0; width: 100%; object-fit: contain; }
+.viewer .bar { display: flex; gap: 10px; padding: calc(10px + env(safe-area-inset-top)) 14px 10px; justify-content: flex-end; }
+.viewer .bar button { min-height: 44px; padding: 0 16px; border-radius: 999px; border: 0; background: rgba(255, 255, 255, .14); color: #fff; font-weight: 700; }
+
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(96px + env(safe-area-inset-bottom)); background: var(--ink); color: var(--paper); padding: 12px 18px; font-weight: 700; z-index: 50; max-width: calc(100% - 32px); text-align: center; border-radius: 999px; box-shadow: 0 10px 30px -10px rgba(0, 0, 0, .5); }
+
+.btn, .chip, .check, .icon-btn, .small-btn, .close, .color, .switch button { transition: transform .14s cubic-bezier(.2, .8, .2, 1), background-color .14s ease-out, opacity .12s ease-out; }
+.btn:active, .chip:active, .check:active, .icon-btn:active, .small-btn:active, .color:active { transform: scale(.96); }
+.hw-body:active { opacity: .55; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+</head>
+<body>
+<div class="app" id="app"></div>
+<script>
+'use strict';
+
+// ---------- Données (dans ce téléphone) ----------
+// Les devoirs dans le stockage du navigateur ; les photos et fichiers dans IndexedDB.
+
+const KEY = 'devoirs-v1';
+const COLORS = ['#2B3FA8', '#C2410C', '#2E7D4F', '#7E3FBF', '#B7791F', '#C2417A', '#0E7490', '#4D5466'];
+let db = load();
+function load() {
+  try {
+    const d = JSON.parse(localStorage.getItem(KEY));
+    if (d && Array.isArray(d.hw)) return d;
+  } catch (e) {}
+  return { subjects: [], hw: [] };
+}
+function save() {
+  try {
+    localStorage.setItem(KEY, JSON.stringify(db));
+  } catch (e) {
+    toast('Plus de place pour enregistrer : supprime d’anciens devoirs.');
+  }
+}
+
+function idb() {
+  return new Promise((ok, ko) => {
+    const r = indexedDB.open('devoirs-fichiers', 1);
+    r.onupgradeneeded = () => r.result.createObjectStore('f');
+    r.onsuccess = () => ok(r.result);
+    r.onerror = () => ko(r.error);
+  });
+}
+async function fileDo(mode, fn) {
+  const d = await idb();
+  return new Promise((ok, ko) => {
+    const tx = d.transaction('f', mode);
+    const req = fn(tx.objectStore('f'));
+    tx.oncomplete = () => ok(req?.result);
+    tx.onerror = () => ko(tx.error);
+  });
+}
+const putFile = (id, blob) => fileDo('readwrite', (s) => s.put(blob, id));
+const getFile = (id) => fileDo('readonly', (s) => s.get(id));
+const delFile = (id) => fileDo('readwrite', (s) => s.delete(id)).catch(() => {});
+
+const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const pad = (n) => String(n).padStart(2, '0');
+const iso = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const parseIso = (s) => {
+  const [y, m, d] = s.split('-').map(Number);
+  return new Date(y, m - 1, d);
+};
+const addDays = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
+const todayIso = () => iso(new Date());
+const daysLeft = (s) => Math.round((parseIso(s) - parseIso(todayIso())) / 864e5);
+const fmt = (s, o) => parseIso(s).toLocaleDateString('fr-FR', o);
+const capital = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+function dueText(s) {
+  if (!s) return 'Sans date';
+  const n = daysLeft(s);
+  if (n < -1) return `En retard de ${-n} j`;
+  if (n === -1) return 'Hier';
+  if (n === 0) return 'Aujourd’hui';
+  if (n === 1) return 'Demain';
+  if (n < 7) return capital(fmt(s, { weekday: 'long' }));
+  return fmt(s, { day: 'numeric', month: 'short' }).replace('.', '');
+}
+const dueClass = (s, done) => (done || !s ? '' : daysLeft(s) < 0 ? 'late' : daysLeft(s) <= 1 ? 'soon' : '');
+
+const subject = (id) => db.subjects.find((x) => x.id === id) || null;
+// Texte lisible sur fond clair, dans la couleur de la matière.
+const inkOf = (c) => `color-mix(in srgb, ${c} 82%, #000)`;
+const subjStyle = (s) => (s ? `--c:${s.color};--c2:${inkOf(s.color)}` : '--c:#C9CCD8;--c2:var(--ink-2)');
+
+const icons = {
+  plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>',
+  check: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+  close: '<svg viewBox="0 0 22 22" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M4 4l14 14M18 4L4 18"/></svg>',
+  clip: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11.5l-8.2 8.2a5 5 0 0 1-7-7l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7l-8.5 8.5a1.7 1.7 0 0 1-2.3-2.3l7.8-7.8"/></svg>',
+  camera: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l1.8-2.5h6.4L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.5"/></svg>',
+  doc: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H6.5A1.5 1.5 0 0 0 5 4.5v15A1.5 1.5 0 0 0 6.5 21h11a1.5 1.5 0 0 0 1.5-1.5V8z"/><path d="M14 3v5h5M8.5 13h7M8.5 16.5h5"/></svg>',
+  cal: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M8 3v4M16 3v4M3.5 10h17M12 13v4M10 15h4"/></svg>',
+  edit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg>',
+};
+
+// ---------- Écrans ----------
+
+let ui = { tab: 'todo', filter: 'all' };
+const app = document.getElementById('app');
+
+function render() {
+  const todo = db.hw.filter((h) => !h.done);
+  const done = db.hw.filter((h) => h.done);
+  const late = todo.filter((h) => h.due && daysLeft(h.due) < 0).length;
+  const today = todo.filter((h) => h.due && daysLeft(h.due) === 0).length;
+  const sub = todo.length ? [late ? `${late} en retard` : '', today ? `${today} pour aujourd’hui` : '', `${todo.length} à faire`].filter(Boolean).join(' · ') : 'Rien à faire pour l’instant.';
+  let html = `<header class="top"><div style="flex:1;min-width:0"><h1>Mes <mark>devoirs</mark></h1><p>${esc(sub)}</p></div></header>
+    <div class="switch" role="group" aria-label="Affichage">
+      <button data-tab="todo" aria-pressed="${ui.tab === 'todo'}">À faire<small>${todo.length || ''}</small></button>
+      <button data-tab="subjects" aria-pressed="${ui.tab === 'subjects'}">Matières</button>
+      <button data-tab="done" aria-pressed="${ui.tab === 'done'}">Faits<small>${done.length || ''}</small></button>
+    </div>`;
+  html += ui.tab === 'subjects' ? subjectsHtml() : ui.tab === 'done' ? doneHtml(done) : todoHtml(todo);
+  app.innerHTML = html;
+  let f = document.querySelector('.footer');
+  if (!f) {
+    f = document.createElement('div');
+    f.className = 'footer';
+    document.body.appendChild(f);
+  }
+  f.innerHTML = ui.tab === 'subjects' ? `<button class="btn" data-action="new-subject">${icons.plus} Nouvelle matière</button>` : `<button class="btn" data-action="new">${icons.plus} Nouveau devoir</button>`;
+}
+
+function hwHtml(h) {
+  const s = subject(h.subject);
+  const n = (h.files || []).length;
+  return `<div class="hw${h.done ? ' done' : ''}" style="${subjStyle(s)}">
+    <button class="check" data-done="${h.id}" aria-label="${h.done ? 'Remettre à faire' : 'C’est fait'} : ${esc(h.title)}" aria-pressed="${!!h.done}">${icons.check}</button>
+    <button class="hw-body" data-open="${h.id}"><span class="hw-title">${esc(h.title)}</span>
+      <span class="hw-meta">${s ? `<span class="subj">${esc(s.name)}</span>` : ''}${n ? `<span class="clip">${icons.clip}${n}</span>` : ''}${h.note ? '<span>note</span>' : ''}</span></button>
+    <span class="due ${dueClass(h.due, h.done)}">${esc(h.done ? 'Fait' : dueText(h.due))}</span>
+  </div>`;
+}
+
+const byDue = (a, b) => (a.due || '9999').localeCompare(b.due || '9999') || (a.createdAt || 0) - (b.createdAt || 0);
+
+function filterChips(list) {
+  const used = db.subjects.filter((s) => list.some((h) => h.subject === s.id));
+  if (!used.length) return '';
+  return `<div class="chips" role="group" aria-label="Matière">
+    <button class="chip" data-filter="all" aria-pressed="${ui.filter === 'all'}">Toutes</button>
+    ${used.map((s) => `<button class="chip" style="${subjStyle(s)}" data-filter="${s.id}" aria-pressed="${ui.filter === s.id}"><i></i>${esc(s.name)}</button>`).join('')}
+  </div>`;
+}
+
+function todoHtml(todo) {
+  if (!db.hw.length) return `<div class="empty"><b>Aucun devoir</b>Touche « Nouveau devoir » en bas : écris ce qu’il faut faire, la matière et pour quand. Tu peux ajouter une photo de l’énoncé.</div>`;
+  if (ui.filter !== 'all' && !todo.some((h) => h.subject === ui.filter)) ui.filter = 'all';
+  let html = filterChips(todo);
+  const list = todo.filter((h) => ui.filter === 'all' || h.subject === ui.filter).sort(byDue);
+  if (!list.length) return html + `<div class="empty"><b>Tout est fait</b>Bravo, il n’y a plus rien à faire.</div>`;
+  const groups = [
+    ['late', 'En retard', (h) => h.due && daysLeft(h.due) < 0],
+    ['', 'Aujourd’hui', (h) => h.due && daysLeft(h.due) === 0],
+    ['', 'Demain', (h) => h.due && daysLeft(h.due) === 1],
+    ['', 'Cette semaine', (h) => h.due && daysLeft(h.due) > 1 && daysLeft(h.due) < 7],
+    ['', 'Plus tard', (h) => h.due && daysLeft(h.due) >= 7],
+    ['', 'Sans date', (h) => !h.due],
+  ];
+  for (const [cls, title, test] of groups) {
+    const g = list.filter(test);
+    if (g.length) html += `<section class="group ${cls}"><h2>${title} <small>${g.length}</small></h2><div class="list">${g.map(hwHtml).join('')}</div></section>`;
+  }
+  return html;
+}
+
+function doneHtml(done) {
+  if (!done.length) return `<div class="empty"><b>Rien de fini pour l’instant</b>Coche un devoir quand il est fait : il arrive ici.</div>`;
+  const list = done.slice().sort((a, b) => (b.doneAt || 0) - (a.doneAt || 0));
+  return `<section class="group"><h2>Faits <small>${list.length}</small></h2><div class="list">${list.map(hwHtml).join('')}</div></section>
+    <div class="actions"><button class="btn ghost" data-action="clear-done">Effacer les devoirs faits</button></div>`;
+}
+
+function subjectsHtml() {
+  if (!db.subjects.length) return `<div class="empty"><b>Pas encore de matière</b>Ajoute tes matières (Maths, Français…) : chaque devoir prend la couleur de sa matière.</div>`;
+  return `<section class="group"><h2>Matières <small>${db.subjects.length}</small></h2><div class="list">${db.subjects
+    .map((s) => {
+      const todo = db.hw.filter((h) => h.subject === s.id && !h.done).length;
+      return `<div class="subj-row" style="${subjStyle(s)}"><span class="dot"></span><button class="grow" data-see="${s.id}"><b>${esc(s.name)}</b><small>${todo ? `${todo} à faire` : 'Rien à faire'}</small></button><button class="small-btn" data-edit-subject="${s.id}" aria-label="Modifier ${esc(s.name)}">${icons.edit}</button></div>`;
+    })
+    .join('')}</div></section><p class="hint">Touche une matière pour voir ses devoirs.</p>`;
+}
+
+// ---------- Actions ----------
+
+document.addEventListener('click', (e) => {
+  if (e.target.closest('.sheet-back, .viewer')) return;
+  const tab = e.target.closest('[data-tab]');
+  if (tab) {
+    ui.tab = tab.dataset.tab;
+    return render();
+  }
+  const f = e.target.closest('[data-filter]');
+  if (f) {
+    ui.filter = f.dataset.filter;
+    return render();
+  }
+  const see = e.target.closest('[data-see]');
+  if (see) {
+    ui.tab = 'todo';
+    ui.filter = see.dataset.see;
+    render();
+    return window.scrollTo(0, 0);
+  }
+  const d = e.target.closest('[data-done]');
+  if (d) return toggleDone(d.dataset.done);
+  const o = e.target.closest('[data-open]');
+  if (o) return openDetail(o.dataset.open);
+  const es = e.target.closest('[data-edit-subject]');
+  if (es) return openSubject(es.dataset.editSubject);
+  const a = e.target.closest('[data-action]')?.dataset.action;
+  if (a === 'new') openEditor(null);
+  else if (a === 'new-subject') openSubject(null);
+  else if (a === 'clear-done') {
+    if (!confirm('Effacer tous les devoirs faits (et leurs photos) ?')) return;
+    db.hw.filter((h) => h.done).forEach((h) => (h.files || []).forEach((x) => delFile(x.id)));
+    db.hw = db.hw.filter((h) => !h.done);
+    save();
+    render();
+    toast('Devoirs faits effacés.');
+  }
+});
+
+function toggleDone(id) {
+  const h = db.hw.find((x) => x.id === id);
+  if (!h) return;
+  h.done = !h.done;
+  h.doneAt = h.done ? Date.now() : null;
+  save();
+  render();
+  toast(h.done ? 'Bien joué !' : 'Remis à faire.');
+}
+
+let toastTimer;
+function toast(t) {
+  document.querySelector('.toast')?.remove();
+  const el = document.createElement('div');
+  el.className = 'toast';
+  el.setAttribute('role', 'status');
+  el.textContent = t;
+  document.body.appendChild(el);
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.remove(), 2200);
+}
+
+const closeBtn = `<button class="close" data-close aria-label="Fermer">${icons.close}</button>`;
+function showSheet(inner) {
+  closeSheet();
+  const back = document.createElement('div');
+  back.className = 'sheet-back';
+  back.innerHTML = `<div class="sheet" role="dialog" aria-modal="true"><div class="band"></div>${inner}</div>`;
+  back.addEventListener('click', (e) => {
+    if (e.target === back || e.target.closest('[data-close]')) closeSheet();
+  });
+  document.body.appendChild(back);
+  document.body.style.overflow = 'hidden';
+  return back;
+}
+function closeSheet() {
+  document.querySelectorAll('.sheet-back').forEach((x) => x.remove());
+  document.body.style.overflow = '';
+  urls.forEach((u) => URL.revokeObjectURL(u));
+  urls = [];
+}
+let urls = [];
+const blobUrl = (b) => {
+  const u = URL.createObjectURL(b);
+  urls.push(u);
+  return u;
+};
+
+// Photos réduites avant d'être rangées (une photo d'iPhone est très lourde).
+async function shrinkImage(file) {
+  if (!/^image\/(jpeg|png|heic|heif|webp)/.test(file.type) && !/\.(heic|jpe?g|png)$/i.test(file.name)) return file;
+  try {
+    const img = await new Promise((ok, ko) => {
+      const im = new Image();
+      im.onload = () => ok(im);
+      im.onerror = ko;
+      im.src = URL.createObjectURL(file);
+    });
+    const k = Math.min(1, 2000 / Math.max(img.naturalWidth, img.naturalHeight));
+    const cv = document.createElement('canvas');
+    cv.width = Math.round(img.naturalWidth * k);
+    cv.height = Math.round(img.naturalHeight * k);
+    cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+    URL.revokeObjectURL(img.src);
+    const blob = await new Promise((ok) => cv.toBlob(ok, 'image/jpeg', 0.85));
+    return blob ? new File([blob], (file.name || 'photo').replace(/\.\w+$/, '') + '.jpg', { type: 'image/jpeg' }) : file;
+  } catch (e) {
+    return file;
+  }
+}
+
+async function filesGridHtml(files, removable) {
+  const parts = [];
+  for (const f of files) {
+    const blob = await getFile(f.id).catch(() => null);
+    const img = blob && /^image\//.test(f.type);
+    parts.push(`<div class="file"><button class="open" data-file="${f.id}" aria-label="Ouvrir ${esc(f.name)}">${img ? `<img src="${blobUrl(blob)}" alt="">` : `<span class="doc-ico">${icons.doc}</span><span class="doc">${esc(blob ? f.name : 'Fichier introuvable')}</span>`}</button>${removable ? `<button class="rm" data-rm="${f.id}" aria-label="Enlever ${esc(f.name)}">${icons.close}</button>` : ''}</div>`);
+  }
+  return parts.join('');
+}
+
+async function openFile(f) {
+  const blob = await getFile(f.id).catch(() => null);
+  if (!blob) return toast('Ce fichier n’est plus sur ce téléphone.');
+  if (/^image\//.test(f.type)) {
+    const v = document.createElement('div');
+    v.className = 'viewer';
+    const u = URL.createObjectURL(blob);
+    v.innerHTML = `<div class="bar"><button data-share>Partager / enregistrer</button><button data-x>Fermer</button></div><img src="${u}" alt="${esc(f.name)}">`;
+    v.addEventListener('click', (e) => {
+      if (e.target.closest('[data-share]')) return shareFile(new File([blob], f.name, { type: f.type }));
+      if (e.target.closest('[data-x]') || e.target === v) {
+        URL.revokeObjectURL(u);
+        v.remove();
+      }
+    });
+    document.body.appendChild(v);
+  } else shareFile(new File([blob], f.name, { type: f.type || 'application/octet-stream' }));
+}
+
+// Sur iPhone, la feuille « Partager » ouvre le fichier (Fichiers, Mail, AirDrop…).
+async function shareFile(file) {
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try {
+      return await navigator.share({ files: [file], title: file.name });
+    } catch (e) {
+      if (e.name === 'AbortError') return;
+    }
+  }
+  const u = URL.createObjectURL(file);
+  const a = document.createElement('a');
+  a.href = u;
+  a.download = file.name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(u), 60000);
+}
+
+// Ajouter ou modifier un devoir.
+function openEditor(id) {
+  const cur = id ? db.hw.find((x) => x.id === id) : null;
+  let subj = cur?.subject ?? (ui.filter !== 'all' ? ui.filter : null);
+  let due = cur?.due || iso(addDays(new Date(), 1));
+  let files = (cur?.files || []).slice();
+  const added = []; // fichiers ajoutés dans cette feuille (à effacer si on annule)
+  const quick = [
+    ['Demain', iso(addDays(new Date(), 1))],
+    ['Après-demain', iso(addDays(new Date(), 2))],
+    ['Dans 1 semaine', iso(addDays(new Date(), 7))],
+  ];
+  const back = showSheet(`<div class="sheet-head"><h3>${cur ? 'Modifier le devoir' : 'Nouveau devoir'}</h3>${closeBtn}</div>
+    <form id="hw-form">
+      <label class="label" for="hw-title">Qu’est-ce qu’il faut faire ?</label>
+      <input id="hw-title" class="field" value="${esc(cur?.title || '')}" placeholder="ex. Exercices 4 à 7 page 52" maxlength="160" enterkeyhint="done" autocomplete="off">
+      <span class="label">Matière</span>
+      <div class="row" id="subj-pick"></div>
+      <span class="label">À rendre pour quand ?</span>
+      <div class="row">${quick.map(([l, d]) => `<button type="button" class="chip" data-due="${d}" aria-pressed="${due === d}">${l}</button>`).join('')}
+        <input type="date" class="field" id="hw-due" value="${due}" aria-label="Choisir la date"></div>
+      <label class="label" for="hw-note">Note <small>(facultatif)</small></label>
+      <textarea id="hw-note" class="field" placeholder="Détails, ce qu’il faut apprendre…">${esc(cur?.note || '')}</textarea>
+      <span class="label">Photos et fichiers <small>(l’énoncé, ton travail…)</small></span>
+      <div class="add-files">
+        <label class="btn ghost pick">${icons.camera} Photo<input type="file" accept="image/*" capture="environment" id="add-photo"></label>
+        <label class="btn ghost pick">${icons.clip} Fichier<input type="file" multiple id="add-file"></label>
+      </div>
+      <div class="files" id="files"></div>
+      <div class="actions"><button class="btn" type="submit">${cur ? 'Enregistrer' : 'Ajouter le devoir'}</button></div>
+    </form>`);
+  const subjBox = back.querySelector('#subj-pick');
+  const drawSubjects = () => {
+    subjBox.innerHTML = db.subjects.map((s) => `<button type="button" class="chip" style="${subjStyle(s)}" data-subj="${s.id}" aria-pressed="${subj === s.id}"><i></i>${esc(s.name)}</button>`).join('') + `<button type="button" class="chip" data-subj-new>${icons.plus} Nouvelle</button>`;
+    subjBox.querySelectorAll('.chip svg').forEach((x) => (x.style.cssText = 'width:16px;height:16px'));
+  };
+  drawSubjects();
+  const dueIn = back.querySelector('#hw-due');
+  const syncDue = () => back.querySelectorAll('[data-due]').forEach((c) => c.setAttribute('aria-pressed', String(c.dataset.due === due)));
+  dueIn.addEventListener('change', () => {
+    due = dueIn.value;
+    syncDue();
+  });
+  const drawFiles = async () => {
+    back.querySelector('#files').innerHTML = await filesGridHtml(files, true);
+  };
+  drawFiles();
+  const addFiles = async (list) => {
+    for (const raw of list) {
+      const file = await shrinkImage(raw);
+      const f = { id: uid(), name: file.name || 'fichier', type: file.type || '', size: file.size };
+      try {
+        await putFile(f.id, file);
+      } catch (e) {
+        toast('Impossible d’enregistrer ce fichier (trop gros ?).');
+        continue;
+      }
+      files.push(f);
+      added.push(f.id);
+    }
+    drawFiles();
+  };
+  back.querySelector('#add-photo').addEventListener('change', (e) => {
+    addFiles([...e.target.files]);
+    e.target.value = '';
+  });
+  back.querySelector('#add-file').addEventListener('change', (e) => {
+    addFiles([...e.target.files]);
+    e.target.value = '';
+  });
+  let saved = false;
+  back.addEventListener('click', (e) => {
+    const s = e.target.closest('[data-subj]');
+    if (s) {
+      subj = subj === s.dataset.subj ? null : s.dataset.subj;
+      return drawSubjects();
+    }
+    if (e.target.closest('[data-subj-new]')) {
+      const name = (prompt('Nom de la matière (ex. Maths) :') || '').trim();
+      if (!name) return;
+      const ns = { id: uid(), name: name.slice(0, 40), color: COLORS[db.subjects.length % COLORS.length] };
+      db.subjects.push(ns);
+      save();
+      subj = ns.id;
+      return drawSubjects();
+    }
+    const q = e.target.closest('[data-due]');
+    if (q) {
+      due = q.dataset.due;
+      dueIn.value = due;
+      return syncDue();
+    }
+    const rm = e.target.closest('[data-rm]');
+    if (rm) {
+      files = files.filter((x) => x.id !== rm.dataset.rm);
+      return drawFiles();
+    }
+    const of = e.target.closest('[data-file]');
+    if (of) openFile(files.find((x) => x.id === of.dataset.file));
+  });
+  // Fermer sans enregistrer : les fichiers ajoutés ici sont effacés.
+  const obs = new MutationObserver(() => {
+    if (!document.body.contains(back)) {
+      obs.disconnect();
+      if (!saved) added.forEach(delFile);
+    }
+  });
+  obs.observe(document.body, { childList: true });
+  back.querySelector('#hw-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const title = back.querySelector('#hw-title').value.trim();
+    if (!title) {
+      back.querySelector('#hw-title').focus();
+      return toast('Écris ce qu’il faut faire.');
+    }
+    const data = { title, subject: subj || null, due: dueIn.value || '', note: back.querySelector('#hw-note').value.trim(), files };
+    if (cur) {
+      (cur.files || []).filter((x) => !files.some((y) => y.id === x.id)).forEach((x) => delFile(x.id));
+      Object.assign(cur, data);
+    } else db.hw.push({ id: uid(), done: false, doneAt: null, createdAt: Date.now(), ...data });
+    saved = true;
+    save();
+    closeSheet();
+    ui.tab = 'todo';
+    render();
+    toast(cur ? 'Modifié !' : `Ajouté pour ${dueText(data.due).toLowerCase()} !`);
+  });
+  if (!cur) setTimeout(() => back.querySelector('#hw-title').focus(), 80);
+}
+
+async function openDetail(id) {
+  const h = db.hw.find((x) => x.id === id);
+  if (!h) return;
+  const s = subject(h.subject);
+  let confirmDel = false;
+  const back = showSheet(`<div class="sheet-head"><h3>${esc(h.title)}</h3>${closeBtn}</div>
+    <p class="meta-line">${s ? `<span class="badge" style="${subjStyle(s)}"><i></i>${esc(s.name)}</span>` : ''}<span>${h.due ? `À rendre ${esc(fmt(h.due, { weekday: 'long', day: 'numeric', month: 'long' }))}` : 'Sans date'}</span>${h.done ? '<span style="color:var(--ok);font-weight:700">· Fait</span>' : h.due && daysLeft(h.due) < 0 ? '<span style="color:var(--late);font-weight:700">· En retard</span>' : ''}</p>
+    ${h.note ? `<div class="note-box">${esc(h.note)}</div>` : ''}
+    ${(h.files || []).length ? `<span class="label">Photos et fichiers</span><div class="files" id="files"></div>` : ''}
+    <div class="actions">
+      <button class="btn ${h.done ? 'ghost' : 'ok'}" data-toggle>${h.done ? 'Remettre à faire' : `${icons.check} C’est fait !`}</button>
+      ${!h.done && h.due && daysLeft(h.due) >= 1 ? `<button class="btn ghost" data-remind>${icons.cal} Rappel dans mon agenda</button>` : ''}
+      <button class="btn ghost" data-edit>${icons.edit} Modifier</button>
+      <button class="btn danger" data-del>Supprimer</button>
+    </div>
+    ${!h.done && h.due && daysLeft(h.due) >= 1 ? '<p class="hint">Le rappel te prévient la veille à 18 h.</p>' : ''}`);
+  if ((h.files || []).length) back.querySelector('#files').innerHTML = await filesGridHtml(h.files, false);
+  back.addEventListener('click', (e) => {
+    const of = e.target.closest('[data-file]');
+    if (of) return openFile(h.files.find((x) => x.id === of.dataset.file));
+    if (e.target.closest('[data-toggle]')) {
+      closeSheet();
+      return toggleDone(id);
+    }
+    if (e.target.closest('[data-edit]')) return openEditor(id);
+    if (e.target.closest('[data-remind]')) return shareFile(new File([icsOf(h)], 'rappel-devoir.ics', { type: 'text/calendar' }));
+    const del = e.target.closest('[data-del]');
+    if (del) {
+      if (!confirmDel) {
+        confirmDel = true;
+        del.textContent = 'Appuie encore pour supprimer';
+        return;
+      }
+      (h.files || []).forEach((x) => delFile(x.id));
+      db.hw = db.hw.filter((x) => x.id !== id);
+      save();
+      closeSheet();
+      render();
+      toast('Supprimé.');
+    }
+  });
+}
+
+// Rappel : un événement le jour du rendu, avec une alerte la veille à 18 h.
+function icsOf(h) {
+  const t = (s) => String(s || '').replace(/[\\;,]/g, (c) => '\\' + c).replace(/\n/g, '\\n');
+  const d = h.due.replace(/-/g, '');
+  const next = iso(addDays(parseIso(h.due), 1)).replace(/-/g, '');
+  const s = subject(h.subject);
+  return ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Mes devoirs//FR', 'BEGIN:VEVENT', `UID:devoir-${h.id}@mes-devoirs`, `DTSTAMP:${new Date().toISOString().replace(/[-:]/g, '').slice(0, 15)}Z`,
+    `DTSTART;VALUE=DATE:${d}`, `DTEND;VALUE=DATE:${next}`, `SUMMARY:${t(`Devoir${s ? ' de ' + s.name : ''} : ${h.title}`)}`, h.note ? `DESCRIPTION:${t(h.note)}` : '',
+    'BEGIN:VALARM', 'ACTION:DISPLAY', `DESCRIPTION:${t('À rendre demain : ' + h.title)}`, 'TRIGGER:-PT6H', 'END:VALARM', 'END:VEVENT', 'END:VCALENDAR'].filter(Boolean).join('\r\n');
+}
+
+// Matières : nom et couleur.
+function openSubject(id) {
+  const cur = id ? subject(id) : null;
+  let color = cur?.color || COLORS[db.subjects.length % COLORS.length];
+  let confirmDel = false;
+  const back = showSheet(`<div class="sheet-head"><h3>${cur ? 'Modifier la matière' : 'Nouvelle matière'}</h3>${closeBtn}</div>
+    <form id="s-form">
+      <label class="label" for="s-name">Nom</label>
+      <input id="s-name" class="field" value="${esc(cur?.name || '')}" placeholder="ex. Maths" maxlength="40" autocomplete="off">
+      <span class="label">Couleur</span>
+      <div class="colors">${COLORS.map((c) => `<button type="button" class="color" style="--c:${c}" data-color="${c}" aria-label="Couleur" aria-pressed="${c === color}"></button>`).join('')}</div>
+      <div class="actions"><button class="btn" type="submit">${cur ? 'Enregistrer' : 'Ajouter la matière'}</button>${cur ? '<button class="btn danger" type="button" data-del>Supprimer la matière</button>' : ''}</div>
+    </form>`);
+  back.addEventListener('click', (e) => {
+    const c = e.target.closest('[data-color]');
+    if (c) {
+      color = c.dataset.color;
+      back.querySelectorAll('[data-color]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.color === color)));
+      return;
+    }
+    const del = e.target.closest('[data-del]');
+    if (del) {
+      if (!confirmDel) {
+        confirmDel = true;
+        del.textContent = 'Appuie encore (les devoirs restent, sans matière)';
+        return;
+      }
+      db.subjects = db.subjects.filter((s) => s.id !== id);
+      db.hw.forEach((h) => h.subject === id && (h.subject = null));
+      if (ui.filter === id) ui.filter = 'all';
+      save();
+      closeSheet();
+      render();
+      toast('Matière supprimée.');
+    }
+  });
+  back.querySelector('#s-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const name = back.querySelector('#s-name').value.trim();
+    if (!name) return back.querySelector('#s-name').focus();
+    if (cur) Object.assign(cur, { name, color });
+    else db.subjects.push({ id: uid(), name, color });
+    save();
+    closeSheet();
+    render();
+    toast(cur ? 'Modifié !' : 'Matière ajoutée.');
+  });
+  setTimeout(() => back.querySelector('#s-name').focus(), 80);
+}
+
+// Demander au navigateur de garder les données (photos comprises).
+navigator.storage?.persist?.().catch(() => {});
+// Retour sur l'appli (ou minuit passé) : les dates « aujourd'hui / demain » se remettent à jour.
+document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && !document.querySelector('.sheet-back') && render());
+render();
+</script>
+</body>
+</html>
