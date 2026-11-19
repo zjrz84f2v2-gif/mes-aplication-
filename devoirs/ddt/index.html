@@ -805,6 +805,17 @@ function relText(d, limit) {
   if (n < 60) return `dans ${Math.round(n / 7)} semaines`;
   return `dans ${Math.round(n / 30)} mois`;
 }
+// La date à droite de chaque devoir, en court : « Demain », « Dans 5 j », « Dans 2 sem. », « Retard 3 j ».
+function shortRel(d) {
+  const n = daysLeft(d);
+  if (n === 0) return 'Aujourd’hui';
+  if (n === 1) return 'Demain';
+  if (n < 0) return `Retard ${-n} j`;
+  if (n < 7) return capital(fmt(d, { weekday: 'long' }));
+  if (n < 14) return `Dans ${n} j`;
+  if (n < 60) return `Dans ${Math.round(n / 7)} sem.`;
+  return `Dans ${Math.round(n / 30)} mois`;
+}
 const shortDate = (d) => fmt(d, { weekday: 'short', day: 'numeric', month: 'short' }).replace(/\./g, '');
 function datesHtml(h, long) {
   if (h.constant) return '';
@@ -838,7 +849,7 @@ function hwHtml(h) {
     ${h.constant ? `<span class="check loop" title="Constant : à faire en continu" aria-label="Constant : à faire en continu">${icons.loop}</span>` : `<button class="check" data-done="${h.id}" aria-label="${h.done ? 'Remettre à faire' : 'C’est fait'} : ${esc(h.title)}" aria-pressed="${!!h.done}">${icons.check}</button>`}
     <button class="hw-body" data-open="${h.id}"><span class="hw-title">${esc(h.title)}</span>
       <span class="hw-meta">${s ? `<span class="subj">${ANIMALS_ON ? mark(s, 20) : ''}${esc(s.name)}</span>` : ''}${profHtml(h)}${st.length ? `<span class="steps-count">${stDone}/${st.length} étapes</span>` : ''}${n ? `<span class="clip">${icons.clip}${n}</span>` : ''}${h.note ? '<span>note</span>' : ''}${h.grade ? `<span class="grade">${esc(h.grade)}</span>` : ''}</span>${datesHtml(h)}${(h.result || []).length ? `<span class="rpill"><b style="--fc:${fileKind(h.result[0]).c}">${esc(fileKind(h.result[0]).short)}</b><span>Rendu : ${esc(h.result[0].name)}${h.result.length > 1 ? ` +${h.result.length - 1}` : ''}</span></span>` : ''}${st.length ? `<span class="bar"><i style="width:${Math.round((100 * stDone) / st.length)}%"></i></span>` : ''}</button>
-    ${h.done || h.constant || !keyDate(h) ? `<span class="due ${h.constant && !h.done ? 'const' : ''}">${esc(h.done ? 'Fait' : h.constant ? 'Constant' : 'Sans date')}</span>` : ''}
+    <span class="due ${h.constant && !h.done ? 'const' : dueClass(limitDate(h), h.done)}">${esc(h.done ? 'Fait' : h.constant ? 'Constant' : limitDate(h) ? shortRel(limitDate(h)) : 'Sans date')}</span>
   </div>`;
 }
 
