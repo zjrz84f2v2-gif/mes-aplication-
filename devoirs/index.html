@@ -174,6 +174,15 @@ svg { flex: 0 0 auto; }
 .const-note { display: flex; align-items: center; gap: 10px; margin: 0; background: color-mix(in srgb, var(--accent) 8%, #fff); color: var(--accent); border-radius: 14px; padding: 14px 16px; font-weight: 700; }
 .const-note svg { width: 22px; height: 22px; }
 
+.top { align-items: center; }
+.top .icon-btn { flex: 0 0 auto; }
+.sync { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; font-weight: 700; padding: 2px 8px; border-radius: 999px; vertical-align: 1px; margin-left: 4px; }
+.sync::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.sync.ok { color: var(--ok); background: color-mix(in srgb, var(--ok) 10%, #fff); }
+.sync.wait { color: var(--ink-2); background: rgba(29, 35, 64, .06); }
+.sync.error { color: var(--soon); background: color-mix(in srgb, var(--soon) 10%, #fff); }
+.link-box { margin-top: 12px; background: var(--card); border: 1.5px solid var(--line); border-radius: 12px; padding: 12px; font: 14px/1.4 ui-monospace, Menlo, monospace; overflow-wrap: anywhere; user-select: all; }
+
 /* Matières */
 .subj-row { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-top: 1px solid var(--line); }
 .subj-row:first-child { border-top: 0; }
@@ -271,12 +280,17 @@ function load() {
   } catch (e) {}
   return { subjects: [], hw: [] };
 }
-function save() {
+function localSave() {
   try {
     localStorage.setItem(KEY, JSON.stringify(db));
   } catch (e) {
     toast('Plus de place pour enregistrer : supprime d’anciens devoirs.');
   }
+}
+// Enregistrer : dans ce téléphone, et en ligne si le partage est activé.
+function save() {
+  localSave();
+  schedulePush();
 }
 
 function idb() {
@@ -387,6 +401,7 @@ const mark = (s, size = 20) => (ANIMALS_ON && s ? animalSvg(animalOf(s), s.color
 const subjStyle = (s) => (s ? `--c:${s.color};--c2:${inkOf(s.color)}` : '--c:#C9CCD8;--c2:var(--ink-2)');
 
 const icons = {
+  invite: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M19 8v6M16 11h6"/></svg>',
   loop: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 2l3 3-3 3"/><path d="M4 11V9a4 4 0 0 1 4-4h12"/><path d="M7 22l-3-3 3-3"/><path d="M20 13v2a4 4 0 0 1-4 4H4"/></svg>',
   reload: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>',
   user: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="3.6"/><path d="M5 20a7 7 0 0 1 14 0"/></svg>',
@@ -401,6 +416,301 @@ const icons = {
   edit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg>',
 };
 
+// ---------- Partage entre appareils (PC, téléphone, une autre personne) ----------
+// Les devoirs sont rangés en ligne dans la base gratuite Firebase (la même que l'appli planning).
+// Chaque appareil garde aussi sa copie : l'appli marche sans internet et envoie les changements au retour du réseau.
+const FB = { apiKey: 'AIzaSyA3aQUZH7RMm4_KA8j1zX1p6LrGd63Z2bw', authDomain: 'planning-2-5e784.firebaseapp.com', projectId: 'planning-2-5e784', appId: '1:764870921572:web:e04569d5e7474f2904fe71' };
+const SPACE_KEY = KEY + '-partage';
+const UP_KEY = KEY + '-envoyes';
+let space = null;
+try {
+  space = localStorage.getItem(SPACE_KEY);
+} catch (e) {}
+(() => {
+  const s = new URLSearchParams(location.search).get('s');
+  if (s && s.length >= 20 && s !== space) {
+    space = s;
+    try {
+      localStorage.setItem(SPACE_KEY, s);
+    } catch (e) {}
+  }
+})();
+let fs = null;
+let fdb = null;
+let unsubs = [];
+let last = { hw: {}, subjects: {} }; // l'état en ligne connu
+let uploaded = new Set();
+try {
+  uploaded = new Set(JSON.parse(localStorage.getItem(UP_KEY) || '[]'));
+} catch (e) {}
+let syncState = space ? 'wait' : 'off';
+const saveUploaded = () => {
+  try {
+    localStorage.setItem(UP_KEY, JSON.stringify([...uploaded]));
+  } catch (e) {}
+};
+// JSON avec les clés dans l'ordre : pour comparer deux versions d'un devoir.
+const stable = (v) => (Array.isArray(v) ? `[${v.map(stable).join(',')}]` : v && typeof v === 'object' ? `{${Object.keys(v).filter((k) => v[k] !== undefined).sort().map((k) => JSON.stringify(k) + ':' + stable(v[k])).join(',')}}` : JSON.stringify(v ?? null));
+const shareUrl = () => {
+  const u = new URL(location.href);
+  u.search = '';
+  u.searchParams.set('s', space);
+  return u.toString();
+};
+function keepUrl() {
+  if (!space) return;
+  const u = new URL(location.href);
+  u.searchParams.delete('r');
+  if (u.searchParams.get('s') !== space) u.searchParams.set('s', space);
+  history.replaceState(null, '', u.toString());
+}
+function setSync(st) {
+  syncState = st;
+  const el = document.getElementById('sync');
+  if (el) el.outerHTML = syncHtml();
+}
+const syncHtml = () => (space ? `<span id="sync" class="sync ${syncState}">${syncState === 'ok' ? 'Partagé · à jour' : syncState === 'error' ? 'Partagé · hors ligne' : 'Partagé · envoi…'}</span>` : '<span id="sync" hidden></span>');
+
+async function fbInit() {
+  if (fdb) return;
+  const base = 'https://www.gstatic.com/firebasejs/12.17.1/';
+  const { initializeApp } = await import(base + 'firebase-app.js');
+  fs = await import(base + 'firebase-firestore.js');
+  fdb = fs.getFirestore(initializeApp(FB, 'devoirs'));
+}
+const ref = (kind, id) => fs.doc(fdb, 'plannings', space, kind, id);
+
+// Fusion : ce qui a changé ici garde la version d'ici, le reste prend la version en ligne.
+function applyRemote(kind, docs) {
+  const R = {};
+  docs.forEach((x) => (R[x.id] = x));
+  const P = last[kind];
+  const L = {};
+  db[kind].forEach((x) => (L[x.id] = x));
+  const out = [];
+  for (const id of new Set([...Object.keys(L), ...Object.keys(R)])) {
+    const l = L[id];
+    const dirty = (l ? stable(l) : undefined) !== P[id];
+    if (dirty) {
+      if (l) out.push(l);
+    } else if (R[id]) out.push(R[id]);
+  }
+  // garder l'ordre d'avant (par date de création)
+  db[kind] = out.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+  last[kind] = Object.fromEntries(Object.values(R).map((x) => [x.id, stable(x)]));
+}
+
+let pushing = false;
+let pushAgain = false;
+let pushTimer;
+function schedulePush() {
+  if (!space) return;
+  clearTimeout(pushTimer);
+  pushTimer = setTimeout(push, 300);
+}
+async function push() {
+  if (!space || !fdb) return;
+  if (pushing) {
+    pushAgain = true;
+    return;
+  }
+  pushing = true;
+  setSync('wait');
+  try {
+    let b = fs.writeBatch(fdb);
+    let n = 0;
+    const flush = async () => {
+      if (n) await b.commit();
+      b = fs.writeBatch(fdb);
+      n = 0;
+    };
+    for (const kind of ['hw', 'subjects']) {
+      const cur = {};
+      db[kind].forEach((x) => (cur[x.id] = stable(x)));
+      for (const [id, j] of Object.entries(cur))
+        if (last[kind][id] !== j) {
+          b.set(ref(kind, id), JSON.parse(j));
+          if (++n >= 400) await flush();
+        }
+      for (const id of Object.keys(last[kind]))
+        if (!cur[id]) {
+          b.delete(ref(kind, id));
+          if (++n >= 400) await flush();
+        }
+      await flush();
+      last[kind] = cur;
+    }
+    await pushFiles();
+    setSync('ok');
+  } catch (e) {
+    console.warn(e);
+    setSync('error');
+  }
+  pushing = false;
+  if (pushAgain) {
+    pushAgain = false;
+    push();
+  }
+}
+
+// Les photos et fichiers : découpés en morceaux (une fiche en ligne ne peut pas dépasser 1 Mo).
+const CHUNK = 700000;
+const allFileIds = () => new Set(db.hw.flatMap((h) => [...(h.files || []), ...(h.result || [])]).map((f) => f.id));
+const toDataUrl = (blob) => new Promise((ok) => {
+  const r = new FileReader();
+  r.onload = () => ok(r.result);
+  r.readAsDataURL(blob);
+});
+async function pushFiles() {
+  const ids = allFileIds();
+  for (const id of ids) {
+    if (uploaded.has(id)) continue;
+    const blob = await getFile(id).catch(() => null);
+    if (!blob) continue;
+    const data = await toDataUrl(blob);
+    const n = Math.ceil(data.length / CHUNK);
+    for (let i = 0; i < n; i++) await fs.setDoc(ref('files', `${id}__${i}`), { fid: id, i, n, data: data.slice(i * CHUNK, (i + 1) * CHUNK) });
+    uploaded.add(id);
+    saveUploaded();
+  }
+  for (const id of [...uploaded])
+    if (!ids.has(id)) {
+      const qs = await fs.getDocs(fs.query(fs.collection(fdb, 'plannings', space, 'files'), fs.where('fid', '==', id)));
+      await Promise.all(qs.docs.map((d) => fs.deleteDoc(d.ref)));
+      uploaded.delete(id);
+      saveUploaded();
+    }
+}
+// Un fichier ajouté sur un autre appareil : on le télécharge la première fois qu'on l'ouvre.
+async function getFileAny(id) {
+  const local = await getFile(id).catch(() => null);
+  if (local || !space) return local;
+  try {
+    await fbInit();
+    const qs = await fs.getDocs(fs.query(fs.collection(fdb, 'plannings', space, 'files'), fs.where('fid', '==', id)));
+    const parts = qs.docs.map((d) => d.data()).sort((a, b) => a.i - b.i);
+    if (!parts.length || parts.length !== parts[0].n) return null;
+    const blob = await (await fetch(parts.map((p) => p.data).join(''))).blob();
+    await putFile(id, blob);
+    uploaded.add(id);
+    saveUploaded();
+    return blob;
+  } catch (e) {
+    return null;
+  }
+}
+
+let pendingRender = false;
+async function startSync() {
+  if (!space) return;
+  keepUrl();
+  try {
+    await fbInit();
+  } catch (e) {
+    return setSync('error');
+  }
+  unsubs.forEach((f) => f());
+  unsubs = [];
+  fs.setDoc(fs.doc(fdb, 'plannings', space), { type: 'devoirs', updatedAt: Date.now() }, { merge: true }).catch(() => {});
+  for (const kind of ['hw', 'subjects'])
+    unsubs.push(
+      fs.onSnapshot(
+        fs.collection(fdb, 'plannings', space, kind),
+        (qs) => {
+          if (qs.metadata.hasPendingWrites) return;
+          applyRemote(kind, qs.docs.map((d) => d.data()));
+          localSave();
+          if (document.querySelector('.sheet-back') || document.activeElement?.id === 'q') pendingRender = true;
+          else render();
+          schedulePush(); // envoie ce qui a été fait ici sans réseau
+          setSync('ok');
+        },
+        () => setSync('error'),
+      ),
+    );
+}
+function stopSync() {
+  unsubs.forEach((f) => f());
+  unsubs = [];
+  space = null;
+  last = { hw: {}, subjects: {} };
+  uploaded = new Set();
+  try {
+    localStorage.removeItem(SPACE_KEY);
+    localStorage.removeItem(UP_KEY);
+  } catch (e) {}
+  const u = new URL(location.href);
+  u.searchParams.delete('s');
+  history.replaceState(null, '', u.toString());
+  setSync('off');
+}
+
+function openInvite() {
+  const draw = () => `<div class="sheet-head"><h3>Inviter</h3>${closeBtn}</div>
+    ${space
+      ? `<p class="hint" style="margin-top:12px">Envoie ce lien à la personne de ton choix, ou ouvre-le sur ton <b>PC</b> ou un autre téléphone : vous voyez les <b>mêmes devoirs</b>, avec les photos et les fichiers, et tout se met à jour en direct.</p>
+        <div class="link-box">${esc(shareUrl())}</div>
+        <div class="actions"><button class="btn" data-share-link>${icons.invite} Envoyer le lien</button><button class="btn ghost" data-copy-link>Copier le lien</button></div>
+        <p class="hint">Sur PC : colle le lien dans Chrome, Edge ou Safari. Garde ce lien pour vous : toute personne qui l’a peut voir et modifier ces devoirs.</p>
+        <div class="actions"><button class="btn danger" data-stop>Arrêter le partage sur cet appareil</button></div>`
+      : `<p class="hint" style="margin-top:12px">Pour voir tes devoirs sur ton <b>PC</b> et ton <b>téléphone</b>, ou les partager avec quelqu’un, active le partage : tes devoirs, photos et fichiers sont copiés en ligne et un lien est créé.</p>
+        <div class="actions"><button class="btn" data-start>${icons.invite} Activer le partage</button></div>
+        <p class="hint">Tes devoirs restent aussi dans ce téléphone, rien n’est effacé.</p>`}`;
+  const back = showSheet(draw());
+  const sheet = back.querySelector('.sheet');
+  let confirmStop = false;
+  back.addEventListener('click', async (e) => {
+    if (e.target.closest('[data-start]')) {
+      e.target.closest('[data-start]').textContent = 'Un instant…';
+      space = Array.from(crypto.getRandomValues(new Uint8Array(24)), (x) => 'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789'[x % 56]).join('');
+      try {
+        localStorage.setItem(SPACE_KEY, space);
+      } catch (err) {}
+      last = { hw: {}, subjects: {} };
+      uploaded = new Set();
+      await startSync();
+      await push();
+      sheet.innerHTML = '<div class="band"></div>' + draw();
+      render();
+      return toast(syncState === 'error' ? 'Partage activé : l’envoi se fera au retour d’internet.' : 'Partage activé !');
+    }
+    if (e.target.closest('[data-copy-link]')) {
+      try {
+        await navigator.clipboard.writeText(shareUrl());
+        toast('Lien copié !');
+      } catch (err) {
+        toast('Copie impossible : sélectionne le lien à la main.');
+      }
+      return;
+    }
+    if (e.target.closest('[data-share-link]')) {
+      if (navigator.share) {
+        try {
+          await navigator.share({ title: 'Mes devoirs', text: 'Mes devoirs, partagés :', url: shareUrl() });
+        } catch (err) {}
+      } else {
+        try {
+          await navigator.clipboard.writeText(shareUrl());
+          toast('Lien copié !');
+        } catch (err) {}
+      }
+      return;
+    }
+    const st = e.target.closest('[data-stop]');
+    if (st) {
+      if (!confirmStop) {
+        confirmStop = true;
+        st.textContent = 'Appuie encore (tes devoirs restent sur cet appareil)';
+        return;
+      }
+      stopSync();
+      closeSheet();
+      render();
+      toast('Partage arrêté sur cet appareil.');
+    }
+  });
+}
+
 // ---------- Écrans ----------
 
 let ui = { tab: 'todo', filter: 'all', q: '' };
@@ -412,7 +722,7 @@ function render() {
   const late = todo.filter((h) => h.due && daysLeft(h.due) < 0).length;
   const today = todo.filter((h) => h.due && daysLeft(h.due) === 0).length;
   const sub = todo.length ? [late ? `${late} en retard` : '', today ? `${today} pour aujourd’hui` : '', `${todo.length} à faire`].filter(Boolean).join(' · ') : 'Rien à faire pour l’instant.';
-  let html = `<header class="top"><div style="flex:1;min-width:0"><h1>Mes <mark>devoirs</mark></h1><p>${esc(sub)}</p></div><button class="icon-btn" data-action="reload" aria-label="Recharger la page" title="Recharger">${icons.reload}</button></header>
+  let html = `<header class="top"><div style="flex:1;min-width:0"><h1>Mes <mark>devoirs</mark></h1><p>${esc(sub)} ${syncHtml()}</p></div><button class="icon-btn" data-action="invite" aria-label="Inviter (PC, téléphone, une autre personne)" title="Inviter">${icons.invite}</button><button class="icon-btn" data-action="reload" aria-label="Recharger la page" title="Recharger">${icons.reload}</button></header>
     <div class="switch" role="group" aria-label="Affichage">
       <button data-tab="todo" aria-pressed="${ui.tab === 'todo'}">À faire<small>${todo.length || ''}</small></button>
       <button data-tab="subjects" aria-pressed="${ui.tab === 'subjects'}">Matières</button>
@@ -518,7 +828,7 @@ async function makeBackup() {
   const files = {};
   for (const h of db.hw)
     for (const f of [...(h.files || []), ...(h.result || [])]) {
-      const blob = await getFile(f.id).catch(() => null);
+      const blob = await getFileAny(f.id).catch(() => null);
       if (blob) files[f.id] = await new Promise((ok) => {
         const r = new FileReader();
         r.onload = () => ok(r.result);
@@ -636,6 +946,7 @@ document.addEventListener('click', (e) => {
     return toast(n ? `${n} matières ajoutées.` : 'Elles sont déjà là.');
   }
   if (a === 'backup') return makeBackup();
+  if (a === 'invite') return openInvite();
   if (a === 'reload') {
     // Recharge la dernière version de l'appli (les devoirs restent dans le téléphone).
     toast('Je recharge…');
@@ -717,6 +1028,11 @@ function closeSheet() {
   document.body.style.overflow = '';
   urls.forEach((u) => URL.revokeObjectURL(u));
   urls = [];
+  // Des changements sont arrivés d'un autre appareil pendant que la feuille était ouverte.
+  if (pendingRender) {
+    pendingRender = false;
+    setTimeout(render);
+  }
 }
 let urls = [];
 const blobUrl = (b) => {
@@ -766,7 +1082,7 @@ const sizeText = (n) => (!n ? '' : n < 1024 * 1024 ? `${Math.max(1, Math.round(n
 async function filesGridHtml(files, removable) {
   const parts = [];
   for (const f of files) {
-    const blob = await getFile(f.id).catch(() => null);
+    const blob = await getFileAny(f.id).catch(() => null);
     const k = fileKind(f);
     const img = blob && k.short === 'IMG';
     parts.push(`<div class="frow">
@@ -781,7 +1097,7 @@ async function filesGridHtml(files, removable) {
 }
 
 async function openFile(f) {
-  const blob = await getFile(f.id).catch(() => null);
+  const blob = await getFileAny(f.id).catch(() => null);
   if (!blob) return toast('Ce fichier n’est plus sur ce téléphone.');
   if (/^image\//.test(f.type)) {
     const v = document.createElement('div');
@@ -1269,6 +1585,7 @@ navigator.storage?.persist?.().catch(() => {});
 // Retour sur l'appli (ou minuit passé) : les dates « aujourd'hui / demain » se remettent à jour.
 document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && !document.querySelector('.sheet-back') && render());
 render();
+startSync();
 </script>
 </body>
 </html>
