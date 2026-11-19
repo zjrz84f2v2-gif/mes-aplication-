@@ -160,6 +160,9 @@ svg { flex: 0 0 auto; }
 .meta-line .prof { font-size: 15px; }
 .step-edit span svg { width: 16px; height: 16px; display: block; color: var(--ink-3); }
 
+.backup { margin-top: 26px; background: var(--card); border-radius: var(--radius); padding: 14px; box-shadow: 0 12px 30px -22px rgba(29, 35, 64, .45); }
+.backup h4 { margin: 0 0 6px; font: 800 20px/1.2 var(--display); }
+
 /* Matières */
 .subj-row { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-top: 1px solid var(--line); }
 .subj-row:first-child { border-top: 0; }
@@ -490,18 +493,78 @@ const PACKS = {
 };
 const packHtml = () => `<div class="actions"><button class="btn ghost" data-pack="archi">Ajouter les matières d’architecture intérieure</button></div>`;
 
+// Sauvegarde dans un fichier (devoirs, matières, photos et fichiers), pour ne jamais rien perdre.
+const backupHtml = () => `<section class="backup"><h4>Sauvegarde</h4>
+    <p class="hint" style="margin:0 0 10px">Tes devoirs restent dans ce téléphone, même quand tu recharges la page. Pour être sûr de ne jamais les perdre (nouveau téléphone, données effacées…), garde aussi une copie dans un fichier.${db.savedAt ? ` Dernière sauvegarde : ${esc(new Date(db.savedAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' }))}.` : ''}</p>
+    <div class="add-files"><button class="btn ghost" data-action="backup">Sauvegarder</button><label class="btn ghost pick">Restaurer<input type="file" accept=".json,application/json" id="restore"></label></div>
+  </section>`;
+
+async function makeBackup() {
+  toast('Je prépare la sauvegarde…');
+  const files = {};
+  for (const h of db.hw)
+    for (const f of [...(h.files || []), ...(h.result || [])]) {
+      const blob = await getFile(f.id).catch(() => null);
+      if (blob) files[f.id] = await new Promise((ok) => {
+        const r = new FileReader();
+        r.onload = () => ok(r.result);
+        r.readAsDataURL(blob);
+      });
+    }
+  const day = todayIso();
+  const out = new File([JSON.stringify({ app: 'mes-devoirs', version: 1, at: Date.now(), db, files })], `sauvegarde-devoirs-${day}.json`, { type: 'application/json' });
+  await shareFile(out);
+  db.savedAt = Date.now();
+  save();
+  render();
+}
+
+// Restaurer : on ajoute ce qui manque, sans rien effacer de ce qui est déjà là.
+async function restoreBackup(file) {
+  let data;
+  try {
+    data = JSON.parse(await file.text());
+  } catch (e) {
+    return toast('Ce fichier n’est pas une sauvegarde de devoirs.');
+  }
+  if (!data?.db?.hw) return toast('Ce fichier n’est pas une sauvegarde de devoirs.');
+  let nh = 0;
+  for (const s of data.db.subjects || []) if (!db.subjects.some((x) => x.id === s.id)) db.subjects.push(s);
+  for (const h of data.db.hw)
+    if (!db.hw.some((x) => x.id === h.id)) {
+      db.hw.push(h);
+      nh++;
+    }
+  for (const [id, url] of Object.entries(data.files || {})) {
+    if (await getFile(id).catch(() => null)) continue;
+    try {
+      await putFile(id, await (await fetch(url)).blob());
+    } catch (e) {}
+  }
+  save();
+  render();
+  toast(nh ? `${nh} devoir${nh > 1 ? 's' : ''} retrouvé${nh > 1 ? 's' : ''} !` : 'Tout était déjà là.');
+}
+
 function subjectsHtml() {
-  if (!db.subjects.length) return `<div class="empty"><b>Pas encore de matière</b>Ajoute tes matières : chaque devoir prend la couleur de sa matière.</div>${packHtml()}`;
+  if (!db.subjects.length) return `<div class="empty"><b>Pas encore de matière</b>Ajoute tes matières : chaque devoir prend la couleur de sa matière.</div>${packHtml()}${backupHtml()}`;
   const hasPack = PACKS.archi.every((n) => db.subjects.some((x) => x.name === n));
   return `<section class="group"><h2>Matières <small>${db.subjects.length}</small></h2><div class="list">${db.subjects
     .map((s) => {
       const todo = db.hw.filter((h) => h.subject === s.id && !h.done).length;
       return `<div class="subj-row" style="${subjStyle(s)}">${ANIMALS_ON ? mark(s, 40) : '<span class="dot"></span>'}<button class="grow" data-see="${s.id}"><b>${esc(s.name)}</b><small>${esc([(s.teachers || []).map((t) => t.name).join(', '), todo ? `${todo} à faire` : 'Rien à faire'].filter(Boolean).join(' · '))}</small></button><button class="small-btn" data-edit-subject="${s.id}" aria-label="Modifier ${esc(s.name)}">${icons.edit}</button></div>`;
     })
-    .join('')}</div></section><p class="hint">Touche une matière pour voir ses devoirs.</p>${hasPack ? '' : packHtml()}`;
+    .join('')}</div></section><p class="hint">Touche une matière pour voir ses devoirs.</p>${hasPack ? '' : packHtml()}${backupHtml()}`;
 }
 
 // ---------- Actions ----------
+
+document.addEventListener('change', (e) => {
+  if (e.target.id !== 'restore') return;
+  const f = e.target.files?.[0];
+  if (f) restoreBackup(f);
+  e.target.value = '';
+});
 
 document.addEventListener('input', (e) => {
   if (e.target.id !== 'q') return;
@@ -558,6 +621,7 @@ document.addEventListener('click', (e) => {
     render();
     return toast(n ? `${n} matières ajoutées.` : 'Elles sont déjà là.');
   }
+  if (a === 'backup') return makeBackup();
   if (a === 'reload') {
     // Recharge la dernière version de l'appli (les devoirs restent dans le téléphone).
     toast('Je recharge…');
