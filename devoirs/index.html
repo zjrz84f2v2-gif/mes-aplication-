@@ -64,6 +64,7 @@ svg { flex: 0 0 auto; }
 .chip { flex: 0 0 auto; min-height: 40px; padding: 0 14px; border-radius: 999px; border: 1.5px solid var(--line); background: var(--card); font-weight: 700; font-size: 15px; display: inline-flex; align-items: center; gap: 7px; color: var(--ink); }
 .chip i { width: 10px; height: 10px; border-radius: 50%; background: var(--c); }
 .chip[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+.chip svg { width: 16px; height: 16px; }
 .chip[aria-pressed="true"] i { box-shadow: 0 0 0 2px var(--paper); }
 
 /* Groupes par date */
@@ -92,6 +93,17 @@ svg { flex: 0 0 auto; }
 
 .empty { background: var(--card); border-radius: var(--radius); padding: 26px 20px; text-align: center; color: var(--ink-2); margin-top: 22px; }
 .empty b { display: block; font: 800 22px/1.2 var(--display); color: var(--ink); margin-bottom: 6px; }
+
+.hw-meta .steps-count { font-weight: 700; color: var(--ink); }
+.bar { display: block; height: 5px; border-radius: 3px; background: rgba(29, 35, 64, .1); margin-top: 7px; overflow: hidden; max-width: 220px; }
+.bar i { display: block; height: 100%; background: var(--ok); border-radius: 3px; }
+.steps-edit { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+.steps-edit:empty { display: none; }
+.step-edit { display: flex; align-items: center; gap: 10px; background: var(--card); border: 1.5px solid var(--line); border-radius: 12px; padding: 6px 6px 6px 12px; }
+.step-edit span { color: var(--ink-3); font-weight: 700; font-variant-numeric: tabular-nums; }
+.step-edit b { flex: 1; min-width: 0; font-weight: 600; overflow-wrap: anywhere; }
+.rm-step { width: 36px; height: 36px; border-radius: 50%; border: 0; background: rgba(29, 35, 64, .08); display: flex; align-items: center; justify-content: center; padding: 0; }
+.rm-step svg { width: 12px; height: 12px; }
 
 /* Matières */
 .subj-row { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-top: 1px solid var(--line); }
@@ -282,10 +294,12 @@ function render() {
 function hwHtml(h) {
   const s = subject(h.subject);
   const n = (h.files || []).length;
+  const st = h.steps || [];
+  const stDone = st.filter((x) => x.done).length;
   return `<div class="hw${h.done ? ' done' : ''}" style="${subjStyle(s)}">
     <button class="check" data-done="${h.id}" aria-label="${h.done ? 'Remettre à faire' : 'C’est fait'} : ${esc(h.title)}" aria-pressed="${!!h.done}">${icons.check}</button>
     <button class="hw-body" data-open="${h.id}"><span class="hw-title">${esc(h.title)}</span>
-      <span class="hw-meta">${s ? `<span class="subj">${esc(s.name)}</span>` : ''}${n ? `<span class="clip">${icons.clip}${n}</span>` : ''}${h.note ? '<span>note</span>' : ''}</span></button>
+      <span class="hw-meta">${s ? `<span class="subj">${esc(s.name)}</span>` : ''}${st.length ? `<span class="steps-count">${stDone}/${st.length} étapes</span>` : ''}${n ? `<span class="clip">${icons.clip}${n}</span>` : ''}${h.note ? '<span>note</span>' : ''}</span>${st.length ? `<span class="bar"><i style="width:${Math.round((100 * stDone) / st.length)}%"></i></span>` : ''}</button>
     <span class="due ${dueClass(h.due, h.done)}">${esc(h.done ? 'Fait' : dueText(h.due))}</span>
   </div>`;
 }
@@ -329,14 +343,21 @@ function doneHtml(done) {
     <div class="actions"><button class="btn ghost" data-action="clear-done">Effacer les devoirs faits</button></div>`;
 }
 
+// Matières toutes prêtes, ajoutées d'un coup (celles qui existent déjà ne sont pas doublées).
+const PACKS = {
+  archi: ['Projet', 'Dessin technique', 'Perspective', 'Croquis', 'Maquette', 'DAO (AutoCAD, SketchUp…)', 'Couleur et matériaux', 'Histoire de l’art et du design', 'Mobilier', 'Éclairage', 'Communication visuelle'],
+};
+const packHtml = () => `<div class="actions"><button class="btn ghost" data-pack="archi">Ajouter les matières d’architecture intérieure</button></div>`;
+
 function subjectsHtml() {
-  if (!db.subjects.length) return `<div class="empty"><b>Pas encore de matière</b>Ajoute tes matières (Maths, Français…) : chaque devoir prend la couleur de sa matière.</div>`;
+  if (!db.subjects.length) return `<div class="empty"><b>Pas encore de matière</b>Ajoute tes matières : chaque devoir prend la couleur de sa matière.</div>${packHtml()}`;
+  const hasPack = PACKS.archi.every((n) => db.subjects.some((x) => x.name === n));
   return `<section class="group"><h2>Matières <small>${db.subjects.length}</small></h2><div class="list">${db.subjects
     .map((s) => {
       const todo = db.hw.filter((h) => h.subject === s.id && !h.done).length;
       return `<div class="subj-row" style="${subjStyle(s)}"><span class="dot"></span><button class="grow" data-see="${s.id}"><b>${esc(s.name)}</b><small>${todo ? `${todo} à faire` : 'Rien à faire'}</small></button><button class="small-btn" data-edit-subject="${s.id}" aria-label="Modifier ${esc(s.name)}">${icons.edit}</button></div>`;
     })
-    .join('')}</div></section><p class="hint">Touche une matière pour voir ses devoirs.</p>`;
+    .join('')}</div></section><p class="hint">Touche une matière pour voir ses devoirs.</p>${hasPack ? '' : packHtml()}`;
 }
 
 // ---------- Actions ----------
@@ -367,6 +388,18 @@ document.addEventListener('click', (e) => {
   const es = e.target.closest('[data-edit-subject]');
   if (es) return openSubject(es.dataset.editSubject);
   const a = e.target.closest('[data-action]')?.dataset.action;
+  const pk = e.target.closest('[data-pack]');
+  if (pk) {
+    let n = 0;
+    for (const name of PACKS[pk.dataset.pack]) {
+      if (db.subjects.some((x) => x.name.toLowerCase() === name.toLowerCase())) continue;
+      db.subjects.push({ id: uid(), name, color: COLORS[db.subjects.length % COLORS.length] });
+      n++;
+    }
+    save();
+    render();
+    return toast(n ? `${n} matières ajoutées.` : 'Elles sont déjà là.');
+  }
   if (a === 'new') openEditor(null);
   else if (a === 'new-subject') openSubject(null);
   else if (a === 'clear-done') {
@@ -504,6 +537,7 @@ function openEditor(id) {
   let subj = cur?.subject ?? (ui.filter !== 'all' ? ui.filter : null);
   let due = cur?.due || iso(addDays(new Date(), 1));
   let files = (cur?.files || []).slice();
+  let steps = (cur?.steps || []).map((x) => ({ ...x }));
   const added = []; // fichiers ajoutés dans cette feuille (à effacer si on annule)
   const quick = [
     ['Demain', iso(addDays(new Date(), 1))],
@@ -521,7 +555,10 @@ function openEditor(id) {
         <input type="date" class="field" id="hw-due" value="${due}" aria-label="Choisir la date"></div>
       <label class="label" for="hw-note">Note <small>(facultatif)</small></label>
       <textarea id="hw-note" class="field" placeholder="Détails, ce qu’il faut apprendre…">${esc(cur?.note || '')}</textarea>
-      <span class="label">Photos et fichiers <small>(l’énoncé, ton travail…)</small></span>
+      <span class="label">Étapes <small>(facultatif : pour un gros projet)</small></span>
+      <div class="steps-edit" id="steps"></div>
+      <div class="row"><input id="step-new" class="field" placeholder="ex. Esquisse, plans, planches, maquette…" maxlength="100" autocomplete="off" enterkeyhint="done" style="flex:1 1 200px"><button type="button" class="chip" data-step-add>${icons.plus} Ajouter</button></div>
+      <span class="label">Photos et fichiers <small>(l’énoncé, ton travail, tes planches…)</small></span>
       <div class="add-files">
         <label class="btn ghost pick">${icons.camera} Photo<input type="file" accept="image/*" capture="environment" id="add-photo"></label>
         <label class="btn ghost pick">${icons.clip} Fichier<input type="file" multiple id="add-file"></label>
@@ -540,6 +577,25 @@ function openEditor(id) {
   dueIn.addEventListener('change', () => {
     due = dueIn.value;
     syncDue();
+  });
+  const drawSteps = () => {
+    back.querySelector('#steps').innerHTML = steps.map((x, i) => `<div class="step-edit"><span>${i + 1}.</span><b>${esc(x.text)}</b><button type="button" class="rm-step" data-step-rm="${x.id}" aria-label="Enlever l’étape ${esc(x.text)}">${icons.close}</button></div>`).join('');
+  };
+  drawSteps();
+  const stepIn = back.querySelector('#step-new');
+  const addStep = () => {
+    const t = stepIn.value.trim();
+    if (!t) return stepIn.focus();
+    steps.push({ id: uid(), text: t, done: false });
+    stepIn.value = '';
+    drawSteps();
+    stepIn.focus();
+  };
+  stepIn.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      addStep();
+    }
   });
   const drawFiles = async () => {
     back.querySelector('#files').innerHTML = await filesGridHtml(files, true);
@@ -590,6 +646,12 @@ function openEditor(id) {
       dueIn.value = due;
       return syncDue();
     }
+    if (e.target.closest('[data-step-add]')) return addStep();
+    const rs = e.target.closest('[data-step-rm]');
+    if (rs) {
+      steps = steps.filter((x) => x.id !== rs.dataset.stepRm);
+      return drawSteps();
+    }
     const rm = e.target.closest('[data-rm]');
     if (rm) {
       files = files.filter((x) => x.id !== rm.dataset.rm);
@@ -613,7 +675,8 @@ function openEditor(id) {
       back.querySelector('#hw-title').focus();
       return toast('Écris ce qu’il faut faire.');
     }
-    const data = { title, subject: subj || null, due: dueIn.value || '', note: back.querySelector('#hw-note').value.trim(), files };
+    const data = { title, subject: subj || null, due: dueIn.value || '', note: back.querySelector('#hw-note').value.trim(), files, steps };
+    if (stepIn.value.trim()) data.steps.push({ id: uid(), text: stepIn.value.trim(), done: false });
     if (cur) {
       (cur.files || []).filter((x) => !files.some((y) => y.id === x.id)).forEach((x) => delFile(x.id));
       Object.assign(cur, data);
@@ -636,6 +699,7 @@ async function openDetail(id) {
   const back = showSheet(`<div class="sheet-head"><h3>${esc(h.title)}</h3>${closeBtn}</div>
     <p class="meta-line">${s ? `<span class="badge" style="${subjStyle(s)}"><i></i>${esc(s.name)}</span>` : ''}<span>${h.due ? `À rendre ${esc(fmt(h.due, { weekday: 'long', day: 'numeric', month: 'long' }))}` : 'Sans date'}</span>${h.done ? '<span style="color:var(--ok);font-weight:700">· Fait</span>' : h.due && daysLeft(h.due) < 0 ? '<span style="color:var(--late);font-weight:700">· En retard</span>' : ''}</p>
     ${h.note ? `<div class="note-box">${esc(h.note)}</div>` : ''}
+    ${(h.steps || []).length ? `<span class="label">Étapes <small id="steps-sum"></small></span><div class="list" id="steps-list"></div>` : ''}
     ${(h.files || []).length ? `<span class="label">Photos et fichiers</span><div class="files" id="files"></div>` : ''}
     <div class="actions">
       <button class="btn ${h.done ? 'ghost' : 'ok'}" data-toggle>${h.done ? 'Remettre à faire' : `${icons.check} C’est fait !`}</button>
@@ -644,8 +708,26 @@ async function openDetail(id) {
       <button class="btn danger" data-del>Supprimer</button>
     </div>
     ${!h.done && h.due && daysLeft(h.due) >= 1 ? '<p class="hint">Le rappel te prévient la veille à 18 h.</p>' : ''}`);
+  const drawChecks = () => {
+    const box = back.querySelector('#steps-list');
+    if (!box) return;
+    const d = h.steps.filter((x) => x.done).length;
+    back.querySelector('#steps-sum').textContent = `(${d} sur ${h.steps.length} faites)`;
+    box.innerHTML = h.steps.map((x) => `<div class="hw${x.done ? ' done' : ''}"><button class="check" data-step="${x.id}" aria-pressed="${!!x.done}" aria-label="${x.done ? 'Pas encore faite' : 'Faite'} : ${esc(x.text)}">${icons.check}</button><span class="hw-title" style="flex:1">${esc(x.text)}</span></div>`).join('');
+  };
+  drawChecks();
   if ((h.files || []).length) back.querySelector('#files').innerHTML = await filesGridHtml(h.files, false);
   back.addEventListener('click', (e) => {
+    const sc = e.target.closest('[data-step]');
+    if (sc) {
+      const x = h.steps.find((y) => y.id === sc.dataset.step);
+      x.done = !x.done;
+      save();
+      drawChecks();
+      render();
+      if (h.steps.every((y) => y.done) && !h.done) toast('Toutes les étapes sont faites : coche le devoir quand tu l’as rendu !');
+      return;
+    }
     const of = e.target.closest('[data-file]');
     if (of) return openFile(h.files.find((x) => x.id === of.dataset.file));
     if (e.target.closest('[data-toggle]')) {
