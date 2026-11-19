@@ -105,6 +105,32 @@ svg { flex: 0 0 auto; }
 .rm-step { width: 36px; height: 36px; border-radius: 50%; border: 0; background: rgba(29, 35, 64, .08); display: flex; align-items: center; justify-content: center; padding: 0; }
 .rm-step svg { width: 12px; height: 12px; }
 
+/* Animaux (version DDT) */
+.animal { flex: 0 0 auto; display: block; }
+.chip .animal { width: 22px; height: 22px; margin-left: -4px; }
+.hw-meta .subj .animal { margin-right: 1px; }
+.animals { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.animal-btn { border: 1.5px solid var(--line); background: var(--card); border-radius: 14px; padding: 8px 4px 6px; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.animal-btn small { font-size: 12px; font-weight: 700; color: var(--ink-2); }
+.animal-btn[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+
+/* Version DDT : tout en rose. */
+[data-theme="ddt"] {
+  --paper: #FFF2F6;
+  --card: #FFFFFF;
+  --ink: #3A1C2C;
+  --ink-2: #74526A;
+  --ink-3: #A88A9E;
+  --line: rgba(58, 28, 44, .12);
+  --accent: #C8366F;
+  --mark: #FFC2D8;
+}
+[data-theme="ddt"] body { background-image: linear-gradient(rgba(200, 54, 111, .08) 1px, transparent 1px); }
+[data-theme="ddt"] .footer { background: linear-gradient(rgba(255, 242, 246, 0), var(--paper) 35%); }
+[data-theme="ddt"] .btn { box-shadow: 0 10px 22px -12px rgba(200, 54, 111, .75); }
+[data-theme="ddt"] .switch { background: rgba(200, 54, 111, .09); }
+[data-theme="ddt"] .hw-meta .subj::before { display: none; }
+
 /* Matières */
 .subj-row { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-top: 1px solid var(--line); }
 .subj-row:first-child { border-top: 0; }
@@ -112,6 +138,7 @@ svg { flex: 0 0 auto; }
 .subj-row button.grow { flex: 1; min-width: 0; text-align: left; border: 0; background: none; padding: 4px 0; }
 .subj-row b { display: block; font-size: 17px; }
 .subj-row small { color: var(--ink-2); font-size: 14px; }
+.small-btn svg { width: 18px; height: 18px; }
 .small-btn { min-height: 40px; padding: 0 14px; border-radius: 999px; border: 1.5px solid var(--line); background: var(--card); font-weight: 700; font-size: 15px; display: inline-flex; align-items: center; gap: 6px; color: var(--ink); }
 
 /* Bouton du bas */
@@ -184,7 +211,9 @@ textarea.field { min-height: 90px; resize: vertical; font-size: 17px; }
 // Les devoirs dans le stockage du navigateur ; les photos et fichiers dans IndexedDB.
 
 const KEY = 'devoirs-v1';
-const COLORS = ['#2B3FA8', '#C2410C', '#2E7D4F', '#7E3FBF', '#B7791F', '#C2417A', '#0E7490', '#4D5466'];
+const COLORS = document.documentElement.dataset.theme === 'ddt'
+  ? ['#D94F86', '#E9784F', '#5FA36A', '#8E6CCF', '#D9A23B', '#4E9BC2', '#C0679A', '#A57B5C']
+  : ['#2B3FA8', '#C2410C', '#2E7D4F', '#7E3FBF', '#B7791F', '#C2417A', '#0E7490', '#4D5466'];
 let db = load();
 function load() {
   try {
@@ -250,6 +279,24 @@ const dueClass = (s, done) => (done || !s ? '' : daysLeft(s) < 0 ? 'late' : days
 const subject = (id) => db.subjects.find((x) => x.id === id) || null;
 // Texte lisible sur fond clair, dans la couleur de la matière.
 const inkOf = (c) => `color-mix(in srgb, ${c} 82%, #000)`;
+// ---------- Animaux (version DDT) : chaque matière a son petit animal ----------
+const ANIMALS_ON = document.documentElement.dataset.theme === 'ddt';
+const EYES = (y = 17, dx = 4.2) => `<circle cx="${16 - dx}" cy="${y}" r="1.6" fill="#2B1B24"/><circle cx="${16 + dx}" cy="${y}" r="1.6" fill="#2B1B24"/>`;
+const ANIMALS = {
+  chat: { name: 'Chat', svg: (c) => `<path d="M6 9 L9.5 3.5 L13 8.5 M26 9 L22.5 3.5 L19 8.5" fill="${c}" stroke="${c}" stroke-width="2" stroke-linejoin="round"/><circle cx="16" cy="17.5" r="10.5" fill="${c}"/>${EYES(16.5)}<path d="M14.6 20.2 h2.8 l-1.4 1.6z" fill="#F7A1BC"/><path d="M8 20h4M8 22.2l4-.8M24 20h-4M24 22.2l-4-.8" stroke="#fff" stroke-width=".9" stroke-linecap="round" opacity=".9"/>` },
+  lapin: { name: 'Lapin', svg: (c) => `<ellipse cx="11.5" cy="7.5" rx="3" ry="7" fill="${c}"/><ellipse cx="20.5" cy="7.5" rx="3" ry="7" fill="${c}"/><ellipse cx="11.5" cy="8" rx="1.4" ry="4.6" fill="#F7C6D6"/><ellipse cx="20.5" cy="8" rx="1.4" ry="4.6" fill="#F7C6D6"/><circle cx="16" cy="19.5" r="9.5" fill="${c}"/>${EYES(18.5, 3.8)}<ellipse cx="16" cy="22" rx="1.5" ry="1.1" fill="#F7A1BC"/>` },
+  renard: { name: 'Renard', svg: (c) => `<path d="M5 6 L11 10 L6 16 Z M27 6 L21 10 L26 16 Z" fill="${c}"/><path d="M5 11 Q16 6 27 11 Q25 24 16 28 Q7 24 5 11Z" fill="${c}"/><path d="M8.5 17 Q12 18 16 28 Q20 18 23.5 17 Q20 23 16 28 Q12 23 8.5 17Z" fill="#FFF4F2"/>${EYES(15.5, 4.5)}<circle cx="16" cy="25" r="1.4" fill="#2B1B24"/>` },
+  ours: { name: 'Ours', svg: (c) => `<circle cx="8" cy="9" r="4.2" fill="${c}"/><circle cx="24" cy="9" r="4.2" fill="${c}"/><circle cx="16" cy="18" r="11" fill="${c}"/>${EYES(16)}<ellipse cx="16" cy="22" rx="4.6" ry="3.5" fill="#FFF1E8"/><ellipse cx="16" cy="20.8" rx="1.7" ry="1.2" fill="#2B1B24"/>` },
+  panda: { name: 'Panda', svg: (c) => `<circle cx="8" cy="9" r="4.2" fill="${c}"/><circle cx="24" cy="9" r="4.2" fill="${c}"/><circle cx="16" cy="18" r="11" fill="#FFFDFB" stroke="${c}" stroke-width="1.4"/><ellipse cx="11.5" cy="17" rx="3" ry="3.8" fill="${c}" transform="rotate(-20 11.5 17)"/><ellipse cx="20.5" cy="17" rx="3" ry="3.8" fill="${c}" transform="rotate(20 20.5 17)"/><circle cx="11.8" cy="16.8" r="1.2" fill="#fff"/><circle cx="20.2" cy="16.8" r="1.2" fill="#fff"/><ellipse cx="16" cy="22.3" rx="1.7" ry="1.2" fill="#2B1B24"/>` },
+  hibou: { name: 'Hibou', svg: (c) => `<path d="M6 8 L10 11 M26 8 L22 11" stroke="${c}" stroke-width="2.4" stroke-linecap="round"/><path d="M6 12 Q6 6 16 7 Q26 6 26 12 V22 Q26 29 16 29 Q6 29 6 22Z" fill="${c}"/><circle cx="11.5" cy="15" r="4.3" fill="#FFF8F2"/><circle cx="20.5" cy="15" r="4.3" fill="#FFF8F2"/><circle cx="11.5" cy="15.2" r="2" fill="#2B1B24"/><circle cx="20.5" cy="15.2" r="2" fill="#2B1B24"/><path d="M14.5 19 h3 l-1.5 2.6z" fill="#F4B24A"/><path d="M11 24 q5 3 10 0" stroke="#FFF8F2" stroke-width="1.2" fill="none" opacity=".7"/>` },
+  grenouille: { name: 'Grenouille', svg: (c) => `<circle cx="10" cy="10" r="4.8" fill="${c}"/><circle cx="22" cy="10" r="4.8" fill="${c}"/><ellipse cx="16" cy="19" rx="12" ry="9" fill="${c}"/><circle cx="10" cy="9.6" r="2.6" fill="#fff"/><circle cx="22" cy="9.6" r="2.6" fill="#fff"/><circle cx="10" cy="9.8" r="1.4" fill="#2B1B24"/><circle cx="22" cy="9.8" r="1.4" fill="#2B1B24"/><path d="M9 20 Q16 26 23 20" stroke="#2B1B24" stroke-width="1.4" fill="none" stroke-linecap="round"/><circle cx="7.5" cy="18.5" r="1.6" fill="#F7A1BC" opacity=".8"/><circle cx="24.5" cy="18.5" r="1.6" fill="#F7A1BC" opacity=".8"/>` },
+  cochon: { name: 'Cochon', svg: (c) => `<path d="M6 9 L8 4.5 L12.5 7.5 M26 9 L24 4.5 L19.5 7.5" fill="${c}" stroke="${c}" stroke-width="2" stroke-linejoin="round"/><circle cx="16" cy="17.5" r="10.5" fill="${c}"/>${EYES(15)}<ellipse cx="16" cy="21" rx="4.6" ry="3.4" fill="#FFFFFF" opacity=".55"/><ellipse cx="14.4" cy="21" rx=".9" ry="1.3" fill="#2B1B24"/><ellipse cx="17.6" cy="21" rx=".9" ry="1.3" fill="#2B1B24"/>` },
+};
+const ANIMAL_KEYS = Object.keys(ANIMALS);
+const animalOf = (s) => (ANIMALS[s.animal] ? s.animal : ANIMAL_KEYS[Math.max(0, db.subjects.indexOf(s)) % ANIMAL_KEYS.length]);
+const animalSvg = (key, color, size) => `<svg class="animal" viewBox="0 0 32 32" width="${size}" height="${size}" aria-hidden="true">${ANIMALS[key].svg(color)}</svg>`;
+// Le petit repère d'une matière : un point de couleur, ou son animal dans la version DDT.
+const mark = (s, size = 20) => (ANIMALS_ON && s ? animalSvg(animalOf(s), s.color, size) : '<i></i>');
 const subjStyle = (s) => (s ? `--c:${s.color};--c2:${inkOf(s.color)}` : '--c:#C9CCD8;--c2:var(--ink-2)');
 
 const icons = {
@@ -299,7 +346,7 @@ function hwHtml(h) {
   return `<div class="hw${h.done ? ' done' : ''}" style="${subjStyle(s)}">
     <button class="check" data-done="${h.id}" aria-label="${h.done ? 'Remettre à faire' : 'C’est fait'} : ${esc(h.title)}" aria-pressed="${!!h.done}">${icons.check}</button>
     <button class="hw-body" data-open="${h.id}"><span class="hw-title">${esc(h.title)}</span>
-      <span class="hw-meta">${s ? `<span class="subj">${esc(s.name)}</span>` : ''}${st.length ? `<span class="steps-count">${stDone}/${st.length} étapes</span>` : ''}${n ? `<span class="clip">${icons.clip}${n}</span>` : ''}${h.note ? '<span>note</span>' : ''}</span>${st.length ? `<span class="bar"><i style="width:${Math.round((100 * stDone) / st.length)}%"></i></span>` : ''}</button>
+      <span class="hw-meta">${s ? `<span class="subj">${ANIMALS_ON ? mark(s, 20) : ''}${esc(s.name)}</span>` : ''}${st.length ? `<span class="steps-count">${stDone}/${st.length} étapes</span>` : ''}${n ? `<span class="clip">${icons.clip}${n}</span>` : ''}${h.note ? '<span>note</span>' : ''}</span>${st.length ? `<span class="bar"><i style="width:${Math.round((100 * stDone) / st.length)}%"></i></span>` : ''}</button>
     <span class="due ${dueClass(h.due, h.done)}">${esc(h.done ? 'Fait' : dueText(h.due))}</span>
   </div>`;
 }
@@ -311,7 +358,7 @@ function filterChips(list) {
   if (!used.length) return '';
   return `<div class="chips" role="group" aria-label="Matière">
     <button class="chip" data-filter="all" aria-pressed="${ui.filter === 'all'}">Toutes</button>
-    ${used.map((s) => `<button class="chip" style="${subjStyle(s)}" data-filter="${s.id}" aria-pressed="${ui.filter === s.id}"><i></i>${esc(s.name)}</button>`).join('')}
+    ${used.map((s) => `<button class="chip" style="${subjStyle(s)}" data-filter="${s.id}" aria-pressed="${ui.filter === s.id}">${mark(s)}${esc(s.name)}</button>`).join('')}
   </div>`;
 }
 
@@ -355,7 +402,7 @@ function subjectsHtml() {
   return `<section class="group"><h2>Matières <small>${db.subjects.length}</small></h2><div class="list">${db.subjects
     .map((s) => {
       const todo = db.hw.filter((h) => h.subject === s.id && !h.done).length;
-      return `<div class="subj-row" style="${subjStyle(s)}"><span class="dot"></span><button class="grow" data-see="${s.id}"><b>${esc(s.name)}</b><small>${todo ? `${todo} à faire` : 'Rien à faire'}</small></button><button class="small-btn" data-edit-subject="${s.id}" aria-label="Modifier ${esc(s.name)}">${icons.edit}</button></div>`;
+      return `<div class="subj-row" style="${subjStyle(s)}">${ANIMALS_ON ? mark(s, 40) : '<span class="dot"></span>'}<button class="grow" data-see="${s.id}"><b>${esc(s.name)}</b><small>${todo ? `${todo} à faire` : 'Rien à faire'}</small></button><button class="small-btn" data-edit-subject="${s.id}" aria-label="Modifier ${esc(s.name)}">${icons.edit}</button></div>`;
     })
     .join('')}</div></section><p class="hint">Touche une matière pour voir ses devoirs.</p>${hasPack ? '' : packHtml()}`;
 }
@@ -568,7 +615,7 @@ function openEditor(id) {
     </form>`);
   const subjBox = back.querySelector('#subj-pick');
   const drawSubjects = () => {
-    subjBox.innerHTML = db.subjects.map((s) => `<button type="button" class="chip" style="${subjStyle(s)}" data-subj="${s.id}" aria-pressed="${subj === s.id}"><i></i>${esc(s.name)}</button>`).join('') + `<button type="button" class="chip" data-subj-new>${icons.plus} Nouvelle</button>`;
+    subjBox.innerHTML = db.subjects.map((s) => `<button type="button" class="chip" style="${subjStyle(s)}" data-subj="${s.id}" aria-pressed="${subj === s.id}">${mark(s)}${esc(s.name)}</button>`).join('') + `<button type="button" class="chip" data-subj-new>${icons.plus} Nouvelle</button>`;
     subjBox.querySelectorAll('.chip svg').forEach((x) => (x.style.cssText = 'width:16px;height:16px'));
   };
   drawSubjects();
@@ -697,7 +744,7 @@ async function openDetail(id) {
   const s = subject(h.subject);
   let confirmDel = false;
   const back = showSheet(`<div class="sheet-head"><h3>${esc(h.title)}</h3>${closeBtn}</div>
-    <p class="meta-line">${s ? `<span class="badge" style="${subjStyle(s)}"><i></i>${esc(s.name)}</span>` : ''}<span>${h.due ? `À rendre ${esc(fmt(h.due, { weekday: 'long', day: 'numeric', month: 'long' }))}` : 'Sans date'}</span>${h.done ? '<span style="color:var(--ok);font-weight:700">· Fait</span>' : h.due && daysLeft(h.due) < 0 ? '<span style="color:var(--late);font-weight:700">· En retard</span>' : ''}</p>
+    <p class="meta-line">${s ? `<span class="badge" style="${subjStyle(s)}">${mark(s, 22)}${esc(s.name)}</span>` : ''}<span>${h.due ? `À rendre ${esc(fmt(h.due, { weekday: 'long', day: 'numeric', month: 'long' }))}` : 'Sans date'}</span>${h.done ? '<span style="color:var(--ok);font-weight:700">· Fait</span>' : h.due && daysLeft(h.due) < 0 ? '<span style="color:var(--late);font-weight:700">· En retard</span>' : ''}</p>
     ${h.note ? `<div class="note-box">${esc(h.note)}</div>` : ''}
     ${(h.steps || []).length ? `<span class="label">Étapes <small id="steps-sum"></small></span><div class="list" id="steps-list"></div>` : ''}
     ${(h.files || []).length ? `<span class="label">Photos et fichiers</span><div class="files" id="files"></div>` : ''}
@@ -768,6 +815,7 @@ function icsOf(h) {
 function openSubject(id) {
   const cur = id ? subject(id) : null;
   let color = cur?.color || COLORS[db.subjects.length % COLORS.length];
+  let animal = cur ? animalOf(cur) : ANIMAL_KEYS[db.subjects.length % ANIMAL_KEYS.length];
   let confirmDel = false;
   const back = showSheet(`<div class="sheet-head"><h3>${cur ? 'Modifier la matière' : 'Nouvelle matière'}</h3>${closeBtn}</div>
     <form id="s-form">
@@ -775,14 +823,25 @@ function openSubject(id) {
       <input id="s-name" class="field" value="${esc(cur?.name || '')}" placeholder="ex. Maths" maxlength="40" autocomplete="off">
       <span class="label">Couleur</span>
       <div class="colors">${COLORS.map((c) => `<button type="button" class="color" style="--c:${c}" data-color="${c}" aria-label="Couleur" aria-pressed="${c === color}"></button>`).join('')}</div>
+      ${ANIMALS_ON ? '<span class="label">Animal</span><div class="animals" id="animals"></div>' : ''}
       <div class="actions"><button class="btn" type="submit">${cur ? 'Enregistrer' : 'Ajouter la matière'}</button>${cur ? '<button class="btn danger" type="button" data-del>Supprimer la matière</button>' : ''}</div>
     </form>`);
+  const drawAnimals = () => {
+    const box = back.querySelector('#animals');
+    if (box) box.innerHTML = ANIMAL_KEYS.map((k) => `<button type="button" class="animal-btn" data-animal="${k}" aria-pressed="${k === animal}" aria-label="${ANIMALS[k].name}">${animalSvg(k, color, 40)}<small>${ANIMALS[k].name}</small></button>`).join('');
+  };
+  drawAnimals();
   back.addEventListener('click', (e) => {
     const c = e.target.closest('[data-color]');
     if (c) {
       color = c.dataset.color;
       back.querySelectorAll('[data-color]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.color === color)));
-      return;
+      return drawAnimals();
+    }
+    const an = e.target.closest('[data-animal]');
+    if (an) {
+      animal = an.dataset.animal;
+      return drawAnimals();
     }
     const del = e.target.closest('[data-del]');
     if (del) {
@@ -804,8 +863,8 @@ function openSubject(id) {
     e.preventDefault();
     const name = back.querySelector('#s-name').value.trim();
     if (!name) return back.querySelector('#s-name').focus();
-    if (cur) Object.assign(cur, { name, color });
-    else db.subjects.push({ id: uid(), name, color });
+    if (cur) Object.assign(cur, { name, color, animal });
+    else db.subjects.push({ id: uid(), name, color, animal });
     save();
     closeSheet();
     render();
