@@ -183,6 +183,24 @@ svg { flex: 0 0 auto; }
 .sync.error { color: var(--soon); background: color-mix(in srgb, var(--soon) 10%, #fff); }
 .link-box { margin-top: 12px; background: var(--card); border: 1.5px solid var(--line); border-radius: 12px; padding: 12px; font: 14px/1.4 ui-monospace, Menlo, monospace; overflow-wrap: anywhere; user-select: all; }
 
+.dates { display: flex; flex-direction: column; gap: 2px; margin-top: 5px; font-size: 13.5px; color: var(--ink-2); }
+.dates .dl b { font-weight: 700; color: var(--ink); margin-right: 3px; }
+.dates em { font-style: normal; font-weight: 800; color: var(--accent); margin-left: 3px; }
+.dates em::before { content: "· "; color: var(--ink-3); font-weight: 600; }
+.dates em.soon { color: var(--soon); }
+.dates em.late { color: var(--late); }
+.dates.long { margin: 12px 0 0; gap: 8px; font-size: 16px; }
+.dates.long .dl { display: block; background: var(--card); border: 1.5px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+.dates.long .dl b { display: block; font-size: 13px; color: var(--ink-2); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 2px; }
+.dates.long .butoir { border-color: color-mix(in srgb, var(--late) 30%, transparent); }
+.date-block { display: flex; flex-direction: column; gap: 8px; background: var(--card); border: 1.5px solid var(--line); border-radius: var(--radius); padding: 12px; transition: opacity .15s ease-out; }
+.date-block.off { opacity: .45; }
+.sub-label { font-weight: 700; font-size: 15px; }
+.sub-label small { font-weight: 500; color: var(--ink-2); }
+.date-block .sub-label:not(:first-child) { margin-top: 8px; padding-top: 12px; border-top: 1px dashed var(--line); }
+.rel { font-weight: 800; color: var(--accent); font-size: 14px; }
+.rel:empty { display: none; }
+
 /* Matières */
 .subj-row { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-top: 1px solid var(--line); }
 .subj-row:first-child { border-top: 0; }
@@ -726,8 +744,8 @@ const app = document.getElementById('app');
 function render() {
   const todo = db.hw.filter((h) => !h.done);
   const done = db.hw.filter((h) => h.done);
-  const late = todo.filter((h) => h.due && daysLeft(h.due) < 0).length;
-  const today = todo.filter((h) => h.due && daysLeft(h.due) === 0).length;
+  const late = todo.filter((h) => limitDate(h) && daysLeft(limitDate(h)) < 0).length;
+  const today = todo.filter((h) => keyDate(h) && daysLeft(keyDate(h)) === 0).length;
   const sub = todo.length ? [late ? `${late} en retard` : '', today ? `${today} pour aujourd’hui` : '', `${todo.length} à faire`].filter(Boolean).join(' · ') : 'Rien à faire pour l’instant.';
   let html = `<header class="top"><div style="flex:1;min-width:0"><h1>Mes <mark>devoirs</mark></h1><p>${esc(sub)} ${syncHtml()}</p></div><button class="icon-btn" data-action="invite" aria-label="Inviter (PC, téléphone, une autre personne)" title="Inviter">${icons.invite}</button><button class="icon-btn" data-action="reload" aria-label="Recharger la page" title="Recharger">${icons.reload}</button></header>
     <div class="switch" role="group" aria-label="Affichage">
@@ -748,7 +766,32 @@ function render() {
 }
 
 // Le prof d'un devoir (parmi ceux de sa matière).
-const teacherOf = (h) => subject(h.subject)?.teachers?.find((t) => t.id === h.teacher) || null;
+// Les profs d'un devoir (plusieurs possibles, parmi ceux de sa matière).
+const teacherIds = (h) => h.teachers || (h.teacher ? [h.teacher] : []);
+const teachersOf = (h) => (subject(h.subject)?.teachers || []).filter((t) => teacherIds(h).includes(t.id));
+const profHtml = (h) => (teachersOf(h).length ? `<span class="prof">${icons.user}${esc(teachersOf(h).map((t) => t.name).join(', '))}</span>` : '');
+// Deux dates facultatives : la date de rendu possible et la date butoir (la limite).
+const keyDate = (h) => h.due || h.deadline || '';
+const limitDate = (h) => h.deadline || h.due || '';
+// « dans 3 jours », « dans 2 semaines », « dépassée depuis 1 jour »…
+function relText(d, limit) {
+  const n = daysLeft(d);
+  if (n === 0) return 'aujourd’hui';
+  if (n === 1) return 'demain';
+  if (n === -1) return limit ? 'dépassée depuis hier' : 'c’était hier';
+  if (n < 0) return limit ? `dépassée depuis ${-n} jours` : `il y a ${-n} jours`;
+  if (n < 14) return `dans ${n} jours`;
+  if (n < 60) return `dans ${Math.round(n / 7)} semaines`;
+  return `dans ${Math.round(n / 30)} mois`;
+}
+const shortDate = (d) => fmt(d, { weekday: 'short', day: 'numeric', month: 'short' }).replace(/\./g, '');
+function datesHtml(h, long) {
+  if (h.constant) return '';
+  const parts = [];
+  if (h.due) parts.push(`<span class="dl"><b>Rendu possible</b> ${esc(long ? fmt(h.due, { weekday: 'long', day: 'numeric', month: 'long' }) : shortDate(h.due))} <em class="${h.done ? '' : dueClass(h.due, false)}">${esc(relText(h.due))}</em></span>`);
+  if (h.deadline) parts.push(`<span class="dl butoir"><b>Date butoir</b> ${esc(long ? fmt(h.deadline, { weekday: 'long', day: 'numeric', month: 'long' }) : shortDate(h.deadline))} <em class="${h.done ? '' : dueClass(h.deadline, false)}">${esc(relText(h.deadline, true))}</em></span>`);
+  return parts.length ? `<span class="dates${long ? ' long' : ''}">${parts.join('')}</span>` : '';
+}
 const tabHtml = (todo, done) => (ui.tab === 'subjects' ? subjectsHtml() : ui.tab === 'done' ? doneHtml(done) : todoHtml(todo));
 const contentHtml = (todo, done) => (ui.q.trim() ? searchHtml() : tabHtml(todo, done));
 
@@ -756,7 +799,7 @@ const contentHtml = (todo, done) => (ui.q.trim() ? searchHtml() : tabHtml(todo, 
 const snorm = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 function searchHtml() {
   const words = snorm(ui.q).split(/\s+/).filter(Boolean);
-  const hay = (h) => snorm([h.constant ? 'constant' : '', h.title, subject(h.subject)?.name, teacherOf(h)?.name, h.note, h.grade, ...(h.steps || []).map((x) => x.text), ...(h.files || []).map((x) => x.name), ...(h.result || []).map((x) => x.name), h.due ? fmt(h.due, { day: 'numeric', month: 'long' }) : ''].join(' '));
+  const hay = (h) => snorm([h.constant ? 'constant' : '', h.title, subject(h.subject)?.name, ...teachersOf(h).map((t) => t.name), h.note, h.grade, ...(h.steps || []).map((x) => x.text), ...(h.files || []).map((x) => x.name), ...(h.result || []).map((x) => x.name), h.due ? fmt(h.due, { day: 'numeric', month: 'long' }) : '', h.deadline ? 'butoir ' + fmt(h.deadline, { day: 'numeric', month: 'long' }) : ''].join(' '));
   const hits = db.hw.filter((h) => words.every((w) => hay(h).includes(w)));
   if (!hits.length) return `<div class="empty"><b>Aucun travail trouvé</b>Rien ne correspond à « ${esc(ui.q.trim())} ».</div>`;
   const todo = hits.filter((h) => !h.done).sort(byDue);
@@ -773,12 +816,12 @@ function hwHtml(h) {
   return `<div class="hw${h.done ? ' done' : ''}" style="${subjStyle(s)}">
     ${h.constant ? `<span class="check loop" title="Constant : à faire en continu" aria-label="Constant : à faire en continu">${icons.loop}</span>` : `<button class="check" data-done="${h.id}" aria-label="${h.done ? 'Remettre à faire' : 'C’est fait'} : ${esc(h.title)}" aria-pressed="${!!h.done}">${icons.check}</button>`}
     <button class="hw-body" data-open="${h.id}"><span class="hw-title">${esc(h.title)}</span>
-      <span class="hw-meta">${s ? `<span class="subj">${ANIMALS_ON ? mark(s, 20) : ''}${esc(s.name)}</span>` : ''}${teacherOf(h) ? `<span class="prof">${icons.user}${esc(teacherOf(h).name)}</span>` : ''}${st.length ? `<span class="steps-count">${stDone}/${st.length} étapes</span>` : ''}${n ? `<span class="clip">${icons.clip}${n}</span>` : ''}${h.note ? '<span>note</span>' : ''}${h.grade ? `<span class="grade">${esc(h.grade)}</span>` : ''}</span>${(h.result || []).length ? `<span class="rpill"><b style="--fc:${fileKind(h.result[0]).c}">${esc(fileKind(h.result[0]).short)}</b><span>Rendu : ${esc(h.result[0].name)}${h.result.length > 1 ? ` +${h.result.length - 1}` : ''}</span></span>` : ''}${st.length ? `<span class="bar"><i style="width:${Math.round((100 * stDone) / st.length)}%"></i></span>` : ''}</button>
-    <span class="due ${h.constant && !h.done ? 'const' : dueClass(h.due, h.done)}">${esc(h.done ? 'Fait' : h.constant ? 'Constant' : dueText(h.due))}</span>
+      <span class="hw-meta">${s ? `<span class="subj">${ANIMALS_ON ? mark(s, 20) : ''}${esc(s.name)}</span>` : ''}${profHtml(h)}${st.length ? `<span class="steps-count">${stDone}/${st.length} étapes</span>` : ''}${n ? `<span class="clip">${icons.clip}${n}</span>` : ''}${h.note ? '<span>note</span>' : ''}${h.grade ? `<span class="grade">${esc(h.grade)}</span>` : ''}</span>${datesHtml(h)}${(h.result || []).length ? `<span class="rpill"><b style="--fc:${fileKind(h.result[0]).c}">${esc(fileKind(h.result[0]).short)}</b><span>Rendu : ${esc(h.result[0].name)}${h.result.length > 1 ? ` +${h.result.length - 1}` : ''}</span></span>` : ''}${st.length ? `<span class="bar"><i style="width:${Math.round((100 * stDone) / st.length)}%"></i></span>` : ''}</button>
+    ${h.done || h.constant || !keyDate(h) ? `<span class="due ${h.constant && !h.done ? 'const' : ''}">${esc(h.done ? 'Fait' : h.constant ? 'Constant' : 'Sans date')}</span>` : ''}
   </div>`;
 }
 
-const byDue = (a, b) => (a.due || '9999').localeCompare(b.due || '9999') || (a.createdAt || 0) - (b.createdAt || 0);
+const byDue = (a, b) => (keyDate(a) || '9999').localeCompare(keyDate(b) || '9999') || (a.createdAt || 0) - (b.createdAt || 0);
 
 function filterChips(list) {
   const used = db.subjects.filter((s) => list.some((h) => h.subject === s.id));
@@ -796,13 +839,13 @@ function todoHtml(todo) {
   const list = todo.filter((h) => ui.filter === 'all' || h.subject === ui.filter).sort(byDue);
   if (!list.length) return html + `<div class="empty"><b>Tout est fait</b>Bravo, il n’y a plus rien à faire.</div>`;
   const groups = [
-    ['late', 'En retard', (h) => h.due && daysLeft(h.due) < 0],
-    ['', 'Aujourd’hui', (h) => h.due && daysLeft(h.due) === 0],
-    ['', 'Demain', (h) => h.due && daysLeft(h.due) === 1],
-    ['', 'Cette semaine', (h) => h.due && daysLeft(h.due) > 1 && daysLeft(h.due) < 7],
-    ['', 'Plus tard', (h) => h.due && daysLeft(h.due) >= 7],
-    ['', 'Constant', (h) => !h.due && h.constant],
-    ['', 'Sans date', (h) => !h.due && !h.constant],
+    ['late', 'En retard', (h) => limitDate(h) && daysLeft(limitDate(h)) < 0],
+    ['', 'Aujourd’hui', (h) => keyDate(h) && daysLeft(limitDate(h)) >= 0 && daysLeft(keyDate(h)) <= 0],
+    ['', 'Demain', (h) => keyDate(h) && daysLeft(keyDate(h)) === 1],
+    ['', 'Cette semaine', (h) => keyDate(h) && daysLeft(keyDate(h)) > 1 && daysLeft(keyDate(h)) < 7],
+    ['', 'Plus tard', (h) => keyDate(h) && daysLeft(keyDate(h)) >= 7],
+    ['', 'Constant', (h) => !keyDate(h) && h.constant],
+    ['', 'Sans date', (h) => !keyDate(h) && !h.constant],
   ];
   for (const [cls, title, test] of groups) {
     const g = list.filter(test);
@@ -1145,9 +1188,10 @@ async function shareFile(file) {
 function openEditor(id) {
   const cur = id ? db.hw.find((x) => x.id === id) : null;
   let subj = cur?.subject ?? (ui.filter !== 'all' ? ui.filter : null);
-  let teacher = cur?.teacher || null;
+  let teachers = cur ? teacherIds(cur).slice() : [];
   let constant = !!cur?.constant;
-  let due = constant ? '' : cur?.due || iso(addDays(new Date(), 1));
+  let due = constant ? '' : cur?.due || '';
+  let deadline = constant ? '' : cur?.deadline || '';
   let files = (cur?.files || []).slice();
   let steps = (cur?.steps || []).map((x) => ({ ...x }));
   const added = []; // fichiers ajoutés dans cette feuille (à effacer si on annule)
@@ -1156,6 +1200,11 @@ function openEditor(id) {
     ['Après-demain', iso(addDays(new Date(), 2))],
     ['Dans 1 semaine', iso(addDays(new Date(), 7))],
   ];
+  const quickLimit = [
+    ['Dans 1 semaine', iso(addDays(new Date(), 7))],
+    ['Dans 2 semaines', iso(addDays(new Date(), 14))],
+    ['Dans 1 mois', iso(addDays(new Date(), 30))],
+  ];
   const back = showSheet(`<div class="sheet-head"><h3>${cur ? 'Modifier le devoir' : 'Nouveau devoir'}</h3>${closeBtn}</div>
     <form id="hw-form">
       <label class="label" for="hw-title">Qu’est-ce qu’il faut faire ?</label>
@@ -1163,10 +1212,18 @@ function openEditor(id) {
       <span class="label">Matière</span>
       <div class="row" id="subj-pick"></div>
       <div id="teacher-box"></div>
-      <span class="label">À rendre pour quand ?</span>
-      <div class="row">${quick.map(([l, d]) => `<button type="button" class="chip" data-due="${d}" aria-pressed="${!constant && due === d}">${l}</button>`).join('')}
-        <button type="button" class="chip" data-constant aria-pressed="${constant}">${icons.loop} Constant</button>
-        <input type="date" class="field" id="hw-due" value="${due}" aria-label="Choisir la date"></div>
+      <span class="label">Dates <small>(facultatif)</small></span>
+      <div class="date-block" id="dates-box">
+        <span class="sub-label">Date de rendu possible</span>
+        <div class="row">${quick.map(([l, d]) => `<button type="button" class="chip" data-due="${d}" aria-pressed="${due === d}">${l}</button>`).join('')}
+          <input type="date" class="field" id="hw-due" value="${due}" aria-label="Date de rendu possible"><button type="button" class="chip" data-clear-date="due">Aucune</button></div>
+        <span class="rel" id="due-rel"></span>
+        <span class="sub-label">Date butoir <small>(la limite)</small></span>
+        <div class="row">${quickLimit.map(([l, d]) => `<button type="button" class="chip" data-limit="${d}" aria-pressed="${deadline === d}">${l}</button>`).join('')}
+          <input type="date" class="field" id="hw-limit" value="${deadline}" aria-label="Date butoir"><button type="button" class="chip" data-clear-date="limit">Aucune</button></div>
+        <span class="rel" id="limit-rel"></span>
+      </div>
+      <div class="row" style="margin-top:12px"><button type="button" class="chip" data-constant aria-pressed="${constant}">${icons.loop} Constant (sans date, à faire en continu)</button></div>
       <p class="hint" id="constant-hint"${constant ? '' : ' hidden'}>Constant : un travail à faire en continu, sans date de rendu.</p>
       <label class="label" for="hw-note">Note <small>(facultatif)</small></label>
       <textarea id="hw-note" class="field" placeholder="Détails, ce qu’il faut apprendre…">${esc(cur?.note || '')}</textarea>
@@ -1187,22 +1244,33 @@ function openEditor(id) {
     subjBox.querySelectorAll('.chip svg').forEach((x) => (x.style.cssText = 'width:16px;height:16px'));
     // Les profs de la matière choisie ; un seul prof : il est choisi tout seul.
     const ts = subject(subj)?.teachers || [];
-    if (teacher && !ts.some((t) => t.id === teacher)) teacher = null;
-    if (!teacher && ts.length === 1 && !cur) teacher = ts[0].id;
+    teachers = teachers.filter((id) => ts.some((t) => t.id === id));
+    if (!teachers.length && ts.length === 1 && !cur) teachers = [ts[0].id];
     back.querySelector('#teacher-box').innerHTML = subj
-      ? `<span class="label">Prof</span><div class="row">${ts.map((t) => `<button type="button" class="chip" data-teacher="${t.id}" aria-pressed="${teacher === t.id}">${icons.user}${esc(t.name)}</button>`).join('')}<button type="button" class="chip" data-teacher-new>${icons.plus} ${ts.length ? 'Autre prof' : 'Ajouter le prof'}</button></div>`
+      ? `<span class="label">Prof <small>(un ou plusieurs)</small></span><div class="row">${ts.map((t) => `<button type="button" class="chip" data-teacher="${t.id}" aria-pressed="${teachers.includes(t.id)}">${icons.user}${esc(t.name)}</button>`).join('')}<button type="button" class="chip" data-teacher-new>${icons.plus} ${ts.length ? 'Autre prof' : 'Ajouter le prof'}</button></div>`
       : '';
   };
   drawSubjects();
   const dueIn = back.querySelector('#hw-due');
+  const limitIn = back.querySelector('#hw-limit');
   const syncDue = () => {
     back.querySelectorAll('[data-due]').forEach((c) => c.setAttribute('aria-pressed', String(!constant && c.dataset.due === due)));
+    back.querySelectorAll('[data-limit]').forEach((c) => c.setAttribute('aria-pressed', String(!constant && c.dataset.limit === deadline)));
     back.querySelector('[data-constant]').setAttribute('aria-pressed', String(constant));
     back.querySelector('#constant-hint').hidden = !constant;
+    back.querySelector('#dates-box').classList.toggle('off', constant);
+    back.querySelector('#due-rel').textContent = due ? `→ ${relText(due)}` : '';
+    back.querySelector('#limit-rel').textContent = deadline ? `→ ${relText(deadline, true)}` : '';
   };
+  syncDue();
   dueIn.addEventListener('change', () => {
     due = dueIn.value;
     if (due) constant = false;
+    syncDue();
+  });
+  limitIn.addEventListener('change', () => {
+    deadline = limitIn.value;
+    if (deadline) constant = false;
     syncDue();
   });
   const drawSteps = () => {
@@ -1256,7 +1324,7 @@ function openEditor(id) {
     const s = e.target.closest('[data-subj]');
     if (s) {
       subj = subj === s.dataset.subj ? null : s.dataset.subj;
-      teacher = null;
+      teachers = [];
       return drawSubjects();
     }
     if (e.target.closest('[data-subj-new]')) {
@@ -1270,7 +1338,8 @@ function openEditor(id) {
     }
     const tc = e.target.closest('[data-teacher]');
     if (tc) {
-      teacher = teacher === tc.dataset.teacher ? null : tc.dataset.teacher;
+      const tid = tc.dataset.teacher;
+      teachers = teachers.includes(tid) ? teachers.filter((x) => x !== tid) : [...teachers, tid];
       return drawSubjects();
     }
     if (e.target.closest('[data-teacher-new]')) {
@@ -1280,21 +1349,34 @@ function openEditor(id) {
       const t = { id: uid(), name: name.slice(0, 60) };
       sb.teachers = [...(sb.teachers || []), t];
       save();
-      teacher = t.id;
+      teachers = [...teachers, t.id];
       return drawSubjects();
     }
     const q = e.target.closest('[data-due]');
     if (q) {
-      due = q.dataset.due;
+      due = due === q.dataset.due ? '' : q.dataset.due;
       dueIn.value = due;
       constant = false;
+      return syncDue();
+    }
+    const ql = e.target.closest('[data-limit]');
+    if (ql) {
+      deadline = deadline === ql.dataset.limit ? '' : ql.dataset.limit;
+      limitIn.value = deadline;
+      constant = false;
+      return syncDue();
+    }
+    const cd = e.target.closest('[data-clear-date]');
+    if (cd) {
+      if (cd.dataset.clearDate === 'due') due = dueIn.value = '';
+      else deadline = limitIn.value = '';
       return syncDue();
     }
     if (e.target.closest('[data-constant]')) {
       constant = !constant;
       if (constant) {
-        due = '';
-        dueIn.value = '';
+        due = dueIn.value = '';
+        deadline = limitIn.value = '';
       }
       return syncDue();
     }
@@ -1327,7 +1409,7 @@ function openEditor(id) {
       back.querySelector('#hw-title').focus();
       return toast('Écris ce qu’il faut faire.');
     }
-    const data = { title, subject: subj || null, teacher: subj ? teacher : null, due: constant ? '' : dueIn.value || '', constant: constant && !dueIn.value, note: back.querySelector('#hw-note').value.trim(), files, steps };
+    const data = { title, subject: subj || null, teachers: subj ? teachers : [], teacher: null, due: constant ? '' : dueIn.value || '', deadline: constant ? '' : limitIn.value || '', constant: constant && !dueIn.value && !limitIn.value, note: back.querySelector('#hw-note').value.trim(), files, steps };
     if (stepIn.value.trim()) data.steps.push({ id: uid(), text: stepIn.value.trim(), done: false });
     if (data.constant) Object.assign(data, { done: false, doneAt: null });
     if (cur) {
@@ -1339,7 +1421,7 @@ function openEditor(id) {
     closeSheet();
     ui.tab = 'todo';
     render();
-    toast(cur ? 'Modifié !' : data.constant ? 'Ajouté en constant !' : `Ajouté pour ${dueText(data.due).toLowerCase()} !`);
+    toast(cur ? 'Modifié !' : data.constant ? 'Ajouté en constant !' : limitDate(data) ? `Ajouté : ${relText(limitDate(data), !!data.deadline)} !` : 'Ajouté !');
   });
   if (!cur) setTimeout(() => back.querySelector('#hw-title').focus(), 80);
 }
@@ -1350,7 +1432,8 @@ async function openDetail(id) {
   const s = subject(h.subject);
   let confirmDel = false;
   const back = showSheet(`<div class="sheet-head"><h3>${esc(h.title)}</h3>${closeBtn}</div>
-    <p class="meta-line">${s ? `<span class="badge" style="${subjStyle(s)}">${mark(s, 22)}${esc(s.name)}</span>` : ''}${teacherOf(h) ? `<span class="prof">${icons.user}${esc(teacherOf(h).name)}</span>` : ''}<span>${h.due ? `À rendre ${esc(fmt(h.due, { weekday: 'long', day: 'numeric', month: 'long' }))}` : h.constant ? 'Constant : à faire en continu' : 'Sans date'}</span>${h.done ? '<span style="color:var(--ok);font-weight:700">· Fait</span>' : h.due && daysLeft(h.due) < 0 ? '<span style="color:var(--late);font-weight:700">· En retard</span>' : ''}</p>
+    <p class="meta-line">${s ? `<span class="badge" style="${subjStyle(s)}">${mark(s, 22)}${esc(s.name)}</span>` : ''}${profHtml(h)}${h.constant ? '<span>Constant : à faire en continu</span>' : keyDate(h) ? '' : '<span>Sans date</span>'}${h.done ? '<span style="color:var(--ok);font-weight:700">· Fait</span>' : limitDate(h) && daysLeft(limitDate(h)) < 0 ? '<span style="color:var(--late);font-weight:700">· En retard</span>' : ''}</p>
+    ${datesHtml(h, true)}
     ${h.note ? `<div class="note-box">${esc(h.note)}</div>` : ''}
     ${(h.steps || []).length ? `<span class="label">Étapes <small id="steps-sum"></small></span><div class="list" id="steps-list"></div>` : ''}
     ${h.done ? '<div id="rendu-slot"></div>' : ''}
@@ -1367,11 +1450,11 @@ async function openDetail(id) {
     </section>
     <div class="actions">
       ${h.constant ? '<p class="const-note">' + icons.loop + '<span>Travail constant : il se fait en continu, il reste toujours dans ta liste.</span></p>' : `<button class="btn ${h.done ? 'ghost' : 'ok'}" data-toggle>${h.done ? 'Remettre à faire' : `${icons.check} C’est fait !`}</button>`}
-      ${!h.done && h.due && daysLeft(h.due) >= 1 ? `<button class="btn ghost" data-remind>${icons.cal} Rappel dans mon agenda</button>` : ''}
+      ${!h.done && limitDate(h) && daysLeft(limitDate(h)) >= 1 ? `<button class="btn ghost" data-remind>${icons.cal} Rappel dans mon agenda</button>` : ''}
       <button class="btn ghost" data-edit>${icons.edit} Modifier</button>
       <button class="btn danger" data-del>Supprimer</button>
     </div>
-    ${!h.done && h.due && daysLeft(h.due) >= 1 ? '<p class="hint">Le rappel te prévient la veille à 18 h.</p>' : ''}`);
+    ${!h.done && limitDate(h) && daysLeft(limitDate(h)) >= 1 ? `<p class="hint">Le rappel te prévient la veille à 18 h${h.deadline ? ' (de la date butoir)' : ''}.</p>` : ''}`);
   const drawChecks = () => {
     const box = back.querySelector('#steps-list');
     if (!box) return;
@@ -1485,8 +1568,9 @@ async function openDetail(id) {
 // Rappel : un événement le jour du rendu, avec une alerte la veille à 18 h.
 function icsOf(h) {
   const t = (s) => String(s || '').replace(/[\\;,]/g, (c) => '\\' + c).replace(/\n/g, '\\n');
-  const d = h.due.replace(/-/g, '');
-  const next = iso(addDays(parseIso(h.due), 1)).replace(/-/g, '');
+  const day = limitDate(h);
+  const d = day.replace(/-/g, '');
+  const next = iso(addDays(parseIso(day), 1)).replace(/-/g, '');
   const s = subject(h.subject);
   return ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Mes devoirs//FR', 'BEGIN:VEVENT', `UID:devoir-${h.id}@mes-devoirs`, `DTSTAMP:${new Date().toISOString().replace(/[-:]/g, '').slice(0, 15)}Z`,
     `DTSTART;VALUE=DATE:${d}`, `DTEND;VALUE=DATE:${next}`, `SUMMARY:${t(`Devoir${s ? ' de ' + s.name : ''} : ${h.title}`)}`, h.note ? `DESCRIPTION:${t(h.note)}` : '',
@@ -1577,7 +1661,11 @@ function openSubject(id) {
     if (tIn.value.trim()) teachers.push({ id: uid(), name: tIn.value.trim() });
     if (cur) {
       Object.assign(cur, { name, color, animal, teachers });
-      db.hw.forEach((h) => h.subject === cur.id && h.teacher && !teachers.some((t) => t.id === h.teacher) && (h.teacher = null));
+      db.hw.forEach((h) => {
+        if (h.subject !== cur.id) return;
+        const keep = teacherIds(h).filter((id) => teachers.some((t) => t.id === id));
+        if (keep.length !== teacherIds(h).length) Object.assign(h, { teachers: keep, teacher: null });
+      });
     } else db.subjects.push({ id: uid(), name, color, animal, teachers });
     save();
     closeSheet();
