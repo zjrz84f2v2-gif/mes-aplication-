@@ -109,9 +109,11 @@ svg { flex: 0 0 auto; }
 .animal { flex: 0 0 auto; display: block; }
 .chip .animal { width: 22px; height: 22px; margin-left: -4px; }
 .hw-meta .subj .animal { margin-right: 1px; }
-.animals { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.animals { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
 .animal-btn { border: 1.5px solid var(--line); background: var(--card); border-radius: 14px; padding: 8px 4px 6px; display: flex; flex-direction: column; align-items: center; gap: 4px; }
-.animal-btn small { font-size: 12px; font-weight: 700; color: var(--ink-2); }
+.animal-btn { position: relative; }
+.animal-btn small { font-size: 12px; font-weight: 700; color: var(--ink-2); text-align: center; line-height: 1.15; }
+.animal-btn .star { position: absolute; top: -8px; right: -4px; font-style: normal; font-size: 11px; font-weight: 800; background: var(--accent); color: #fff; border-radius: 999px; padding: 2px 7px; }
 .animal-btn[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
 
 /* Version DDT : tout en rose. */
@@ -279,23 +281,61 @@ const dueClass = (s, done) => (done || !s ? '' : daysLeft(s) < 0 ? 'late' : days
 const subject = (id) => db.subjects.find((x) => x.id === id) || null;
 // Texte lisible sur fond clair, dans la couleur de la matière.
 const inkOf = (c) => `color-mix(in srgb, ${c} 82%, #000)`;
-// ---------- Animaux (version DDT) : chaque matière a son petit animal ----------
+// ---------- Chiens (version DDT) : chaque matière a son chien, dans ses vraies couleurs ----------
 const ANIMALS_ON = document.documentElement.dataset.theme === 'ddt';
-const EYES = (y = 17, dx = 4.2) => `<circle cx="${16 - dx}" cy="${y}" r="1.6" fill="#2B1B24"/><circle cx="${16 + dx}" cy="${y}" r="1.6" fill="#2B1B24"/>`;
-const ANIMALS = {
-  chat: { name: 'Chat', svg: (c) => `<path d="M6 9 L9.5 3.5 L13 8.5 M26 9 L22.5 3.5 L19 8.5" fill="${c}" stroke="${c}" stroke-width="2" stroke-linejoin="round"/><circle cx="16" cy="17.5" r="10.5" fill="${c}"/>${EYES(16.5)}<path d="M14.6 20.2 h2.8 l-1.4 1.6z" fill="#F7A1BC"/><path d="M8 20h4M8 22.2l4-.8M24 20h-4M24 22.2l-4-.8" stroke="#fff" stroke-width=".9" stroke-linecap="round" opacity=".9"/>` },
-  lapin: { name: 'Lapin', svg: (c) => `<ellipse cx="11.5" cy="7.5" rx="3" ry="7" fill="${c}"/><ellipse cx="20.5" cy="7.5" rx="3" ry="7" fill="${c}"/><ellipse cx="11.5" cy="8" rx="1.4" ry="4.6" fill="#F7C6D6"/><ellipse cx="20.5" cy="8" rx="1.4" ry="4.6" fill="#F7C6D6"/><circle cx="16" cy="19.5" r="9.5" fill="${c}"/>${EYES(18.5, 3.8)}<ellipse cx="16" cy="22" rx="1.5" ry="1.1" fill="#F7A1BC"/>` },
-  renard: { name: 'Renard', svg: (c) => `<path d="M5 6 L11 10 L6 16 Z M27 6 L21 10 L26 16 Z" fill="${c}"/><path d="M5 11 Q16 6 27 11 Q25 24 16 28 Q7 24 5 11Z" fill="${c}"/><path d="M8.5 17 Q12 18 16 28 Q20 18 23.5 17 Q20 23 16 28 Q12 23 8.5 17Z" fill="#FFF4F2"/>${EYES(15.5, 4.5)}<circle cx="16" cy="25" r="1.4" fill="#2B1B24"/>` },
-  ours: { name: 'Ours', svg: (c) => `<circle cx="8" cy="9" r="4.2" fill="${c}"/><circle cx="24" cy="9" r="4.2" fill="${c}"/><circle cx="16" cy="18" r="11" fill="${c}"/>${EYES(16)}<ellipse cx="16" cy="22" rx="4.6" ry="3.5" fill="#FFF1E8"/><ellipse cx="16" cy="20.8" rx="1.7" ry="1.2" fill="#2B1B24"/>` },
-  panda: { name: 'Panda', svg: (c) => `<circle cx="8" cy="9" r="4.2" fill="${c}"/><circle cx="24" cy="9" r="4.2" fill="${c}"/><circle cx="16" cy="18" r="11" fill="#FFFDFB" stroke="${c}" stroke-width="1.4"/><ellipse cx="11.5" cy="17" rx="3" ry="3.8" fill="${c}" transform="rotate(-20 11.5 17)"/><ellipse cx="20.5" cy="17" rx="3" ry="3.8" fill="${c}" transform="rotate(20 20.5 17)"/><circle cx="11.8" cy="16.8" r="1.2" fill="#fff"/><circle cx="20.2" cy="16.8" r="1.2" fill="#fff"/><ellipse cx="16" cy="22.3" rx="1.7" ry="1.2" fill="#2B1B24"/>` },
-  hibou: { name: 'Hibou', svg: (c) => `<path d="M6 8 L10 11 M26 8 L22 11" stroke="${c}" stroke-width="2.4" stroke-linecap="round"/><path d="M6 12 Q6 6 16 7 Q26 6 26 12 V22 Q26 29 16 29 Q6 29 6 22Z" fill="${c}"/><circle cx="11.5" cy="15" r="4.3" fill="#FFF8F2"/><circle cx="20.5" cy="15" r="4.3" fill="#FFF8F2"/><circle cx="11.5" cy="15.2" r="2" fill="#2B1B24"/><circle cx="20.5" cy="15.2" r="2" fill="#2B1B24"/><path d="M14.5 19 h3 l-1.5 2.6z" fill="#F4B24A"/><path d="M11 24 q5 3 10 0" stroke="#FFF8F2" stroke-width="1.2" fill="none" opacity=".7"/>` },
-  grenouille: { name: 'Grenouille', svg: (c) => `<circle cx="10" cy="10" r="4.8" fill="${c}"/><circle cx="22" cy="10" r="4.8" fill="${c}"/><ellipse cx="16" cy="19" rx="12" ry="9" fill="${c}"/><circle cx="10" cy="9.6" r="2.6" fill="#fff"/><circle cx="22" cy="9.6" r="2.6" fill="#fff"/><circle cx="10" cy="9.8" r="1.4" fill="#2B1B24"/><circle cx="22" cy="9.8" r="1.4" fill="#2B1B24"/><path d="M9 20 Q16 26 23 20" stroke="#2B1B24" stroke-width="1.4" fill="none" stroke-linecap="round"/><circle cx="7.5" cy="18.5" r="1.6" fill="#F7A1BC" opacity=".8"/><circle cx="24.5" cy="18.5" r="1.6" fill="#F7A1BC" opacity=".8"/>` },
-  cochon: { name: 'Cochon', svg: (c) => `<path d="M6 9 L8 4.5 L12.5 7.5 M26 9 L24 4.5 L19.5 7.5" fill="${c}" stroke="${c}" stroke-width="2" stroke-linejoin="round"/><circle cx="16" cy="17.5" r="10.5" fill="${c}"/>${EYES(15)}<ellipse cx="16" cy="21" rx="4.6" ry="3.4" fill="#FFFFFF" opacity=".55"/><ellipse cx="14.4" cy="21" rx=".9" ry="1.3" fill="#2B1B24"/><ellipse cx="17.6" cy="21" rx=".9" ry="1.3" fill="#2B1B24"/>` },
+// Une tête de chien de face, avec du volume (dégradés), des yeux brillants et une truffe luisante.
+function dogSvg(k, d) {
+  const id = 'dg-' + k;
+  const ears = {
+    flop: `<path d="M13 22 C4 24 3 40 8 47 C12 51 17 46 18 38 C19 31 19 25 13 22Z" fill="url(#${id}e)"/><path d="M51 22 C60 24 61 40 56 47 C52 51 47 46 46 38 C45 31 45 25 51 22Z" fill="url(#${id}e)"/>`,
+    long: `<path d="M14 21 C3 24 2 46 8 55 C12 60 18 54 19 44 C20 33 20 25 14 21Z" fill="url(#${id}e)"/><path d="M50 21 C61 24 62 46 56 55 C52 60 46 54 45 44 C44 33 44 25 50 21Z" fill="url(#${id}e)"/>`,
+    prick: `<path d="M12 27 L15 6 C17 3 20 4 22 7 L29 19Z" fill="url(#${id}e)"/><path d="M52 27 L49 6 C47 3 44 4 42 7 L35 19Z" fill="url(#${id}e)"/><path d="M16 20 L17.5 10 L24 18Z M48 20 L46.5 10 L40 18Z" fill="${d.inner || '#E8B8A8'}" opacity=".8"/>`,
+    bat: `<path d="M11 28 C6 18 7 6 13 4 C19 3 25 12 27 20Z" fill="url(#${id}e)"/><path d="M53 28 C58 18 57 6 51 4 C45 3 39 12 37 20Z" fill="url(#${id}e)"/><path d="M13 21 C11 15 12 9 14.5 8 C17.5 8 21 13 22.5 18Z M51 21 C53 15 52 9 49.5 8 C46.5 8 43 13 41.5 18Z" fill="${d.inner || '#E3A99A'}" opacity=".85"/>`,
+    fold: `<path d="M14 18 C9 16 6 20 8 26 C10 31 15 31 19 26 C21 22 19 19 14 18Z" fill="url(#${id}e)"/><path d="M50 18 C55 16 58 20 56 26 C54 31 49 31 45 26 C43 22 45 19 50 18Z" fill="url(#${id}e)"/>`,
+  }[d.ear];
+  const snoutY = d.long ? 47 : 45;
+  return `<defs>
+    <radialGradient id="${id}h" cx=".42" cy=".35" r=".75"><stop offset="0" stop-color="${d.light}"/><stop offset=".65" stop-color="${d.fur}"/><stop offset="1" stop-color="${d.dark}"/></radialGradient>
+    <linearGradient id="${id}e" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${d.earLight || d.fur}"/><stop offset="1" stop-color="${d.earDark || d.dark}"/></linearGradient>
+    <radialGradient id="${id}m" cx=".5" cy=".3" r=".8"><stop offset="0" stop-color="${d.muzzleLight || d.muzzle}"/><stop offset="1" stop-color="${d.muzzle}"/></radialGradient>
+  </defs>
+  ${d.ear !== 'prick' && d.ear !== 'bat' ? ears : ''}
+  <ellipse cx="32" cy="34" rx="${d.wide ? 21 : 19.5}" ry="${d.long ? 19 : 18.5}" fill="url(#${id}h)"/>
+  ${d.ear === 'prick' || d.ear === 'bat' ? ears : ''}
+  ${d.extra || ''}
+  <ellipse cx="32" cy="${snoutY}" rx="${d.wide ? 12.5 : 11}" ry="${d.long ? 9.5 : 8.5}" fill="url(#${id}m)"/>
+  <path d="M24.5 30.2 Q27 28.3 29.2 30.4 M34.8 30.4 Q37 28.3 39.5 30.2" stroke="${d.brow || d.dark}" stroke-width="1.4" fill="none" stroke-linecap="round" opacity=".7"/>
+  <ellipse cx="26.6" cy="33" rx="2.7" ry="2.9" fill="${d.eye || '#2A1A10'}"/><ellipse cx="37.4" cy="33" rx="2.7" ry="2.9" fill="${d.eye || '#2A1A10'}"/>
+  ${d.eye && d.eye !== '#2A1A10' ? '<circle cx="26.6" cy="33.2" r="1.3" fill="#10141c"/><circle cx="37.4" cy="33.2" r="1.3" fill="#10141c"/>' : ''}
+  <circle cx="27.6" cy="32" r=".95" fill="#fff"/><circle cx="38.4" cy="32" r=".95" fill="#fff"/>
+  <path d="M27.3 ${snoutY - 6.5} Q32 ${snoutY - 8.8} 36.7 ${snoutY - 6.5} Q37.4 ${snoutY - 3.2} 32 ${snoutY - 1.6} Q26.6 ${snoutY - 3.2} 27.3 ${snoutY - 6.5}Z" fill="${d.nose || '#1E1512'}"/>
+  <ellipse cx="30.3" cy="${snoutY - 6.2}" rx="1.6" ry=".8" fill="#fff" opacity=".45"/>
+  <path d="M32 ${snoutY - 1.6} V${snoutY + 1.6} M32 ${snoutY + 1.6} Q29 ${snoutY + 4.2} 26.5 ${snoutY + 2.2} M32 ${snoutY + 1.6} Q35 ${snoutY + 4.2} 37.5 ${snoutY + 2.2}" stroke="${d.mouth || '#3A2418'}" stroke-width="1.1" fill="none" stroke-linecap="round"/>
+  ${d.tongue ? `<path d="M29.8 ${snoutY + 3.4} Q32 ${snoutY + 8.5} 34.2 ${snoutY + 3.4}Z" fill="#E77A8C"/>` : ''}`;
+}
+const DOGS = {
+  labrador_chocolat: { name: 'Labrador chocolat', star: true, ear: 'flop', fur: '#6B3E26', light: '#8E5A3B', dark: '#4A2716', earDark: '#3F2112', muzzle: '#7A4A30', muzzleLight: '#8F5C3E', nose: '#3B2218', eye: '#C4842F', brow: '#2E170C', tongue: true },
+  labrador_sable: { name: 'Labrador sable', ear: 'flop', fur: '#E2BE86', light: '#F1D6A8', dark: '#C79A5E', earDark: '#B98A50', muzzle: '#EBCB97', muzzleLight: '#F6E2BF', tongue: true },
+  labrador_noir: { name: 'Labrador noir', ear: 'flop', fur: '#2B2725', light: '#4A4440', dark: '#151312', earDark: '#0F0D0C', muzzle: '#35302D', muzzleLight: '#48413C', nose: '#0B0908', eye: '#9A6430', brow: '#000', mouth: '#000' },
+  golden: { name: 'Golden retriever', ear: 'flop', fur: '#D49A4E', light: '#E8BA74', dark: '#AE7330', earLight: '#C98B3F', earDark: '#9C6224', muzzle: '#E3B26E', muzzleLight: '#F0CD95', tongue: true },
+  berger: { name: 'Berger allemand', ear: 'prick', fur: '#C88A48', light: '#DDA466', dark: '#9C6327', earLight: '#3A2A1E', earDark: '#1E1610', muzzle: '#2A1F18', muzzleLight: '#4A372A', inner: '#B07A60', long: true,
+    extra: '<path d="M14 26 C18 15 26 12 32 13 C38 12 46 15 50 26 C44 21 38 20 32 22 C26 20 20 21 14 26Z" fill="#2A2019" opacity=".85"/>' },
+  husky: { name: 'Husky', ear: 'prick', fur: '#F2F2F0', light: '#FFFFFF', dark: '#C9CDD2', earLight: '#5A6068', earDark: '#363B42', muzzle: '#F6F6F4', muzzleLight: '#FFFFFF', eye: '#6FB4E6', inner: '#E9C7C2',
+    extra: '<path d="M13 30 C14 18 22 14 32 14 C42 14 50 18 51 30 C47 26 42 25 38.5 27.5 C36 25 34 24 32 26 C30 24 28 25 25.5 27.5 C22 25 17 26 13 30Z" fill="#4E555E"/><path d="M30 14.5 L32 24 L34 14.5Z" fill="#F6F6F4"/>' },
+  border_collie: { name: 'Border collie', ear: 'fold', fur: '#1F1C1B', light: '#3A3533', dark: '#0E0C0B', earDark: '#0A0908', muzzle: '#F4F1EC', muzzleLight: '#FFFFFF', eye: '#6B4423', brow: '#000',
+    extra: '<path d="M29.5 15 C31 15 33 15 34.5 15 L36 26 Q38 33 43 40 L21 40 Q26 33 28 26Z" fill="#F4F1EC"/>' },
+  beagle: { name: 'Beagle', ear: 'long', fur: '#C17A3A', light: '#D8955A', dark: '#9A5A24', earLight: '#8A4E22', earDark: '#5E3214', muzzle: '#F5EFE6', muzzleLight: '#FFFFFF',
+    extra: '<path d="M30 16 C31.3 16 32.7 16 34 16 L35 28 Q37 34 40 38 L24 38 Q27 34 29 28Z" fill="#F5EFE6"/>' },
+  bouledogue: { name: 'Bouledogue français', ear: 'bat', wide: true, fur: '#D9B07C', light: '#EACAA0', dark: '#B88A55', earDark: '#A87A48', muzzle: '#4A3A30', muzzleLight: '#6A5444', inner: '#D49C8E' },
+  teckel: { name: 'Teckel', ear: 'long', long: true, fur: '#A8552A', light: '#C46E3E', dark: '#7E3A18', earLight: '#94461F', earDark: '#5E2810', muzzle: '#B0602F', muzzleLight: '#C67646' },
+  shiba: { name: 'Shiba inu', ear: 'prick', fur: '#D9823C', light: '#E99B57', dark: '#B5621F', earLight: '#D07A35', earDark: '#A85A1C', muzzle: '#FBF1E4', muzzleLight: '#FFFFFF', inner: '#F3DCC8',
+    extra: '<ellipse cx="21" cy="40" rx="6.5" ry="5" fill="#FBF1E4"/><ellipse cx="43" cy="40" rx="6.5" ry="5" fill="#FBF1E4"/><ellipse cx="26" cy="28" rx="2.4" ry="1.4" fill="#FBF1E4" opacity=".9"/><ellipse cx="38" cy="28" rx="2.4" ry="1.4" fill="#FBF1E4" opacity=".9"/>' },
 };
-const ANIMAL_KEYS = Object.keys(ANIMALS);
-const animalOf = (s) => (ANIMALS[s.animal] ? s.animal : ANIMAL_KEYS[Math.max(0, db.subjects.indexOf(s)) % ANIMAL_KEYS.length]);
-const animalSvg = (key, color, size) => `<svg class="animal" viewBox="0 0 32 32" width="${size}" height="${size}" aria-hidden="true">${ANIMALS[key].svg(color)}</svg>`;
-// Le petit repère d'une matière : un point de couleur, ou son animal dans la version DDT.
+const ANIMALS = DOGS;
+const ANIMAL_KEYS = Object.keys(DOGS);
+const animalOf = (s) => (DOGS[s.animal] ? s.animal : ANIMAL_KEYS[Math.max(0, db.subjects.indexOf(s)) % ANIMAL_KEYS.length]);
+const animalSvg = (key, color, size) => `<svg class="animal" viewBox="0 0 64 64" width="${size}" height="${size}" aria-hidden="true">${dogSvg(key, DOGS[key])}</svg>`;
+// Le petit repère d'une matière : un point de couleur, ou son chien dans la version DDT.
 const mark = (s, size = 20) => (ANIMALS_ON && s ? animalSvg(animalOf(s), s.color, size) : '<i></i>');
 const subjStyle = (s) => (s ? `--c:${s.color};--c2:${inkOf(s.color)}` : '--c:#C9CCD8;--c2:var(--ink-2)');
 
@@ -823,12 +863,12 @@ function openSubject(id) {
       <input id="s-name" class="field" value="${esc(cur?.name || '')}" placeholder="ex. Maths" maxlength="40" autocomplete="off">
       <span class="label">Couleur</span>
       <div class="colors">${COLORS.map((c) => `<button type="button" class="color" style="--c:${c}" data-color="${c}" aria-label="Couleur" aria-pressed="${c === color}"></button>`).join('')}</div>
-      ${ANIMALS_ON ? '<span class="label">Animal</span><div class="animals" id="animals"></div>' : ''}
+      ${ANIMALS_ON ? '<span class="label">Chien</span><div class="animals" id="animals"></div>' : ''}
       <div class="actions"><button class="btn" type="submit">${cur ? 'Enregistrer' : 'Ajouter la matière'}</button>${cur ? '<button class="btn danger" type="button" data-del>Supprimer la matière</button>' : ''}</div>
     </form>`);
   const drawAnimals = () => {
     const box = back.querySelector('#animals');
-    if (box) box.innerHTML = ANIMAL_KEYS.map((k) => `<button type="button" class="animal-btn" data-animal="${k}" aria-pressed="${k === animal}" aria-label="${ANIMALS[k].name}">${animalSvg(k, color, 40)}<small>${ANIMALS[k].name}</small></button>`).join('');
+    if (box) box.innerHTML = ANIMAL_KEYS.map((k) => `<button type="button" class="animal-btn" data-animal="${k}" aria-pressed="${k === animal}" aria-label="${ANIMALS[k].name}">${animalSvg(k, color, 40)}<small>${ANIMALS[k].name}</small>${ANIMALS[k].star ? '<em class="star">La star</em>' : ''}</button>`).join('');
   };
   drawAnimals();
   back.addEventListener('click', (e) => {
