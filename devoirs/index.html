@@ -67,6 +67,15 @@ svg { flex: 0 0 auto; }
 .chip svg { width: 16px; height: 16px; }
 .chip[aria-pressed="true"] i { box-shadow: 0 0 0 2px var(--paper); }
 
+/* Recherche */
+.search-wrap { position: relative; margin-top: 14px; }
+.search-wrap .s-ico { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); width: 20px; height: 20px; color: var(--ink-3); pointer-events: none; }
+.search { width: 100%; min-height: 50px; border: 1.5px solid var(--line); background: var(--card); border-radius: 14px; padding: 10px 46px 10px 44px; font-size: 17px; -webkit-appearance: none; appearance: none; }
+.search::placeholder { color: var(--ink-3); }
+.search::-webkit-search-cancel-button { display: none; }
+.clear-q { position: absolute; right: 7px; top: 50%; transform: translateY(-50%); width: 36px; height: 36px; border-radius: 50%; border: 0; background: rgba(29, 35, 64, .08); display: flex; align-items: center; justify-content: center; padding: 0; color: var(--ink-2); }
+.clear-q svg { width: 12px; height: 12px; }
+
 /* Groupes par date */
 .group { margin-top: 22px; }
 .group h2 { display: flex; align-items: baseline; gap: 8px; margin: 0 0 8px; font: 800 20px/1.2 var(--display); letter-spacing: -.01em; }
@@ -139,6 +148,9 @@ svg { flex: 0 0 auto; }
 .rendu h4 small { font: 600 14px var(--font); color: var(--ink-2); }
 .rendu .files { margin: 6px 0 12px; }
 .rendu .files:empty { display: none; }
+.rpill { display: flex; align-items: center; gap: 8px; margin-top: 7px; max-width: 100%; background: color-mix(in srgb, var(--ok) 8%, #fff); border: 1.5px solid color-mix(in srgb, var(--ok) 30%, transparent); border-radius: 10px; padding: 5px 9px 5px 5px; font-size: 14px; font-weight: 700; color: var(--ink); }
+.rpill b { flex: 0 0 auto; font: 800 11px/1 var(--font); color: var(--fc); background: color-mix(in srgb, var(--fc) 14%, #fff); border-radius: 6px; padding: 5px 6px; }
+.rpill span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .hw-meta .rendu-tag { display: inline-flex; align-items: center; gap: 3px; font-weight: 800; color: var(--ok); }
 .hw-meta .rendu-tag svg { width: 14px; height: 14px; stroke: var(--ok); }
 .hw-meta .grade { font-weight: 800; color: var(--ink); background: var(--mark); padding: 0 7px; border-radius: 6px; }
@@ -189,14 +201,19 @@ textarea.field { min-height: 90px; resize: vertical; font-size: 17px; }
 .color[aria-pressed="true"] { box-shadow: 0 0 0 3px var(--paper), 0 0 0 5px var(--ink); }
 
 /* Pièces jointes */
-.files { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 10px; margin-top: 10px; }
-.file { position: relative; aspect-ratio: 1; border-radius: 14px; overflow: hidden; background: var(--card); border: 1.5px solid var(--line); }
-.file > button.open { width: 100%; height: 100%; border: 0; padding: 0; background: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; }
-.file img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.file .doc { font-size: 12px; font-weight: 700; color: var(--ink-2); padding: 0 8px; text-align: center; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
-.file .doc-ico { width: 34px; height: 34px; color: var(--accent); }
-.file .rm { position: absolute; top: 6px; right: 6px; width: 30px; height: 30px; border-radius: 50%; border: 0; background: rgba(29, 35, 64, .7); color: #fff; display: flex; align-items: center; justify-content: center; padding: 0; }
-.file .rm svg { width: 12px; height: 12px; }
+.files { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.files:empty { display: none; }
+.frow { display: flex; align-items: center; gap: 6px; background: var(--card); border: 1.5px solid var(--line); border-radius: 14px; padding: 6px; }
+.fopen { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; border: 0; background: none; padding: 0; text-align: left; }
+.fthumb { width: 56px; height: 56px; flex: 0 0 auto; border-radius: 10px; overflow: hidden; display: flex; align-items: center; justify-content: center; background: color-mix(in srgb, var(--fc) 13%, #fff); border: 1.5px solid color-mix(in srgb, var(--fc) 35%, transparent); }
+.fthumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.fthumb b { font: 800 13px/1 var(--font); letter-spacing: .02em; color: var(--fc); }
+.finfo { flex: 1; min-width: 0; }
+.finfo b { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; font-size: 16px; font-weight: 700; overflow: hidden; overflow-wrap: anywhere; line-height: 1.25; }
+.finfo small { display: block; margin-top: 2px; font-size: 13px; color: var(--ink-2); }
+.fgo { flex: 0 0 auto; font-weight: 700; font-size: 14px; color: var(--accent); padding: 0 6px; }
+.frow .rm { width: 36px; height: 36px; flex: 0 0 auto; border-radius: 50%; border: 0; background: rgba(29, 35, 64, .08); display: flex; align-items: center; justify-content: center; padding: 0; color: var(--ink-2); }
+.frow .rm svg { width: 12px; height: 12px; }
 .add-files { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .pick { position: relative; overflow: hidden; }
 .pick input { position: absolute; inset: 0; opacity: 0; font-size: 0; cursor: pointer; }
@@ -350,6 +367,7 @@ const mark = (s, size = 20) => (ANIMALS_ON && s ? animalSvg(animalOf(s), s.color
 const subjStyle = (s) => (s ? `--c:${s.color};--c2:${inkOf(s.color)}` : '--c:#C9CCD8;--c2:var(--ink-2)');
 
 const icons = {
+  search: '<svg class="s-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>',
   plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>',
   check: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
   close: '<svg viewBox="0 0 22 22" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M4 4l14 14M18 4L4 18"/></svg>',
@@ -362,7 +380,7 @@ const icons = {
 
 // ---------- Écrans ----------
 
-let ui = { tab: 'todo', filter: 'all' };
+let ui = { tab: 'todo', filter: 'all', q: '' };
 const app = document.getElementById('app');
 
 function render() {
@@ -377,7 +395,8 @@ function render() {
       <button data-tab="subjects" aria-pressed="${ui.tab === 'subjects'}">Matières</button>
       <button data-tab="done" aria-pressed="${ui.tab === 'done'}">Faits<small>${done.length || ''}</small></button>
     </div>`;
-  html += ui.tab === 'subjects' ? subjectsHtml() : ui.tab === 'done' ? doneHtml(done) : todoHtml(todo);
+  html += `<div class="search-wrap" role="search">${icons.search}<input id="q" class="search" type="search" value="${esc(ui.q)}" placeholder="Rechercher un travail (titre, matière, fichier…)" autocomplete="off" enterkeyhint="search" aria-label="Rechercher dans tous les travaux">${ui.q ? `<button class="clear-q" data-clear-q aria-label="Effacer la recherche">${icons.close}</button>` : ''}</div>`;
+  html += `<div id="content">${contentHtml(todo, done)}</div>`;
   app.innerHTML = html;
   let f = document.querySelector('.footer');
   if (!f) {
@@ -388,6 +407,22 @@ function render() {
   f.innerHTML = ui.tab === 'subjects' ? `<button class="btn" data-action="new-subject">${icons.plus} Nouvelle matière</button>` : `<button class="btn" data-action="new">${icons.plus} Nouveau devoir</button>`;
 }
 
+const tabHtml = (todo, done) => (ui.tab === 'subjects' ? subjectsHtml() : ui.tab === 'done' ? doneHtml(done) : todoHtml(todo));
+const contentHtml = (todo, done) => (ui.q.trim() ? searchHtml() : tabHtml(todo, done));
+
+// Recherche dans tous les travaux (à faire et faits) : titre, matière, note, étapes, noms des fichiers, note obtenue.
+const snorm = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+function searchHtml() {
+  const words = snorm(ui.q).split(/\s+/).filter(Boolean);
+  const hay = (h) => snorm([h.title, subject(h.subject)?.name, h.note, h.grade, ...(h.steps || []).map((x) => x.text), ...(h.files || []).map((x) => x.name), ...(h.result || []).map((x) => x.name), h.due ? fmt(h.due, { day: 'numeric', month: 'long' }) : ''].join(' '));
+  const hits = db.hw.filter((h) => words.every((w) => hay(h).includes(w)));
+  if (!hits.length) return `<div class="empty"><b>Aucun travail trouvé</b>Rien ne correspond à « ${esc(ui.q.trim())} ».</div>`;
+  const todo = hits.filter((h) => !h.done).sort(byDue);
+  const done = hits.filter((h) => h.done).sort((a, b) => (b.doneAt || 0) - (a.doneAt || 0));
+  return `${todo.length ? `<section class="group"><h2>À faire <small>${todo.length}</small></h2><div class="list">${todo.map(hwHtml).join('')}</div></section>` : ''}
+    ${done.length ? `<section class="group"><h2>Faits <small>${done.length}</small></h2><div class="list">${done.map(hwHtml).join('')}</div></section>` : ''}`;
+}
+
 function hwHtml(h) {
   const s = subject(h.subject);
   const n = (h.files || []).length;
@@ -396,7 +431,7 @@ function hwHtml(h) {
   return `<div class="hw${h.done ? ' done' : ''}" style="${subjStyle(s)}">
     <button class="check" data-done="${h.id}" aria-label="${h.done ? 'Remettre à faire' : 'C’est fait'} : ${esc(h.title)}" aria-pressed="${!!h.done}">${icons.check}</button>
     <button class="hw-body" data-open="${h.id}"><span class="hw-title">${esc(h.title)}</span>
-      <span class="hw-meta">${s ? `<span class="subj">${ANIMALS_ON ? mark(s, 20) : ''}${esc(s.name)}</span>` : ''}${st.length ? `<span class="steps-count">${stDone}/${st.length} étapes</span>` : ''}${n ? `<span class="clip">${icons.clip}${n}</span>` : ''}${h.note ? '<span>note</span>' : ''}${(h.result || []).length ? `<span class="rendu-tag">${icons.check}Rendu</span>` : ''}${h.grade ? `<span class="grade">${esc(h.grade)}</span>` : ''}</span>${st.length ? `<span class="bar"><i style="width:${Math.round((100 * stDone) / st.length)}%"></i></span>` : ''}</button>
+      <span class="hw-meta">${s ? `<span class="subj">${ANIMALS_ON ? mark(s, 20) : ''}${esc(s.name)}</span>` : ''}${st.length ? `<span class="steps-count">${stDone}/${st.length} étapes</span>` : ''}${n ? `<span class="clip">${icons.clip}${n}</span>` : ''}${h.note ? '<span>note</span>' : ''}${h.grade ? `<span class="grade">${esc(h.grade)}</span>` : ''}</span>${(h.result || []).length ? `<span class="rpill"><b style="--fc:${fileKind(h.result[0]).c}">${esc(fileKind(h.result[0]).short)}</b><span>Rendu : ${esc(h.result[0].name)}${h.result.length > 1 ? ` +${h.result.length - 1}` : ''}</span></span>` : ''}${st.length ? `<span class="bar"><i style="width:${Math.round((100 * stDone) / st.length)}%"></i></span>` : ''}</button>
     <span class="due ${dueClass(h.due, h.done)}">${esc(h.done ? 'Fait' : dueText(h.due))}</span>
   </div>`;
 }
@@ -459,8 +494,25 @@ function subjectsHtml() {
 
 // ---------- Actions ----------
 
+document.addEventListener('input', (e) => {
+  if (e.target.id !== 'q') return;
+  ui.q = e.target.value;
+  const todo = db.hw.filter((h) => !h.done);
+  const done = db.hw.filter((h) => h.done);
+  document.getElementById('content').innerHTML = contentHtml(todo, done);
+  const wrap = e.target.parentNode;
+  const has = wrap.querySelector('[data-clear-q]');
+  if (ui.q && !has) wrap.insertAdjacentHTML('beforeend', `<button class="clear-q" data-clear-q aria-label="Effacer la recherche">${icons.close}</button>`);
+  if (!ui.q && has) has.remove();
+});
+
 document.addEventListener('click', (e) => {
   if (e.target.closest('.sheet-back, .viewer')) return;
+  if (e.target.closest('[data-clear-q]')) {
+    ui.q = '';
+    render();
+    return document.getElementById('q')?.focus();
+  }
   const tab = e.target.closest('[data-tab]');
   if (tab) {
     ui.tab = tab.dataset.tab;
@@ -580,12 +632,34 @@ async function shrinkImage(file) {
   }
 }
 
+// Le type d'un fichier : son extension en grand, dans une couleur reconnaissable.
+function fileKind(f) {
+  const ext = ((f.name || '').match(/\.([a-z0-9]{1,5})$/i)?.[1] || '').toLowerCase();
+  if (/^image\//.test(f.type) || /^(jpe?g|png|heic|gif|webp)$/.test(ext)) return { label: 'Photo', short: 'IMG', c: '#2E7D4F' };
+  if (ext === 'pdf' || /pdf/.test(f.type)) return { label: 'PDF', short: 'PDF', c: '#C5221F' };
+  if (/^(docx?|odt|pages|rtf|txt)$/.test(ext)) return { label: 'Document', short: ext.toUpperCase().slice(0, 4), c: '#1A5FB4' };
+  if (/^(xlsx?|ods|csv|numbers)$/.test(ext)) return { label: 'Tableur', short: ext.toUpperCase().slice(0, 4), c: '#1E7B45' };
+  if (/^(pptx?|odp|key)$/.test(ext)) return { label: 'Présentation', short: ext.toUpperCase().slice(0, 4), c: '#C2570C' };
+  if (/^(dwg|dxf|skp|3dm|rvt|ifc|obj|blend|max|c4d)$/.test(ext)) return { label: 'Plan / 3D', short: ext.toUpperCase().slice(0, 4), c: '#7E3FBF' };
+  if (/^(zip|rar|7z)$/.test(ext)) return { label: 'Archive', short: ext.toUpperCase(), c: '#4D5466' };
+  if (/^(mp4|mov|m4v)$/.test(ext) || /^video\//.test(f.type)) return { label: 'Vidéo', short: ext.toUpperCase() || 'VID', c: '#B3261E' };
+  return { label: 'Fichier', short: (ext || 'FIC').toUpperCase().slice(0, 4), c: '#4D5466' };
+}
+const sizeText = (n) => (!n ? '' : n < 1024 * 1024 ? `${Math.max(1, Math.round(n / 1024))} Ko` : `${(n / 1024 / 1024).toFixed(1).replace('.', ',')} Mo`);
+
 async function filesGridHtml(files, removable) {
   const parts = [];
   for (const f of files) {
     const blob = await getFile(f.id).catch(() => null);
-    const img = blob && /^image\//.test(f.type);
-    parts.push(`<div class="file"><button class="open" data-file="${f.id}" aria-label="Ouvrir ${esc(f.name)}">${img ? `<img src="${blobUrl(blob)}" alt="">` : `<span class="doc-ico">${icons.doc}</span><span class="doc">${esc(blob ? f.name : 'Fichier introuvable')}</span>`}</button>${removable ? `<button class="rm" data-rm="${f.id}" aria-label="Enlever ${esc(f.name)}">${icons.close}</button>` : ''}</div>`);
+    const k = fileKind(f);
+    const img = blob && k.short === 'IMG';
+    parts.push(`<div class="frow">
+      <button class="fopen" data-file="${f.id}" aria-label="Ouvrir ${esc(f.name)}">
+        <span class="fthumb" style="--fc:${k.c}">${img ? `<img src="${blobUrl(blob)}" alt="">` : `<b>${esc(k.short)}</b>`}</span>
+        <span class="finfo"><b>${esc(blob ? f.name : 'Fichier introuvable')}</b><small>${esc([k.label, sizeText(f.size || blob?.size)].filter(Boolean).join(' · '))}</small></span>
+        <span class="fgo">Ouvrir</span>
+      </button>${removable ? `<button class="rm" data-rm="${f.id}" aria-label="Enlever ${esc(f.name)}">${icons.close}</button>` : ''}
+    </div>`);
   }
   return parts.join('');
 }
@@ -797,7 +871,8 @@ async function openDetail(id) {
     <p class="meta-line">${s ? `<span class="badge" style="${subjStyle(s)}">${mark(s, 22)}${esc(s.name)}</span>` : ''}<span>${h.due ? `À rendre ${esc(fmt(h.due, { weekday: 'long', day: 'numeric', month: 'long' }))}` : 'Sans date'}</span>${h.done ? '<span style="color:var(--ok);font-weight:700">· Fait</span>' : h.due && daysLeft(h.due) < 0 ? '<span style="color:var(--late);font-weight:700">· En retard</span>' : ''}</p>
     ${h.note ? `<div class="note-box">${esc(h.note)}</div>` : ''}
     ${(h.steps || []).length ? `<span class="label">Étapes <small id="steps-sum"></small></span><div class="list" id="steps-list"></div>` : ''}
-    ${(h.files || []).length ? `<span class="label">Photos et fichiers</span><div class="files" id="files"></div>` : ''}
+    ${h.done ? '<div id="rendu-slot"></div>' : ''}
+    ${(h.files || []).length ? `<span class="label">Photos et fichiers de l’énoncé</span><div class="files" id="files"></div>` : ''}
     <section class="rendu${h.done ? ' on' : ''}">
       <h4>Mon rendu <small>${h.done ? 'le résultat de ton travail' : 'quand c’est fait'}</small></h4>
       <div class="files" id="result"></div>
@@ -824,6 +899,8 @@ async function openDetail(id) {
   };
   drawChecks();
   if ((h.files || []).length) back.querySelector('#files').innerHTML = await filesGridHtml(h.files, false);
+  const slot = back.querySelector('#rendu-slot');
+  if (slot) slot.replaceWith(back.querySelector('.rendu'));
   const drawResult = async () => {
     back.querySelector('#result').innerHTML = await filesGridHtml(h.result || [], true);
   };
