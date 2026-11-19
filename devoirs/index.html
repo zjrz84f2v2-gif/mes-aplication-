@@ -133,6 +133,16 @@ svg { flex: 0 0 auto; }
 [data-theme="ddt"] .switch { background: rgba(200, 54, 111, .09); }
 [data-theme="ddt"] .hw-meta .subj::before { display: none; }
 
+.rendu { margin-top: 20px; background: var(--card); border: 1.5px dashed var(--line); border-radius: var(--radius); padding: 14px; }
+.rendu.on { border-style: solid; border-color: color-mix(in srgb, var(--ok) 45%, transparent); background: color-mix(in srgb, var(--ok) 5%, var(--card)); }
+.rendu h4 { margin: 0 0 4px; font: 800 20px/1.2 var(--display); display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.rendu h4 small { font: 600 14px var(--font); color: var(--ink-2); }
+.rendu .files { margin: 6px 0 12px; }
+.rendu .files:empty { display: none; }
+.hw-meta .rendu-tag { display: inline-flex; align-items: center; gap: 3px; font-weight: 800; color: var(--ok); }
+.hw-meta .rendu-tag svg { width: 14px; height: 14px; stroke: var(--ok); }
+.hw-meta .grade { font-weight: 800; color: var(--ink); background: var(--mark); padding: 0 7px; border-radius: 6px; }
+
 /* Matières */
 .subj-row { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-top: 1px solid var(--line); }
 .subj-row:first-child { border-top: 0; }
@@ -386,7 +396,7 @@ function hwHtml(h) {
   return `<div class="hw${h.done ? ' done' : ''}" style="${subjStyle(s)}">
     <button class="check" data-done="${h.id}" aria-label="${h.done ? 'Remettre à faire' : 'C’est fait'} : ${esc(h.title)}" aria-pressed="${!!h.done}">${icons.check}</button>
     <button class="hw-body" data-open="${h.id}"><span class="hw-title">${esc(h.title)}</span>
-      <span class="hw-meta">${s ? `<span class="subj">${ANIMALS_ON ? mark(s, 20) : ''}${esc(s.name)}</span>` : ''}${st.length ? `<span class="steps-count">${stDone}/${st.length} étapes</span>` : ''}${n ? `<span class="clip">${icons.clip}${n}</span>` : ''}${h.note ? '<span>note</span>' : ''}</span>${st.length ? `<span class="bar"><i style="width:${Math.round((100 * stDone) / st.length)}%"></i></span>` : ''}</button>
+      <span class="hw-meta">${s ? `<span class="subj">${ANIMALS_ON ? mark(s, 20) : ''}${esc(s.name)}</span>` : ''}${st.length ? `<span class="steps-count">${stDone}/${st.length} étapes</span>` : ''}${n ? `<span class="clip">${icons.clip}${n}</span>` : ''}${h.note ? '<span>note</span>' : ''}${(h.result || []).length ? `<span class="rendu-tag">${icons.check}Rendu</span>` : ''}${h.grade ? `<span class="grade">${esc(h.grade)}</span>` : ''}</span>${st.length ? `<span class="bar"><i style="width:${Math.round((100 * stDone) / st.length)}%"></i></span>` : ''}</button>
     <span class="due ${dueClass(h.due, h.done)}">${esc(h.done ? 'Fait' : dueText(h.due))}</span>
   </div>`;
 }
@@ -491,7 +501,7 @@ document.addEventListener('click', (e) => {
   else if (a === 'new-subject') openSubject(null);
   else if (a === 'clear-done') {
     if (!confirm('Effacer tous les devoirs faits (et leurs photos) ?')) return;
-    db.hw.filter((h) => h.done).forEach((h) => (h.files || []).forEach((x) => delFile(x.id)));
+    db.hw.filter((h) => h.done).forEach((h) => [...(h.files || []), ...(h.result || [])].forEach((x) => delFile(x.id)));
     db.hw = db.hw.filter((h) => !h.done);
     save();
     render();
@@ -506,7 +516,7 @@ function toggleDone(id) {
   h.doneAt = h.done ? Date.now() : null;
   save();
   render();
-  toast(h.done ? 'Bien joué !' : 'Remis à faire.');
+  if (!document.querySelector('.sheet-back')) toast(h.done ? 'Bien joué ! Touche le devoir pour ajouter ton rendu.' : 'Remis à faire.');
 }
 
 let toastTimer;
@@ -788,6 +798,16 @@ async function openDetail(id) {
     ${h.note ? `<div class="note-box">${esc(h.note)}</div>` : ''}
     ${(h.steps || []).length ? `<span class="label">Étapes <small id="steps-sum"></small></span><div class="list" id="steps-list"></div>` : ''}
     ${(h.files || []).length ? `<span class="label">Photos et fichiers</span><div class="files" id="files"></div>` : ''}
+    <section class="rendu${h.done ? ' on' : ''}">
+      <h4>Mon rendu <small>${h.done ? 'le résultat de ton travail' : 'quand c’est fait'}</small></h4>
+      <div class="files" id="result"></div>
+      <div class="add-files">
+        <label class="btn ghost pick">${icons.camera} Photo<input type="file" accept="image/*" capture="environment" id="res-photo"></label>
+        <label class="btn ghost pick">${icons.clip} Fichier<input type="file" multiple id="res-file"></label>
+      </div>
+      <label class="label" for="res-grade" style="margin-top:14px">Note obtenue <small>(facultatif)</small></label>
+      <input id="res-grade" class="field" value="${esc(h.grade || '')}" placeholder="ex. 15/20, A, très bien…" maxlength="40" autocomplete="off" style="max-width:240px">
+    </section>
     <div class="actions">
       <button class="btn ${h.done ? 'ghost' : 'ok'}" data-toggle>${h.done ? 'Remettre à faire' : `${icons.check} C’est fait !`}</button>
       ${!h.done && h.due && daysLeft(h.due) >= 1 ? `<button class="btn ghost" data-remind>${icons.cal} Rappel dans mon agenda</button>` : ''}
@@ -804,7 +824,49 @@ async function openDetail(id) {
   };
   drawChecks();
   if ((h.files || []).length) back.querySelector('#files').innerHTML = await filesGridHtml(h.files, false);
+  const drawResult = async () => {
+    back.querySelector('#result').innerHTML = await filesGridHtml(h.result || [], true);
+  };
+  drawResult();
+  const addResult = async (list) => {
+    h.result = h.result || [];
+    for (const raw of list) {
+      const file = await shrinkImage(raw);
+      const f = { id: uid(), name: file.name || 'rendu', type: file.type || '', size: file.size };
+      try {
+        await putFile(f.id, file);
+      } catch (e) {
+        toast('Impossible d’enregistrer ce fichier (trop gros ?).');
+        continue;
+      }
+      h.result.push(f);
+    }
+    save();
+    drawResult();
+    render();
+    toast('Rendu ajouté !');
+  };
+  for (const sel of ['#res-photo', '#res-file'])
+    back.querySelector(sel).addEventListener('change', (e) => {
+      addResult([...e.target.files]);
+      e.target.value = '';
+    });
+  back.querySelector('#res-grade').addEventListener('change', (e) => {
+    h.grade = e.target.value.trim();
+    save();
+    render();
+  });
   back.addEventListener('click', (e) => {
+    const rr = e.target.closest('#result [data-rm]');
+    if (rr) {
+      delFile(rr.dataset.rm);
+      h.result = (h.result || []).filter((x) => x.id !== rr.dataset.rm);
+      save();
+      drawResult();
+      return render();
+    }
+    const rf = e.target.closest('#result [data-file]');
+    if (rf) return openFile(h.result.find((x) => x.id === rf.dataset.file));
     const sc = e.target.closest('[data-step]');
     if (sc) {
       const x = h.steps.find((y) => y.id === sc.dataset.step);
@@ -818,8 +880,14 @@ async function openDetail(id) {
     const of = e.target.closest('[data-file]');
     if (of) return openFile(h.files.find((x) => x.id === of.dataset.file));
     if (e.target.closest('[data-toggle]')) {
+      const wasDone = h.done;
       closeSheet();
-      return toggleDone(id);
+      toggleDone(id);
+      if (!wasDone) {
+        openDetail(id).then(() => document.querySelector('.rendu')?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
+        toast('Bien joué ! Ajoute ton rendu si tu veux.');
+      }
+      return;
     }
     if (e.target.closest('[data-edit]')) return openEditor(id);
     if (e.target.closest('[data-remind]')) return shareFile(new File([icsOf(h)], 'rappel-devoir.ics', { type: 'text/calendar' }));
@@ -830,7 +898,7 @@ async function openDetail(id) {
         del.textContent = 'Appuie encore pour supprimer';
         return;
       }
-      (h.files || []).forEach((x) => delFile(x.id));
+      [...(h.files || []), ...(h.result || [])].forEach((x) => delFile(x.id));
       db.hw = db.hw.filter((x) => x.id !== id);
       save();
       closeSheet();
