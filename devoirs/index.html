@@ -372,6 +372,7 @@ const mark = (s, size = 20) => (ANIMALS_ON && s ? animalSvg(animalOf(s), s.color
 const subjStyle = (s) => (s ? `--c:${s.color};--c2:${inkOf(s.color)}` : '--c:#C9CCD8;--c2:var(--ink-2)');
 
 const icons = {
+  reload: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>',
   user: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="3.6"/><path d="M5 20a7 7 0 0 1 14 0"/></svg>',
   search: '<svg class="s-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>',
   plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>',
@@ -395,7 +396,7 @@ function render() {
   const late = todo.filter((h) => h.due && daysLeft(h.due) < 0).length;
   const today = todo.filter((h) => h.due && daysLeft(h.due) === 0).length;
   const sub = todo.length ? [late ? `${late} en retard` : '', today ? `${today} pour aujourd’hui` : '', `${todo.length} à faire`].filter(Boolean).join(' · ') : 'Rien à faire pour l’instant.';
-  let html = `<header class="top"><div style="flex:1;min-width:0"><h1>Mes <mark>devoirs</mark></h1><p>${esc(sub)}</p></div></header>
+  let html = `<header class="top"><div style="flex:1;min-width:0"><h1>Mes <mark>devoirs</mark></h1><p>${esc(sub)}</p></div><button class="icon-btn" data-action="reload" aria-label="Recharger la page" title="Recharger">${icons.reload}</button></header>
     <div class="switch" role="group" aria-label="Affichage">
       <button data-tab="todo" aria-pressed="${ui.tab === 'todo'}">À faire<small>${todo.length || ''}</small></button>
       <button data-tab="subjects" aria-pressed="${ui.tab === 'subjects'}">Matières</button>
@@ -556,6 +557,13 @@ document.addEventListener('click', (e) => {
     save();
     render();
     return toast(n ? `${n} matières ajoutées.` : 'Elles sont déjà là.');
+  }
+  if (a === 'reload') {
+    // Recharge la dernière version de l'appli (les devoirs restent dans le téléphone).
+    toast('Je recharge…');
+    const u = new URL(location.href);
+    u.searchParams.set('r', Date.now());
+    return location.replace(u.toString());
   }
   if (a === 'new') openEditor(null);
   else if (a === 'new-subject') openSubject(null);
